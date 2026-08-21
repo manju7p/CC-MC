@@ -1,0 +1,16 @@
+{
+  "name": "cc-mc",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Chilling Centre Milk Collection & Device Integration System - monorepo root",
+  "scripts": {
+    "dev:api": "pnpm --filter @cc-mc/api start:dev",
+    "dev:web": "pnpm --filter @cc-mc/web dev",
+    "build": "pnpm --filter @cc-mc/shared-types build && pnpm --filter @cc-mc/api build && pnpm --filter @cc-mc/web build",
+    "test:api": "pnpm --filter @cc-mc/api test",
+    "test:api:e2e": "pnpm --filter @cc-mc/api test:e2e"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
