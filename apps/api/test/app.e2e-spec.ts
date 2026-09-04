@@ -19,6 +19,8 @@ import { AppModule } from "../src/app.module";
  *             manager1@ccmc.local (Manager, centre 1)
  *             operator1@ccmc.local (Operator, centre 1)
  *             operator2@ccmc.local (Operator, centre 2)
+ *             gateway-blr-cc-01@ccmc.local (GatewayService, centre 1 only - Checkpoint 5)
+ *             gateway-mys-cc-01@ccmc.local (GatewayService, centre 2 only - Checkpoint 5)
  *   Sources:  1 = SRC-BLR-001 (centre 1), 2 = SRC-MYS-001 (centre 2)
  *   Vehicles: 1 = KA01AB1234 (centre 1), 2 = KA09CD5678 (centre 2)
  *   Quality rules (global): FAT 3.0-6.0, SNF 8.0-10.0, TEMPERATURE 0-10

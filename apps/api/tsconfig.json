@@ -4,8 +4,22 @@
     "declaration": false,
     "target": "ES2021",
     "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": "./",
     "incremental": true,
+    /* Deliberately placed INSIDE outDir. nest-cli.json sets
+     * "deleteOutDir": true, which wipes ./dist before every build/watch
+     * recompile. TypeScript's default tsbuildinfo location is next to
+     * this config file (i.e. OUTSIDE dist), so without this override the
+     * cache survives that wipe: on the 2nd+ build, tsc sees no source
+     * changes, trusts the stale cache, and silently skips re-emitting
+     * files that deleteOutDir just deleted - "Found 0 errors" is printed,
+     * but dist/main.js (and everything else) is simply gone, and
+     * `nest start`/`node dist/main` then crashes with MODULE_NOT_FOUND.
+     * Keeping the cache inside dist means deleteOutDir clears both
+     * together, so every build is either a correct fresh compile or a
+     * correct incremental one - never a mismatch between the two. */
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,
@@ -15,5 +29,7 @@
     "emitDecoratorMetadata": true,
     "sourceMap": true,
     "resolveJsonModule": true
-  }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test"]
 }

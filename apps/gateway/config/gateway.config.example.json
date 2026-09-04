@@ -1,0 +1,21 @@
+{
+  "gatewayId": "gw-example-001",
+  "centreId": 1,
+  "cloudApiBaseUrl": "https://ccmc-api.example.org",
+  "logDirectory": "./logs",
+  "dataDirectory": "./data",
+  "cloudAuthEmail": "gateway-blr-cc-01@ccmc.local",
+  "cloudAuthPassword": "REPLACE-WITH-THIS-GATEWAY-SERVICE-ACCOUNT-PASSWORD",
+  "serial": {
+    "_comment": "OPTIONAL block - omit entirely if this gateway has no real serial hardware wired up yet (simulator-only). When present, both portPath and baudRate are required. portPath is the OS-specific serial port (e.g. COM3 on Windows, /dev/ttyUSB0 on Linux) - REPLACE with the real port for this install. baudRate is the one CEO-confirmed-configurable RS232 parameter for the current ESSAE equipment (9600) - the other RS232 parameters (8 data bits, no parity, 1 stop bit, no flow control) are FIXED constants, not configured here - see src/transport/serial-transport.types.ts.",
+    "portPath": "COM3",
+    "baudRate": 9600
+  },
+  "localApi": {
+    "_comment": "OPTIONAL block - omit entirely if this gateway should not expose a local operator dashboard API at all (no port opened). When present, enabled/port/accessToken are all required (bindAddress is the one genuinely optional field, defaulting to 127.0.0.1/localhost-only). This is a READ-ONLY HTTP surface serving only data already durable in gateway.sqlite (today's local transactions, outbox/sync status, gateway health) to the local React dashboard - never SQLite access itself, never cloud credentials, never write endpoints. accessToken is a SEPARATE shared secret from cloudAuthPassword/the cloud's JWT - generate your own random value per install (e.g. `node -e \"console.log(require('crypto').randomBytes(24).toString('hex'))\"`), never reuse the cloud password here. See src/local-api/local-api-server.ts and docs/gateway-architecture.md's 'Local vs. cloud responsibility' section.",
+    "enabled": true,
+    "port": 4100,
+    "bindAddress": "127.0.0.1",
+    "accessToken": "REPLACE-WITH-A-RANDOM-LOCAL-API-TOKEN"
+  }
+}

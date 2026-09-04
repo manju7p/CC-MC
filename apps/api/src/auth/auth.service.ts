@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
-import { RecordStatus, type LoginResponse } from "@cc-mc/shared-types";
+import { RecordStatus, type AuthenticatedUser, type LoginResponse } from "@cc-mc/shared-types";
 import { User } from "./entities/user.entity";
 import { UserRole } from "../rbac/entities/user-role.entity";
 import { UserCentreAssignment } from "../rbac/entities/user-centre-assignment.entity";
@@ -62,6 +62,28 @@ export class AuthService {
     };
   }
 
+  /**
+   * Maps the internal RequestUser shape (roleNames/permissionCodes - see
+   * rbac.types.ts) to the AuthenticatedUser shape the frontend/shared-types
+   * contract actually declares (roles/permissions). login() already built
+   * this mapping inline; GET /auth/me (used by the frontend to restore a
+   * session on page load - see AuthContext.tsx) previously returned the raw
+   * RequestUser instead, so a restored session's user.permissions was
+   * undefined and hasPermission() would throw the first time anything
+   * called it. Extracted here so both call sites share one mapping instead
+   * of the controller re-implementing it and risking the same drift again.
+   */
+  toAuthenticatedUser(context: RequestUser): AuthenticatedUser {
+    return {
+      id: context.id,
+      email: context.email,
+      fullName: context.fullName,
+      roles: context.roleNames,
+      permissions: context.permissionCodes as AuthenticatedUser["permissions"],
+      centreAccess: context.centreAccess,
+    };
+  }
+
   async login(email: string, password: string): Promise<LoginResponse> {
     const user = await this.userRepo.findOneBy({ email });
 
@@ -93,14 +115,7 @@ export class AuthService {
 
     return {
       accessToken,
-      user: {
-        id: context.id,
-        email: context.email,
-        fullName: context.fullName,
-        roles: context.roleNames,
-        permissions: context.permissionCodes as LoginResponse["user"]["permissions"],
-        centreAccess: context.centreAccess,
-      },
+      user: this.toAuthenticatedUser(context),
     };
   }
 }

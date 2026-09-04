@@ -42,6 +42,33 @@ scheme. This intentionally sidesteps the harder offline-numbering problem
 exist yet in this slice. Revisit when the Local Device Gateway and its sync
 design are actually built (see the implementation proposal, Section 8).
 
+**Update (Checkpoint 5, gateway cloud sync):** confirmed as-is. The
+gateway is NOT a second numbering authority - it never generates or
+assumes a `transactionNumber`. It only generates and tracks its own
+`localIdempotencyKey` (a UUID, `src/storage/idempotency.ts`) for sync
+identity; the cloud remains the sole source of `transactionNumber`,
+assigned exactly the same way for a gateway-submitted reception as for a
+web-submitted one. See `docs/gateway-architecture.md` §13b.
+
+### #gateway-credential-storage - Where do the gateway's cloud login credentials live?
+
+Not specified by any BRD section (the gateway itself is not a BRD
+concept - it exists to satisfy the separate Local Device Gateway
+requirement). **Assumption (Checkpoint 5):** the gateway authenticates as
+an ordinary seeded `User` (a new least-privilege `GatewayService` role,
+`RECEPTION_CREATE` only) through the existing `/auth/login` flow - no
+parallel auth mechanism. Its email/password live in
+`apps/gateway/config/gateway.config.json`, a local, gitignored, plaintext
+file - the same trust model `apps/api/.env` already uses for the cloud's
+own secrets (JWT signing secret, DB credentials), protected by OS file
+permissions on the deployment machine rather than an
+application-level secret store. This was flagged as a real security
+consideration back in `docs/gateway-decision.md` §9 ("addressed fully in
+Phase 12"); Checkpoint 5 makes the interim choice concrete rather than
+leaving it unimplemented. Revisit before a production rollout if the
+target Windows deployment should instead use DPAPI, Windows Credential
+Manager, or a similar OS-native secret store.
+
 ### #dashboard-day-boundary - What does "today" mean for the dashboard?
 
 Not specified in the BRD; the deployment context is Indian dairy chilling

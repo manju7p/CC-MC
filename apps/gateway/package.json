@@ -1,0 +1,29 @@
+{
+  "name": "@cc-mc/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CC-MC Local Device Gateway - runs at each chilling centre, bridges local devices (weighing scale, milk analyser) to the cloud API. See docs/gateway-decision.md and docs/gateway-architecture.md.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "start:dev": "ts-node src/main.ts",
+    "status": "node dist/main.js --status",
+    "simulate": "ts-node scripts/simulate-capture-cli.ts",
+    "test": "jest --config jest.config.js",
+    "test:cloud": "jest --config test/cloud-integration/jest-cloud.config.js --runInBand",
+    "package:deployment": "node packaging/build-deployment.mjs"
+  },
+  "dependencies": {
+    "@cc-mc/shared-types": "workspace:*",
+    "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "@serialport/binding-mock": "^10.2.2",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.10.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

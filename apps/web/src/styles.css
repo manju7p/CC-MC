@@ -31,6 +31,17 @@ body {
   font-size: 0.9rem;
 }
 
+.centre-context {
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  border-right: 1px solid #4b5563;
+  padding-right: 1rem;
+}
+
+.centre-context.error {
+  color: #fca5a5;
+}
+
 .navbar-user button {
   background: #374151;
   color: white;
@@ -215,4 +226,119 @@ body {
   cursor: pointer;
   background: #2563eb;
   color: white;
+}
+
+.filter-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.filter-row label,
+.dashboard-centre-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.filter-row select,
+.dashboard-centre-filter select {
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.audit-detail {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+}
+
+.audit-detail pre {
+  max-width: 420px;
+  max-height: 240px;
+  overflow: auto;
+  background: #111827;
+  color: #e5e7eb;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.dashboard-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.empty-state {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: white;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  text-align: center;
+  color: #4b5563;
+}
+
+.callout {
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+}
+
+.callout-hold {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.connectivity-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.connectivity-online {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.connectivity-offline {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.local-settings-form {
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.local-settings-form input {
+  min-width: 260px;
+}
+
+.status-synced {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-pending {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-processing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-failed {
+  background: #fee2e2;
+  color: #991b1b;
 }

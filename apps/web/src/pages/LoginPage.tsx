@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -12,9 +12,17 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (user) {
-    navigate("/", { replace: true });
-  }
+  // Already-authenticated users (e.g. navigating back to /login directly)
+  // are bounced to the dashboard. This must run as an effect, not during
+  // render - calling navigate() while LoginPage itself is still rendering
+  // triggers a "cannot update a component while rendering a different
+  // component" React warning and risks skipping the redirect on some
+  // renders (a real, pre-existing bug fixed here, not a new feature).
+  useEffect(() => {
+    if (user) {
+      navigate("/", { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

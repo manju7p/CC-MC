@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
-import type { LoginResponse } from "@cc-mc/shared-types";
+import type { AuthenticatedUser, LoginResponse } from "@cc-mc/shared-types";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
@@ -16,13 +16,17 @@ export class AuthController {
   }
 
   /**
-   * Returns the current user's context (roles/permissions/centre access).
-   * Used by the frontend to know what to render - not itself a security
-   * control (see Rule 2: frontend checks are UX only).
+   * Returns the current user's context (roles/permissions/centre access), in
+   * the same AuthenticatedUser shape as POST /auth/login's `user` field - so
+   * the frontend can restore a session on page load (see AuthContext.tsx)
+   * using the exact same type it gets from login, instead of the internal
+   * RequestUser shape (roleNames/permissionCodes) this previously returned
+   * unmapped, which left a restored session's user.permissions undefined.
+   * Not itself a security control (see Rule 2: frontend checks are UX only).
    */
   @Get("me")
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: RequestUser): RequestUser {
-    return user;
+  me(@CurrentUser() user: RequestUser): AuthenticatedUser {
+    return this.authService.toAuthenticatedUser(user);
   }
 }

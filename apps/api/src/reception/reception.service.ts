@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityManager, Repository } from "typeorm";
 import { QualityParameter, ReadingSource, TransactionStatus } from "@cc-mc/shared-types";
 import { MilkReceptionTransaction } from "./entities/milk-reception-transaction.entity";
 import { TransactionOverride } from "./entities/transaction-override.entity";
@@ -16,6 +16,35 @@ import { CreateReceptionDto } from "./dto/create-reception.dto";
 import { OverrideReceptionDto } from "./dto/override-reception.dto";
 
 const REQUIRED_PARAMETERS = [QualityParameter.FAT, QualityParameter.SNF, QualityParameter.TEMPERATURE];
+
+/**
+ * The fields create() actually compares to decide "same logical payload"
+ * for an idempotent retry (Checkpoint 5). Deliberately every business
+ * field the caller controls - centreId/sourceId/vehicleId identify WHAT
+ * was received, quantityKg/fat/snf/temperature identify the reading
+ * itself. operatorUserId is NOT compared: two retries of the same
+ * physical capture, from the gateway's perspective, always carry the
+ * gateway's own service-account user id anyway (see the gateway
+ * cloud-auth design), so it adds no discriminating signal and comparing
+ * it would only risk a false conflict if that ever changed.
+ */
+type ReceptionPayloadFields = Pick<
+  CreateReceptionDto,
+  "centreId" | "sourceId" | "vehicleId" | "quantityKg" | "fat" | "snf" | "temperature"
+>;
+
+/**
+ * Additive response shape for POST /reception (Checkpoint 5): every
+ * existing field of MilkReceptionTransaction, unchanged, plus `outcome` -
+ * "created" for a genuinely new row, "duplicate" for an idempotent retry
+ * that returned an already-existing row. Both are HTTP 201 (Nest's POST
+ * default, unchanged) - `outcome` is how a caller that cares (the
+ * gateway's HttpCloudClient) tells them apart; the existing web UI simply
+ * never reads this field, exactly like it never reads any other field it
+ * doesn't use. A genuine payload conflict is NOT part of this type - see
+ * create()'s ConflictException path.
+ */
+export type ReceptionCreateResult = MilkReceptionTransaction & { outcome: "created" | "duplicate" };
 
 @Injectable()
 export class ReceptionService {
@@ -83,6 +112,16 @@ export class ReceptionService {
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(MilkReceptionTransaction);
 
+      // Checkpoint 5: a caller that supplied localIdempotencyKey (the
+      // Local Device Gateway, always; the web UI, never) gets the
+      // idempotent-retry-safe path. Every other field of this method is
+      // untouched from Checkpoint 2 - the two paths share the same
+      // validation, quality-rule resolution, and transaction-number
+      // assignment; they only differ in how the row gets inserted.
+      if (dto.localIdempotencyKey) {
+        return this.createIdempotent(manager, repo, user, dto, centre, validation);
+      }
+
       // Transaction number is assigned centrally, after the row has an id,
       // so two concurrent creations can never collide (see
       // docs/assumptions.md #transaction-numbering for why this differs
@@ -101,6 +140,7 @@ export class ReceptionService {
           readingSource: ReadingSource.MANUAL,
           reason: validation.reason,
           transactionNumber: `PENDING-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          localIdempotencyKey: null,
         }),
       );
 
@@ -121,8 +161,135 @@ export class ReceptionService {
         manager,
       );
 
-      return final;
+      return { ...final, outcome: "created" as const };
     });
+  }
+
+  /**
+   * The idempotent-retry-safe insert path (Checkpoint 5), used only when
+   * the caller supplied a localIdempotencyKey. Uses the ALREADY-EXISTING
+   * nullable-unique constraint on milk_reception_transactions.localIdempotencyKey
+   * (see the InitSchema migration - this checkpoint adds no schema change)
+   * as the actual correctness boundary, via `INSERT ... ON CONFLICT
+   * ("localIdempotencyKey") DO NOTHING` - not an application-level
+   * pre-check-then-insert, which would leave a race window between the
+   * check and the insert. Postgres itself resolves the race: if two
+   * transactions race to insert the same key, the SECOND one's INSERT
+   * statement blocks until the FIRST one commits or rolls back; once it
+   * unblocks, its own ON CONFLICT clause correctly sees whether the key
+   * now exists (and skips) or doesn't (and proceeds) - see
+   * docs/gateway-architecture.md's cloud-sync section and
+   * test/reception-idempotency.e2e-spec.ts's concurrent test for the
+   * proof. This one query is also why the manual conflict-detection path
+   * below never needs its own locking: by the time it runs, Postgres has
+   * already guaranteed the row it reads is the single, final, committed
+   * winner.
+   */
+  private async createIdempotent(
+    manager: EntityManager,
+    repo: Repository<MilkReceptionTransaction>,
+    user: RequestUser,
+    dto: CreateReceptionDto,
+    centre: ChillingCentre,
+    validation: { status: TransactionStatus; reason: string | null },
+  ): Promise<ReceptionCreateResult> {
+    const insertResult = await repo
+      .createQueryBuilder()
+      .insert()
+      .into(MilkReceptionTransaction)
+      .values({
+        centreId: dto.centreId,
+        sourceId: dto.sourceId,
+        vehicleId: dto.vehicleId,
+        operatorUserId: user.id,
+        quantityKg: String(dto.quantityKg),
+        fat: String(dto.fat),
+        snf: String(dto.snf),
+        temperature: String(dto.temperature),
+        status: validation.status,
+        readingSource: ReadingSource.MANUAL,
+        reason: validation.reason,
+        transactionNumber: `PENDING-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        localIdempotencyKey: dto.localIdempotencyKey,
+      })
+      .onConflict(`("localIdempotencyKey") DO NOTHING`)
+      .returning(["id"])
+      .execute();
+
+    const insertedId: number | undefined = (insertResult.raw as Array<{ id: number }> | undefined)?.[0]?.id;
+
+    if (insertedId !== undefined) {
+      // Our INSERT actually landed a new row - finish exactly like the
+      // non-idempotent path: assign the real transactionNumber now that
+      // an id exists, save, and audit. Fetched fresh (not built from the
+      // insert values) so `final` reflects exactly what the database has,
+      // matching the non-idempotent path's behavior.
+      const created = await repo.findOneByOrFail({ id: insertedId });
+      created.transactionNumber = `${centre.code}-${created.id}`;
+      const final = await repo.save(created);
+
+      await this.audit.record(
+        {
+          userId: user.id,
+          centreId: dto.centreId,
+          action: "RECEPTION_CREATE",
+          resourceType: "MilkReceptionTransaction",
+          resourceId: String(final.id),
+          oldValue: null,
+          newValue: final,
+          reason: validation.reason,
+        },
+        manager,
+      );
+
+      return { ...final, outcome: "created" as const };
+    }
+
+    // Our INSERT was skipped - a row with this localIdempotencyKey already
+    // exists and (per the comment above) is guaranteed committed and
+    // visible to us right now. Compare payloads: same payload is a safe,
+    // audit-free replay; a different payload is a caller bug surfaced
+    // loudly (see ReceptionPayloadFields's doc comment) - either way,
+    // nothing new is written, and NO second audit record is created.
+    const existing = await repo.findOneByOrFail({ localIdempotencyKey: dto.localIdempotencyKey });
+    const conflicts = this.findPayloadConflicts(existing, dto);
+
+    if (conflicts.length > 0) {
+      throw new ConflictException({
+        message:
+          `localIdempotencyKey "${dto.localIdempotencyKey}" was already used for a transaction with ` +
+          `different data (conflicting field(s): ${conflicts.join(", ")}). Retrying with the same ` +
+          `idempotency key must resubmit the SAME logical payload - this looks like a caller bug, not ` +
+          `a legitimate retry.`,
+        conflictingFields: conflicts,
+        existingTransactionId: existing.id,
+      });
+    }
+
+    return { ...existing, outcome: "duplicate" as const };
+  }
+
+  /**
+   * Exact-value comparison between an already-persisted transaction and an
+   * incoming request claiming the same localIdempotencyKey - mirrors the
+   * gateway's own findPayloadConflicts() (apps/gateway/src/storage/
+   * sqlite-local-storage.ts) so both halves of the same idempotency
+   * contract agree on what "the same payload" means. Numeric columns are
+   * compared via Number(...) rather than string equality because they are
+   * persisted as fixed-precision decimal strings (e.g. "45.50") - a
+   * caller resubmitting `45.5` must not be treated as a conflict merely
+   * because of trailing-zero formatting.
+   */
+  private findPayloadConflicts(existing: MilkReceptionTransaction, incoming: ReceptionPayloadFields): string[] {
+    const conflicts: string[] = [];
+    if (existing.centreId !== incoming.centreId) conflicts.push("centreId");
+    if (existing.sourceId !== incoming.sourceId) conflicts.push("sourceId");
+    if (existing.vehicleId !== incoming.vehicleId) conflicts.push("vehicleId");
+    if (Number(existing.quantityKg) !== incoming.quantityKg) conflicts.push("quantityKg");
+    if (Number(existing.fat) !== incoming.fat) conflicts.push("fat");
+    if (Number(existing.snf) !== incoming.snf) conflicts.push("snf");
+    if (Number(existing.temperature) !== incoming.temperature) conflicts.push("temperature");
+    return conflicts;
   }
 
   async override(user: RequestUser, id: number, dto: OverrideReceptionDto) {

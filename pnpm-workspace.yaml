@@ -4,6 +4,7 @@ packages:
 
 allowBuilds:
   '@nestjs/core': true
+  '@serialport/bindings-cpp': true
   bcrypt: true
   esbuild: true
 

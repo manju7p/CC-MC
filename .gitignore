@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-deployment/
 build/
 .env
 .env.local
@@ -8,3 +9,11 @@ build/
 coverage/
 .pnpm-store/
 *.tsbuildinfo
+venv/
+serial_capture.bin
+_to_delete
+
+
+# Gateway: the real per-centre config file is environment-specific (not
+# secret, but not a template either - see apps/gateway/config/gateway.config.example.json)
+apps/gateway/config/gateway.config.json

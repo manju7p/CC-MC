@@ -1,0 +1,100 @@
+<!--
+  WinSW v3 service configuration for the CC-MC Local Device Gateway.
+
+  This is a real, schema-correct WinSW config - every element name and
+  attribute here was verified against WinSW's own documentation
+  (https://github.com/winsw/winsw, XML config reference at
+  https://deepwiki.com/winsw/winsw/3.3-xml-configuration), not invented.
+  It has NOT been executed against a real Windows SCM in this sandbox
+  (Linux-only, see docs/gateway-decision.md §10) - that verification is a
+  Checkpoint 10 / real-Windows-machine task. This file documents what will
+  be installed and can be inspected/reviewed today; it cannot be proven to
+  actually register a working service until it runs on Windows.
+
+  Deployment layout this config assumes (see docs/gateway-decision.md §1
+  and packaging/build-deployment.mjs):
+
+    <install-dir>\CCMCGateway.exe        <- WinSW's own executable, renamed
+    <install-dir>\CCMCGateway.xml        <- this file
+    <install-dir>\node\node.exe          <- vendored Node.js runtime
+    <install-dir>\app\dist\main.js       <- compiled gateway entrypoint
+    <install-dir>\app\node_modules\      <- gateway's runtime dependencies
+    <install-dir>\config\gateway.config.json  <- persistent, non-secret config
+    <install-dir>\data\gateway.sqlite    <- persistent local storage (Checkpoint 3+)
+    <install-dir>\logs\                   <- WinSW-managed rolling log files
+
+  <workingdirectory> is set to the install root so the gateway's own
+  relative config-path resolution (config.loader.ts's
+  resolveConfigPath() default of "./config/gateway.config.json") works
+  identically to how it's invoked in local development - no
+  Windows-specific path branching needed in application code.
+-->
+<service>
+  <id>CCMCGateway</id>
+  <name>CC-MC Local Device Gateway</name>
+  <description>
+    Bridges chilling-centre weighing scale and milk analyser devices to the
+    CC-MC cloud API. See docs/gateway-architecture.md and
+    docs/gateway-setup.md in the CC-MC repository.
+  </description>
+
+  <executable>node\node.exe</executable>
+  <arguments>app\dist\main.js</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!--
+    GATEWAY_CONFIG_PATH is intentionally NOT set here: the gateway resolves
+    its config relative to the working directory by default (see
+    config.loader.ts), so the same install layout works without an
+    environment override. This variable is left as a documented example of
+    how an operator COULD point at a config file living elsewhere, without
+    actually exercising that path in the default install.
+  -->
+  <!-- <env name="GATEWAY_CONFIG_PATH" value="%BASE%\config\gateway.config.json"/> -->
+
+  <!--
+    Start type: Automatic - the SCM starts this service on every boot with
+    no user logon required (docs/gateway-decision.md §5). Delayed-start
+    tuning is an explicit TBD, not set here (see §10, "Known limitations").
+  -->
+  <startmode>Automatic</startmode>
+
+  <!--
+    Logging: WinSW's own rolling log of the wrapped process's raw
+    stdout/stderr, distinct from the gateway's own structured JSON logs
+    (which the gateway writes to stdout and which land inside these same
+    files as a side effect of WinSW's redirection - see
+    docs/gateway-decision.md §7 and logger.ts's header comment).
+  -->
+  <logpath>%BASE%\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+
+  <!--
+    Crash recovery: WinSW's own restart-on-failure is the SOLE/PRIMARY
+    recovery mechanism for this service - see the "Crash recovery model"
+    section of docs/gateway-decision.md (updated in Checkpoint 2 per
+    Principal Engineer constraint 11) for the full reasoning. In short:
+    WinSW directly supervises the child node.exe process and observes its
+    actual exit code, so it is the layer best positioned to decide whether
+    a restart is warranted. SCM-level "Recovery" tab actions are
+    deliberately NOT configured in this XML (WinSW has no first-class
+    element for them; they would require a separate `sc.exe failure`
+    call in install.ps1) - a second, redundant supervisor watching a
+    supervisor is unneeded complexity (Rule 11: prefer boring, reliable
+    technology; do not over-engineer) unless real-world Windows testing
+    (Checkpoint 10) turns up a concrete gap this doesn't cover.
+  -->
+  <onfailure action="restart" delay="5 sec"/>
+  <resetfailure>1 day</resetfailure>
+
+  <!--
+    Service account: left as the WinSW/SCM default (LocalSystem) for this
+    proof-of-concept. The least-privilege account decision is explicitly
+    deferred to Phase 12 (docs/gateway-decision.md §9) - not guessed at
+    here without real device/COM-port permission requirements to design
+    against.
+  -->
+</service>

@@ -147,6 +147,17 @@ export interface CreateReceptionRequest {
   fat: number;
   snf: number;
   temperature: number;
+  /**
+   * Optional. Set by the Local Device Gateway (Checkpoint 5) so a retried
+   * sync attempt (after a network failure, timeout, or lost response) is
+   * safely idempotent server-side instead of creating a duplicate
+   * transaction. Omitted entirely by the existing web create-reception
+   * form - a request without this field behaves exactly as it always has.
+   * See apps/api/src/reception/reception.service.ts's create() and
+   * docs/gateway-architecture.md's cloud-sync section for the full
+   * same-key/same-payload vs. same-key/different-payload semantics.
+   */
+  localIdempotencyKey?: string;
 }
 
 export interface ReceptionTransactionDto {
@@ -199,4 +210,74 @@ export interface AuditLogDto {
   newValue: unknown;
   reason: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Local (edge) gateway API
+// ---------------------------------------------------------------------------
+// Consumed by apps/web's local dashboard (LocalDashboardPage.tsx) and
+// produced by apps/gateway's local-api-server.ts - see
+// docs/gateway-architecture.md's "Local vs. cloud responsibility" section
+// for the full edge/offline-first architecture this supports. These types
+// describe the gateway's LOCAL SQLite-backed operational view, which is
+// deliberately NOT the same shape as the cloud's DashboardSummaryDto/
+// ReceptionTransactionDto above - the local gateway has no concept of
+// ACCEPTED/HOLD/REJECTED (local_transactions/outbox_records has no such
+// column, and the cloud's quality-validation outcome is never sent back to
+// the gateway today), so these DTOs honestly expose only outbox sync state
+// (PENDING/PROCESSING/SYNCED/FAILED) instead of fabricating a status the
+// local schema cannot support.
+
+export type LocalOutboxStatus = "PENDING" | "PROCESSING" | "SYNCED" | "FAILED";
+
+export type LocalServiceState = "STARTING" | "RUNNING" | "STOPPING" | "STOPPED";
+
+export type LocalConnectivityState = "UNKNOWN" | "CONNECTED" | "DISCONNECTED";
+
+/** Mirrors apps/gateway's GatewayHealthSnapshot - returned by GET /local/status. */
+export interface LocalGatewayStatusDto {
+  gatewayId: string;
+  centreId: number;
+  version: string;
+  startedAt: string | null;
+  uptimeSeconds: number;
+  serviceState: LocalServiceState;
+  cloudConnectivity: LocalConnectivityState;
+  deviceConnectivity: LocalConnectivityState;
+  pendingSyncCount: number;
+}
+
+/**
+ * One locally-captured reception transaction, joined with its outbox sync
+ * state. NOTE: deliberately has no `status` (ACCEPTED/HOLD/REJECTED) field
+ * - see this section's header comment. `outboxStatus`/`cloudTransactionId`
+ * are the only sync-related signals the local schema actually has.
+ */
+export interface LocalReceptionSummaryDto {
+  id: number;
+  localIdempotencyKey: string;
+  sourceId: number;
+  vehicleId: number;
+  quantityKg: number;
+  fat: number;
+  snf: number;
+  temperature: number;
+  capturedAt: string;
+  createdAt: string;
+  outboxStatus: LocalOutboxStatus;
+  cloudTransactionId: number | null;
+}
+
+/** Returned by GET /local/today - today's (IST calendar day) local collection summary. */
+export interface LocalTodaySummaryDto {
+  /** IST calendar date this summary covers, e.g. "2026-08-23". */
+  dateLabel: string;
+  totalTransactions: number;
+  totalQuantityKg: number;
+  transactions: LocalReceptionSummaryDto[];
+}
+
+/** Returned by GET /local/transactions?limit=N. */
+export interface LocalTransactionsResponseDto {
+  transactions: LocalReceptionSummaryDto[];
 }

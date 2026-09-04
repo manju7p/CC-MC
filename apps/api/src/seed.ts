@@ -5,11 +5,14 @@
  *  - The permission codes from @cc-mc/shared-types
  *  - Three MVP roles (Operator, Manager, Admin) - a defensible default
  *    subset of the BRD's seven illustrative roles (Section 5), matching
- *    tonight's explicit scope. See docs/assumptions.md #role-set.
+ *    tonight's explicit scope. See docs/assumptions.md #role-set. Plus a
+ *    fourth, machine-only role (GatewayService, Checkpoint 5) - see below.
  *  - Two chilling centres, so cross-centre isolation is demonstrable.
- *  - Four users: one Admin (all-centres), one Manager and one Operator at
- *    Centre 1, and a second Operator at Centre 2 specifically so
- *    cross-centre denial has something concrete to test against.
+ *  - Four human users: one Admin (all-centres), one Manager and one
+ *    Operator at Centre 1, and a second Operator at Centre 2 specifically
+ *    so cross-centre denial has something concrete to test against.
+ *  - Two gateway service-account users (Checkpoint 5), one per centre,
+ *    RECEPTION_CREATE only - see the GatewayService role above.
  *  - Global quality rules for FAT / SNF / TEMPERATURE.
  *  - A couple of sample sources/vehicles per centre so Reception is
  *    immediately exercisable after seeding.
@@ -58,6 +61,18 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.AUDIT_VIEW,
   ],
   Admin: Object.values(PERMISSIONS),
+
+  // Checkpoint 5: the Local Device Gateway's unattended service-account
+  // role. Deliberately the smallest possible permission set - a gateway
+  // only ever calls POST /reception, so RECEPTION_CREATE is the ONLY
+  // permission it holds. No RECEPTION_VIEW, no DASHBOARD_VIEW, no
+  // AUDIT_VIEW - a compromised or misbehaving gateway credential still
+  // cannot read anything, and can only create receptions for the one
+  // centre it's assigned to (see the UserCentreAssignment rows below;
+  // CentreAccessService itself is completely unmodified for this role -
+  // see docs/gateway-architecture.md's cloud-sync section for the full
+  // design).
+  GatewayService: [PERMISSIONS.RECEPTION_CREATE],
 };
 
 export async function seed(dataSource: DataSource): Promise<void> {
@@ -128,6 +143,27 @@ export async function seed(dataSource: DataSource): Promise<void> {
   const operator1 = await upsertUser("operator1@ccmc.local", "Bangalore Operator", "Operator@12345");
   const operator2 = await upsertUser("operator2@ccmc.local", "Mysore Operator", "Operator@12345");
 
+  // Checkpoint 5: one gateway service account PER CENTRE. Each is a
+  // completely ordinary User row authenticated through the exact same
+  // POST /auth/login endpoint and JwtStrategy every human user goes
+  // through - see docs/gateway-architecture.md's cloud-sync section for
+  // why this, rather than a parallel auth mechanism, is the design. Two
+  // accounts (not one shared account) so a gateway installed at one
+  // centre structurally cannot even present credentials that would
+  // resolve to another centre's access - there is no "switch centre"
+  // concept for a gateway account to abuse, unlike a human Admin.
+  const gatewayServiceRole = await roleRepo.findOneByOrFail({ name: "GatewayService" });
+  const gatewayBlr = await upsertUser(
+    "gateway-blr-cc-01@ccmc.local",
+    "Gateway Service Account - Bangalore (BLR-CC-01)",
+    "GatewayBLR@2026!sync",
+  );
+  const gatewayMys = await upsertUser(
+    "gateway-mys-cc-01@ccmc.local",
+    "Gateway Service Account - Mysore (MYS-CC-01)",
+    "GatewayMYS@2026!sync",
+  );
+
   const assignRole = async (userId: number, roleId: number) => {
     const exists = await userRoleRepo.findOneBy({ userId, roleId });
     if (!exists) await userRoleRepo.save(userRoleRepo.create({ userId, roleId }));
@@ -136,6 +172,8 @@ export async function seed(dataSource: DataSource): Promise<void> {
   await assignRole(manager1.id, managerRole.id);
   await assignRole(operator1.id, operatorRole.id);
   await assignRole(operator2.id, operatorRole.id);
+  await assignRole(gatewayBlr.id, gatewayServiceRole.id);
+  await assignRole(gatewayMys.id, gatewayServiceRole.id);
 
   const assignCentre = async (userId: number, opts: { centreId?: number; allCentres?: boolean }) => {
     const centreId = opts.centreId ?? null;
@@ -150,6 +188,12 @@ export async function seed(dataSource: DataSource): Promise<void> {
   await assignCentre(manager1.id, { centreId: centreBlr.id });
   await assignCentre(operator1.id, { centreId: centreBlr.id });
   await assignCentre(operator2.id, { centreId: centreMys.id });
+  // Never allCentres for a gateway account - exactly one centre each,
+  // enforced the same way (CentreAccessService.assertCanAccess) as every
+  // other centre-scoped user in this system. See
+  // test/reception-idempotency.e2e-spec.ts's centre-isolation tests.
+  await assignCentre(gatewayBlr.id, { centreId: centreBlr.id });
+  await assignCentre(gatewayMys.id, { centreId: centreMys.id });
 
   // --- Global quality rules -------------------------------------------
   const globalRules: Array<{ parameter: QualityParameter; minValue: number; maxValue: number }> = [
@@ -231,6 +275,14 @@ if (require.main === module) {
       console.log("              operator1@ccmc.local / Operator@12345 (Operator, Bangalore)");
       // eslint-disable-next-line no-console
       console.log("              operator2@ccmc.local / Operator@12345 (Operator, Mysore)");
+      // eslint-disable-next-line no-console
+      console.log(
+        "              gateway-blr-cc-01@ccmc.local / GatewayBLR@2026!sync (GatewayService, Bangalore only)",
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        "              gateway-mys-cc-01@ccmc.local / GatewayMYS@2026!sync (GatewayService, Mysore only)",
+      );
       await ds.destroy();
     })
     .catch((err: unknown) => {
