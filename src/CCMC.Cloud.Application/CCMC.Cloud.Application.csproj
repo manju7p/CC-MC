@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CCMC.Cloud.Domain\CCMC.Cloud.Domain.csproj" />
+    <ProjectReference Include="..\CCMC.Contracts\CCMC.Contracts.csproj" />
+    <ProjectReference Include="..\CCMC.Cloud.Infrastructure\CCMC.Cloud.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

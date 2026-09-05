@@ -1,0 +1,17 @@
+<Window x:Class="CCMC.Desktop.Windows.DeviceStatusWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CCMC - Device Status" Height="320" Width="480"
+        WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="20">
+        <TextBlock Text="Weighing Scale" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBlock Name="ScaleStateTextBlock" Margin="0,0,0,4"/>
+        <TextBlock Name="ScaleDetailTextBlock" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8"/>
+        <Button Name="TestScaleButton" Content="Test Scale Connection" Height="30" Click="TestScaleButton_Click" Margin="0,0,0,20"/>
+
+        <TextBlock Text="Milk Analyser" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBlock Name="AnalyserStateTextBlock" Margin="0,0,0,4"/>
+        <TextBlock Name="AnalyserDetailTextBlock" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8"/>
+        <Button Name="TestAnalyserButton" Content="Test Analyser Connection" Height="30" Click="TestAnalyserButton_Click"/>
+    </StackPanel>
+</Window>
