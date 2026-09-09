@@ -10,6 +10,15 @@ rules, and the result (ACCEPTED / HOLD / REJECTED) becomes a durable
 transaction, synced to a central cloud system for reporting/RBAC/audit
 across all centres.
 
+**Confirmed tier (v2.1 scope decision — see BRD §20):** CCMC targets the
+Milk Chilling Centre (CC/MCC) tier specifically, not the Bulk Milk Cooler
+(BMC)/village-collection tier. A Chilling Centre receives already-pooled
+milk from multiple upstream BMCs/VLCs (via `Source`/`Vehicle`), not
+individual farmer pours — farmer-level payment, per-farmer rate charts
+and farmer settlement belong to that upstream BMC/VLC tier and are
+explicitly out of scope for this application. See "Scope Decisions
+(v2.1)" below for the full reasoning and the vendor evidence behind it.
+
 ## Current Architecture
 
 **Target (authoritative, this session):**
@@ -78,7 +87,7 @@ documented contract, not against the old source.
 Originally documented from read-only inspection of the old NestJS API
 (`apps/api` on `pranav-dev`) during the Windows app's Phase 0; a fresh
 ASP.NET Core implementation of this same contract now actually exists in
-this repository (see CLAUDE.md "CC-MC Cloud Backend" and README.md §29 for
+this repository (see STATUS.md "CC-MC Cloud Backend" and README.md §29 for
 full detail - architecture, exact commands, security review). Updated
 below to describe what is **actually built and verified**, not just
 inspected:
@@ -110,11 +119,11 @@ inspected:
   (accepts optional `localIdempotencyKey` — the exact mechanism the
   Windows app's sync engine already relies on, enforced via a real
   PostgreSQL unique index + transaction, not app-level check-then-insert
-  — see CLAUDE.md/README §29.6), `POST /reception/{id}/override` (Manager
+  — see STATUS.md/README §29.6), `POST /reception/{id}/override` (Manager
   resolves a HOLD to ACCEPTED/REJECTED; requires `RECEPTION_OVERRIDE`).
 - Dashboard: `GET /dashboard/summary?centreId=` (IST calendar-day
   boundary, converted to UTC before querying — see the Npgsql bug fixed
-  in CLAUDE.md "CC-MC Cloud Backend").
+  in STATUS.md "CC-MC Cloud Backend").
 - Audit: `GET /audit-logs` (server writes audit rows itself on
   login/reception-create/override — the client does not need to submit
   audit events separately).
@@ -173,11 +182,11 @@ assumed compatible.
   `NUMERIC(5,2)`, `Vehicle.CapacityKg` `NUMERIC(10,2)`,
   `QualityRule.MinValue`/`MaxValue` `NUMERIC(6,2)`.
 - **SQLite (Windows app, local operational store):** built (see
-  CLAUDE.md "Completed Work" Phase 5) - a business/domain model logically
+  STATUS.md "Completed Work" Phase 5) - a business/domain model logically
   compatible with the cloud shape (mirrors `CreateReceptionRequestDto`),
   plus local-only infrastructure tables (`outbox_records`,
   `device_configurations`, `offline_credentials`). 10 tables total,
-  tracked via `SchemaMigrator`/`schema_migrations` - see CLAUDE.md
+  tracked via `SchemaMigrator`/`schema_migrations` - see STATUS.md
   "Completed Work" Phase 5 for the full table list.
 - The Windows app **never** holds PostgreSQL credentials and never
   connects to Postgres directly - all cloud access goes through the
@@ -189,7 +198,7 @@ assumed compatible.
   `local_transactions` + `outbox_records` (1:1), outbox state machine
   `PENDING → PROCESSING → SYNCED`/`FAILED`, atomic creation, startup sweep
   to requeue orphaned `PROCESSING` rows, deterministic exponential
-  backoff. See CLAUDE.md "Completed Work" Phase 5/10 for what was
+  backoff. See STATUS.md "Completed Work" Phase 5/10 for what was
   actually implemented.
 
 ## Device Integration
@@ -252,7 +261,7 @@ app's `CCMC.Contracts` DTOs handle this via
 `FlexibleDecimalJsonConverter`/`FlexibleNullableDecimalJsonConverter`
 (`CCMC.Contracts.Json`), applied to exactly those properties. This was
 originally missed (a critical pre-commit review caught it as a build-
-breaking-at-runtime defect - see CLAUDE.md "Fixed in the critical fix
+breaking-at-runtime defect - see STATUS.md "Fixed in the critical fix
 pass") - if any new DTO property is ever added for another cloud
 `decimal` column, it needs the same converter, or it will throw
 `JsonException` the first time the cloud actually returns a real,
@@ -283,7 +292,7 @@ string-encoded value.
   resulting `Session.IsOffline = true` session carries an empty access
   token, and `SyncEngineService` treats it identically to "no session" -
   sync stays paused until the operator re-authenticates online (Dashboard
-  → "Sign in online"). See `CLAUDE.md` "Product Decisions" #2 for the
+  → "Sign in online"). See `STATUS.md` "Product Decisions" #2 for the
   full design and its explicit constraints (never store the password,
   never use the token as an offline substitute, never let a stale offline
   cache override a genuine online rejection).
@@ -336,8 +345,11 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v2 — authoritative source of truth)
-CLAUDE.md / context.md / .gitignore
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v2.1 — authoritative source of
+                                            truth; §20-23 added this
+                                            session, see "Scope Decisions
+                                            (v2.1)" below)
+CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
 ├── CCMC.Domain/          enums, value objects, entities, device interfaces,
@@ -366,7 +378,7 @@ tests/
 ├── CCMC.Tests/              xUnit — Domain, Persistence, Sync, Serial, Devices, Auth (89 tests, all passing)
 └── CCMC.Cloud.Api.Tests/    xUnit — real integration tests against a live PostgreSQL test DB (21 tests, all passing)
 
---- CC-MC Cloud Backend (built in a later pass — see CLAUDE.md "CC-MC Cloud Backend", README.md §29) ---
+--- CC-MC Cloud Backend (built in a later pass — see STATUS.md "CC-MC Cloud Backend", README.md §29) ---
 ├── CCMC.Cloud.Domain/         entities/enums/QualityValidationService — zero project references
 ├── CCMC.Cloud.Infrastructure/ EF Core (CcmcDbContext, migrations), password hashing, JWT, dev seeder — refs Cloud.Domain
 ├── CCMC.Cloud.Application/    Auth/RBAC, Reception (idempotent create/override), MasterData, Dashboard, Audit — refs Cloud.Domain + Cloud.Infrastructure + CCMC.Contracts
@@ -379,12 +391,12 @@ publishing + actually launching multiple times, including after the
 critical fix pass (`dotnet publish` then ran the real `.exe`, which
 created a real SQLite DB via `SchemaMigrator` AND logged
 `DeviceManager` actually reaching `VideoconWeighingScaleAdapter`
-construction - see CLAUDE.md "Fixed in the critical fix pass" for the
+construction - see STATUS.md "Fixed in the critical fix pass" for the
 log excerpt; smoke-test artifacts were cleaned up afterward). The cloud
 backend was confirmed running for real against a live local PostgreSQL 16
 instance (migrations applied, development seed run, every endpoint
 curl-verified end-to-end, two real runtime bugs found and fixed - see
-CLAUDE.md "CC-MC Cloud Backend"). See CLAUDE.md "Completed Work" for the
+STATUS.md "CC-MC Cloud Backend"). See STATUS.md "Completed Work" for the
 Windows app's full phase-by-phase breakdown, "Fixed in the critical fix
 pass" for its two blockers + three warnings, "CC-MC Cloud Backend" for the
 cloud side's own architecture/decisions/bugs-fixed, and "Known
@@ -414,7 +426,7 @@ a consumer of any of these files):
 - `apps/api/src/seed.ts` — the old seed script; **not** read or copied
   when writing `CCMC.Cloud.Infrastructure.Seed.DevelopmentSeeder` (its
   role→permission grants and quality-rule limits are fresh judgment calls
-  from BRD v2 directly — see CLAUDE.md "CC-MC Cloud Backend").
+  from BRD v2 directly — see STATUS.md "CC-MC Cloud Backend").
 - `packages/shared-types/src/index.ts` — canonical DTO shapes
   (`CreateReceptionRequest`, `ReceptionTransactionDto`,
   `AuthenticatedUser`, `PERMISSIONS`, enums) that `CCMC.Contracts` was
@@ -451,7 +463,7 @@ a consumer of any of these files):
 - Do not build a web application.
 - Do not build/port the Node.js gateway as the primary architecture.
 - Do not impose MVVM ceremony (explicit override of BRD v2 §3 — see
-  CLAUDE.md "Architecture Decisions").
+  STATUS.md "Architecture Decisions").
 - Do not invent a Videocon (or any) device protocol without a real
   capture or manufacturer documentation.
 - Do not invent a new cloud API endpoint/field/DB relationship without
@@ -462,18 +474,75 @@ a consumer of any of these files):
 - Do not reuse, port, or call into the legacy `pranav-dev` NestJS API /
   Node gateway / React web app from the new cloud backend — its contract
   was a reference point, its code was never imported (see "CC-MC Cloud
-  Backend" in CLAUDE.md). Do not mass-delete or ignore `pranav-dev`
+  Backend" in STATUS.md). Do not mass-delete or ignore `pranav-dev`
   either — it remains historical/reference material.
 - Do not add browser-oriented CORS complexity to the cloud API — the only
   client is a native Windows `HttpClient`, not a browser SPA.
 - Do not commit or push anything from a session working on this repo
   unless explicitly asked.
+- **Do not build chilling-tank/batch tracking, bulk storage tank
+  telemetry, CIP, or plant/equipment monitoring** — explicit v2.1 scope
+  decision (BRD §22), not an oversight. Checked against six MCC/chilling-
+  centre software vendors (Everest, KVR, TecXpert, ProcuPort, Stellapps
+  SmartCC, NanoDairy); none of them build this either — see "Scope
+  Decisions (v2.1)" below.
+- **Do not build farmer-level payment, per-farmer rate charts, or farmer
+  settlement** — that belongs to the upstream BMC/VLC tier, not this
+  Chilling Centre application (BRD §20).
+- **Do not build outbound tanker dispatch or reconciliation/closing-stock
+  reporting as part of the MVP** — both are confirmed in-scope (BRD §23)
+  but explicitly sequenced Post-MVP; do not pull them into the current
+  MVP build without being asked.
+
+## Scope Decisions (v2.1)
+
+This session reviewed the BRD against how privately-owned Milk Chilling
+Centres actually operate in India (not Bulk Milk Coolers, and not a
+cooperative federation the size of KMF), and against six vendors already
+selling software at this exact tier. Three decisions came out of that
+review and are now encoded in BRD §20–§23 (v2.1) as well as here:
+
+1. **Confirmed tier: Chilling Centre, not BMC.** See "Product" above.
+2. **Out of scope, by decision (BRD §22):** chilling-tank/batch tracking
+   (tank assignment, inlet/outlet temperature, chilling start/end, lot
+   tracking), bulk storage tank telemetry (level, temperature, age,
+   utilisation), CIP (clean-in-place cycle logging), and plant/equipment
+   monitoring (chiller, compressor, pumps, tank sensors, power/failure
+   events). Rationale: none of six independently-reviewed MCC/chilling-
+   centre vendors — Everest Instruments, KVR Technologies, TecXpert, Sort
+   String/ProcuPort, Stellapps SmartCC, NanoDairy — publicly build any of
+   this either, including Stellapps SmartCC, whose product is explicitly
+   a cloud layer for *monitoring* chilling centres. Six independent
+   vendors agreeing on the same boundary reads as a market pattern (tank/
+   CIP/equipment telemetry sold separately, by plant-automation/SCADA
+   firms) rather than a gap unique to this BRD. This device model stays
+   scoped to exactly the weighing scale and milk analyser (BRD §5) —
+   no additional sensor/telemetry device categories are being added.
+3. **Deferred, not descoped (BRD §22, note under §10):** laboratory
+   quality tests beyond FAT/SNF/CLR/Temperature — acidity, Clot-on-
+   Boiling (COB), antibiotic/adulteration screening — and a lab workflow
+   distinct from reception. No verified measurement instrument or
+   protocol exists for these yet; revisit once one is identified, no
+   fixed date.
+4. **In scope but Post-MVP (BRD §23):** outbound tanker dispatch to the
+   processing plant, and reconciliation/closing-stock reporting. Both are
+   real, vendor-proven capabilities (TecXpert and ProcuPort build both;
+   Everest builds dispatch) and require no new device/hardware — pure
+   workflow and reporting additions on top of the existing reception +
+   sync architecture. Sequenced after the current MVP (BRD §17,
+   unchanged) specifically because dispatch depends on reception/sync
+   being stable, and reconciliation depends on dispatch data existing.
+
+Full vendor-by-vendor detail (confidence level, what was verified vs.
+vendor-claimed, and the per-capability coverage grid) lives in the BRD
+§20–§23, not duplicated here — read those sections directly rather than
+re-deriving vendor claims from memory.
 
 ## Open Questions
 
 Only genuinely unresolved items remain here — several prior open
 questions were since resolved as explicit product decisions (see
-CLAUDE.md "Product Decisions") and are no longer listed:
+STATUS.md "Product Decisions") and are no longer listed:
 
 1. Videocon vs. ESSAE hardware discrepancy (see "Current Hardware
    Facts") — needs explicit human confirmation.
@@ -506,13 +575,13 @@ verified COM4/2400 default.
 
 Two BLOCKER-level defects found by a read-only pre-commit review (cloud
 decimal JSON deserialization; `DeviceManager.InitializeAsync()` never
-being called) were fixed and verified — see CLAUDE.md "Fixed in the
+being called) were fixed and verified — see STATUS.md "Fixed in the
 critical fix pass". Six further product decisions were then made and
 (except the installer, deliberately) implemented — configurable
 multi-centre device serial settings, offline operator login (Argon2id +
 DPAPI), operator-token-only sync, hand-rolled SQLite confirmed
 permanently, manager-override cloud sync via its own outbox, and WiX MSI
-chosen as the (unbuilt) installer direction — see CLAUDE.md "Product
+chosen as the (unbuilt) installer direction — see STATUS.md "Product
 Decisions" for the full detail on each.
 
 **Cloud backend (built in a later pass): fully implemented and verified
@@ -522,7 +591,7 @@ override, audit logging, dashboard summary, health checks, Swagger — all
 manually curl-verified end-to-end plus 21 automated integration tests
 (all passing) against a dedicated `ccmc_cloud_test` database. Two real
 runtime bugs (JWT claim remapping; Npgsql UTC-only `DateTimeOffset`) were
-found via this live testing and fixed — see CLAUDE.md "CC-MC Cloud
+found via this live testing and fixed — see STATUS.md "CC-MC Cloud
 Backend" for the full writeup, and README.md §29 for architecture/exact
 commands.
 
@@ -531,7 +600,7 @@ commands.
 cloud-backend).
 
 What is genuinely NOT done (not oversights — each is either blocked on
-external input or an explicit scope cut, see CLAUDE.md "Known
+external input or an explicit scope cut, see STATUS.md "Known
 Limitations", "Decisions Pending", "Product Decisions" - DEFERRED, and
 README.md §29.16/§29.17):
 - Real Videocon scale / milk analyser protocol decoders (blocked on

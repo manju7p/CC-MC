@@ -8,7 +8,7 @@ a central cloud API when connectivity allows.
 
 This document is a practical developer/operator guide for the code in
 this repository, on the `windows-application` branch. For the full
-architecture rationale and decision history, see `CLAUDE.md` (engineering
+architecture rationale and decision history, see `STATUS.md` (engineering
 progress log) and `context.md` (current technical context).
 
 ## 1. Overview
@@ -168,7 +168,7 @@ deserialization (including the cloud's decimal-as-string quirk - see
 credential verification, and override-sync outbox behavior. The cloud
 suite covers health checks, login/JWT/authorization, centre-scoping,
 reception idempotency/conflict/quality-hold, and manager overrides,
-against a real database - see `CLAUDE.md` "Tests Completed" for the exact
+against a real database - see `STATUS.md` "Tests Completed" for the exact
 current count and breakdown.
 
 If you only want to run the Windows-client suite (no PostgreSQL needed):
@@ -278,7 +278,7 @@ The category is the .NET logger category (e.g.
 `CCMC.Infrastructure.Devices.DeviceManager`), which doubles as the
 Application/Device/Serial/Parser/Reception/Synchronization/Security
 grouping - each of those concerns lives in its own class. Passwords,
-access tokens, and other secrets are never logged - see `CLAUDE.md`
+access tokens, and other secrets are never logged - see `STATUS.md`
 "Architecture Decisions" for what each log call site does and doesn't
 include.
 
@@ -401,7 +401,7 @@ returns a fabricated weight/quality reading. A successful test means
   through their own durable outbox, only once the underlying reception
   itself has synced (has a cloud transaction id). **Important limitation:**
   the cloud's override endpoint has no idempotency-key mechanism (unlike
-  reception creation) - see `CLAUDE.md` "Architecture Decisions" for the
+  reception creation) - see `STATUS.md` "Architecture Decisions" for the
   documented contract gap this implies. A terminal/4xx response on an
   override retry is marked FAILED for manual/ops review, never silently
   retried or silently assumed successful.
@@ -465,7 +465,7 @@ returns a fabricated weight/quality reading. A successful test means
 
 ## 25. Deferred Implementation Items
 
-Explicitly deferred, not oversights - see `CLAUDE.md` "Decisions Pending"
+Explicitly deferred, not oversights - see `STATUS.md` "Decisions Pending"
 for the full reasoning behind each:
 
 - **Real Videocon scale protocol decoder** - blocked on physical device
