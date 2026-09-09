@@ -345,10 +345,10 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v2.1 — authoritative source of
-                                            truth; §20-23 added this
-                                            session, see "Scope Decisions
-                                            (v2.1)" below)
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v2.2 — authoritative source of
+                                            truth; §20-23 added/updated
+                                            this session, see "Scope
+                                            Decisions (v2.1–v2.2)" below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
@@ -489,18 +489,19 @@ a consumer of any of these files):
 - **Do not build farmer-level payment, per-farmer rate charts, or farmer
   settlement** — that belongs to the upstream BMC/VLC tier, not this
   Chilling Centre application (BRD §20).
-- **Do not build outbound tanker dispatch or reconciliation/closing-stock
-  reporting as part of the MVP** — both are confirmed in-scope (BRD §23)
-  but explicitly sequenced Post-MVP; do not pull them into the current
-  MVP build without being asked.
+- **Outbound tanker dispatch and reconciliation/closing-stock reporting
+  are now part of the MVP** (v2.2 — moved in from Post-MVP; see BRD §17,
+  §23 "Superseded" note, and "Scope Decisions" below). Build dispatch
+  before reconciliation, since reconciliation depends on dispatch data
+  existing.
 
-## Scope Decisions (v2.1)
+## Scope Decisions (v2.1–v2.2)
 
 This session reviewed the BRD against how privately-owned Milk Chilling
 Centres actually operate in India (not Bulk Milk Coolers, and not a
 cooperative federation the size of KMF), and against six vendors already
-selling software at this exact tier. Three decisions came out of that
-review and are now encoded in BRD §20–§23 (v2.1) as well as here:
+selling software at this exact tier. Four decisions came out of that
+review and are now encoded in BRD §20–§23 (v2.1/v2.2) as well as here:
 
 1. **Confirmed tier: Chilling Centre, not BMC.** See "Product" above.
 2. **Out of scope, by decision (BRD §22):** chilling-tank/batch tracking
@@ -524,14 +525,22 @@ review and are now encoded in BRD §20–§23 (v2.1) as well as here:
    distinct from reception. No verified measurement instrument or
    protocol exists for these yet; revisit once one is identified, no
    fixed date.
-4. **In scope but Post-MVP (BRD §23):** outbound tanker dispatch to the
+4. **In scope, and part of MVP (BRD §17, §23 "Superseded" note — v2.2,
+   originally Post-MVP under v2.1):** outbound tanker dispatch to the
    processing plant, and reconciliation/closing-stock reporting. Both are
    real, vendor-proven capabilities (TecXpert and ProcuPort build both;
    Everest builds dispatch) and require no new device/hardware — pure
    workflow and reporting additions on top of the existing reception +
-   sync architecture. Sequenced after the current MVP (BRD §17,
-   unchanged) specifically because dispatch depends on reception/sync
-   being stable, and reconciliation depends on dispatch data existing.
+   sync architecture, reusing the idempotent-create pattern (reception)
+   and the durable-outbox pattern (override) that are each already built
+   once. Estimated ~2–3 developer-weeks combined. Build dispatch first;
+   reconciliation depends on dispatch data existing.
+5. **Working assumption, not yet confirmed:** dispatch's composite
+   FAT/SNF is computed as a weighted average of receptions since the
+   last dispatch — arithmetic over already-captured reception data, no
+   tank sensor, consistent with the §22 out-of-scope decision. Confirm
+   this with whoever owns the product call before dispatch UI work
+   starts; the alternative is manual entry at dispatch time.
 
 Full vendor-by-vendor detail (confidence level, what was verified vs.
 vendor-claimed, and the per-capability coverage grid) lives in the BRD
