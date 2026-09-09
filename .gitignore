@@ -1,0 +1,52 @@
+# .NET build artifacts
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Build/publish output
+[Bb]uild/
+[Pp]ublish/
+*.pubxml.user
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+.nuget/
+
+# Logs
+*.log
+logs/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local configuration / secrets
+appsettings.Local.json
+appsettings.*.local.json
+.env
+.env.*
+
+# Windows / OS
+Thumbs.db
+Desktop.ini
+
+# Temp / generated
+*.tmp
+*.temp
+~$*

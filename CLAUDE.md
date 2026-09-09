@@ -1,0 +1,207 @@
+# Working guidelines for CCMC
+
+Engineering guidelines for building this software — how to test it, how
+to keep its docs honest, the code-style and git defaults, and the
+security/infra baseline. This file should stay true regardless of which
+part of the repo a session is touching (Windows client or cloud API) and
+regardless of which phase the project is in.
+
+**Where to look for everything else** — this repo splits "how to build"
+from "what's true right now" from "what happened and why," on purpose:
+
+- **`Doc/CCMC_BRD_and_Technical_Design_v2.docx`** — the source of truth
+  for product scope. If any other document disagrees with it, the other
+  document is wrong, not the BRD — unless the BRD itself is stale, in
+  which case fix the BRD first (see "Documentation consistency" below).
+- **`context.md`** — the current-state summary: architecture, module
+  responsibilities, hardware facts, constraints, "things we must not do,"
+  open questions. Read this first when picking up work.
+- **`STATUS.md`** — the chronological engineering log: phases completed,
+  bugs found and fixed, product decisions made and why. Read this when
+  `context.md` cites something ("see STATUS.md ...") and you need the
+  full story behind it.
+
+## Testing philosophy
+
+- **Real branches, not just the happy path.** Every layer should cover
+  success, validation failure, a real error condition (COM port
+  unavailable, cloud unreachable, malformed serial data), and
+  boundary/empty states — not just "it builds" or "the call succeeds."
+- **Two dependency tiers, both real, kept explicit.** This repo already
+  does this correctly — keep doing it: the Windows-client test project
+  (`tests/CCMC.Tests`) exercises real `Microsoft.Data.Sqlite` against a
+  real (temp-file) database rather than mocking the ORM layer, because
+  the thing worth proving is atomicity/idempotency under a real engine.
+  The cloud test project (`tests/CCMC.Cloud.Api.Tests`) runs the actual
+  ASP.NET Core startup pipeline (`WebApplicationFactory<Program>`,
+  real migrations, real seed) against a dedicated `ccmc_cloud_test`
+  database — **never** `ccmc_cloud_dev`. Don't introduce a mocked-DB
+  layer to make tests "faster" — the real-engine tests are what caught
+  both runtime bugs documented in STATUS.md ("CC-MC Cloud Backend" →
+  "Fixed Bugs"); a mock would have passed both times regardless.
+- **Document known gaps instead of hiding them.** If something isn't
+  covered — a device parser that doesn't exist yet, an endpoint with no
+  idempotency mechanism — write it down (STATUS.md "Known Limitations" /
+  context.md "Open Questions" are the existing pattern) rather than
+  letting the absence of a red test imply the absence of a problem.
+- **One command runs everything.** `dotnet test CCMC.sln` already is
+  that command for this repo — it runs both the Windows-client and
+  cloud-backend suites and prints one pass/fail count. Keep it that way;
+  don't let a new test project need its own separate invocation to be
+  included in "the tests pass."
+- **Hardware-in-the-loop tests are their own tier, not a substitute for
+  the above.** No physical Videocon scale or milk analyser exists in any
+  dev environment today — tests that would need one are explicitly
+  listed as not-yet-covered (STATUS.md "Tests Completed"), not silently
+  skipped or faked with synthetic device data.
+
+## CI
+
+- No CI workflow exists in this repo yet (`.github/workflows` is empty).
+  When one is added, the required job should run `dotnet build CCMC.sln`
+  and `dotnet test CCMC.sln` on every push and PR — both are already
+  fast and self-contained enough for that (no live Postgres needed for
+  the Windows-client suite; the cloud suite needs a Postgres service
+  container, which GitHub Actions supports natively).
+- Anything that needs real hardware (a physical scale/analyser) or a
+  manual step belongs in a separate, non-blocking job once it exists —
+  don't gate every PR on a dependency most dev machines and CI runners
+  don't have.
+- Prefer one required "summary" check over requiring each job
+  individually — simpler to wire into branch protection later.
+
+## Documentation consistency
+
+- The BRD is the source of truth for scope (see "Where to look" above).
+  `context.md`, `STATUS.md` and `README.md` are technical companions —
+  fix them to match the BRD when they diverge, not the other way round,
+  unless the divergence reveals the BRD itself is stale (the BMC-vs-
+  Chilling-Centre correction in BRD v2.1 §20 is the example of this: the
+  BRD's own scope framing was wrong, so it was fixed first, with a
+  version bump and changelog line, before anything else was touched).
+- When any of these documents changes materially, bump its version
+  header and add a one-line changelog entry in the header itself saying
+  what changed and why (see the BRD's own "Changelog (v2.1): ..." line
+  for the pattern). A future session — human or Claude — should be able
+  to tell what's new without diffing.
+- `README.md`'s job is to get a new contributor from clone to a running,
+  tested system (`dotnet build`, `dotnet test`, `dotnet run` for the
+  cloud API). If it describes commands or state that no longer work,
+  that's a bug — fix it the same way you'd fix a broken build script.
+
+## Code style defaults
+
+- **No premature abstraction.** Three similar lines beats a shared
+  helper built for a hypothetical second caller. This repo already made
+  this call explicitly at the architecture level — hand-rolled SQLite
+  over EF Core, a small hand-rolled `ILoggerProvider` over a logging
+  package — both because the alternative's machinery wasn't justified by
+  this project's actual size. Apply the same judgment at the function
+  level.
+- **No speculative error handling.** Validate at real boundaries (serial
+  port I/O, HTTP calls to the cloud, user input) and trust internal
+  domain/framework guarantees elsewhere. Every error condition in
+  `context.md`'s device/sync model is a boundary that was actually
+  identified — COM port unavailable, device disconnected, malformed
+  serial data, cloud unreachable — not a generic try/catch wrapped
+  around code that cannot fail.
+- **Comment the why, not the what.** A well-named method or class
+  already says what it does. Only comment a genuinely non-obvious
+  constraint — `ReadingProvenanceTracker`'s doc comment (explaining why
+  "MANUAL the moment either field is edited" is the least-ambiguous
+  behavior a single `ReadingSource` can represent) is the model to
+  follow, not the exception.
+- **No half-finished implementations or speculative feature flags.** If
+  a requirement doesn't exist yet, don't build for it. This is also
+  already a named project rule (STATUS.md "Engineering Rules": "no fake
+  device data," "no guessed device protocol") — extend the same
+  discipline to any other feature, not just device parsing.
+- **Match the existing patterns in the file/module you're editing.**
+  Consistency within a codebase beats a "better" pattern used in exactly
+  one place.
+
+## Device / serial integration discipline
+
+CCMC-specific, because this repo talks to physical hardware and the
+failure modes are different from a normal web/mobile stack:
+
+- **Never fabricate a device reading.** If a protocol isn't verified,
+  the adapter throws `DeviceProtocolNotEstablishedException` — it does
+  not return a plausible-looking number. This is the single
+  most-enforced rule in the codebase (see STATUS.md "Architecture
+  Decisions" and "Engineering Rules") and it does not get relaxed for
+  convenience, a demo, or a deadline.
+- **Never guess a device protocol.** A real parser is built only from
+  manufacturer documentation or controlled raw captures from the
+  physical device (`RawCaptureLogger`), and ships with captured-frame
+  regression tests. See "Parser Development Workflow" in STATUS.md for
+  the exact sequence.
+- **Exactly one component owns a given COM port**, enforced at runtime
+  (`SerialPortOwnershipException` on a second `Acquire()`), not just by
+  convention.
+- **Treat raw serial bytes as untrusted input**, the same as an HTTP
+  request body — validate/frame-detect before trusting them, and never
+  let malformed serial data reach the reception workflow or crash the
+  application.
+- **Business logic stays out of both the UI and the parser layer.** The
+  reception workflow (`CCMC.Application`) is the only place quality
+  rules and acceptance logic live.
+
+## Git and review hygiene
+
+- Only commit when explicitly asked — draft the diff, let the human
+  decide when it lands. (This repo currently has nothing committed
+  beyond the initial scaffold — see `git status` before assuming
+  otherwise.)
+- New commits over amends, unless explicitly asked to amend — an amend
+  after a failed pre-commit hook rewrites the wrong thing.
+- Stage files by name, not `git add -A`/`.` — a broad add can pull in a
+  `.env`, `appsettings.*.json` with a real connection string, or a
+  generated `bin`/`obj` artifact that doesn't belong in the diff.
+- Before pushing, skim what's actually staged (`git status`, `git diff
+  --staged`) for anything that looks like a secret, even behind an
+  innocuous filename (e.g. `appsettings.Development.json`).
+- Never force-push, `reset --hard`, or skip hooks without the human
+  explicitly asking for that specific action in that specific instance.
+
+## Security baseline
+
+- Parameterized queries only — `Microsoft.Data.Sqlite` parameters on the
+  client, EF Core/Npgsql on the cloud side — never string-concatenated
+  SQL, on either side of the stack.
+- Authorization is enforced server-side, per endpoint/action
+  (`[RequirePermission(code)]` + `CentreAccessGuard`, fails closed if an
+  action forgets the attribute). The Windows client's own permission
+  checks are UX-only, exactly as documented in `context.md` — never
+  treat a client-side check as an actual security control.
+- Secrets (`Jwt:Secret`, `ConnectionStrings:CcmcDb`, any future API key)
+  come from environment variables or configuration outside source
+  control — never hardcoded, and never committed in a non-dev
+  `appsettings.*.json`.
+- TLS in transit for all cloud calls; DPAPI-protected storage at rest
+  for anything sensitive kept locally (the offline-credential
+  Argon2id verifier is the existing pattern — see `context.md`
+  "Authentication / Authorization"). Never persist a plaintext password
+  or treat a cloud access token as an offline-login substitute.
+- Treat raw device bytes as untrusted input in the same sense as a
+  webhook payload — see "Device / serial integration discipline" above.
+
+## When picking new infrastructure or a cloud target
+
+- Size the cloud API's hosting/database tier to the actual number of
+  chilling centres being served, not an imagined national rollout —
+  start on the smallest managed tier that fits, document the upgrade
+  path.
+- Prefer managed Postgres and managed container/app hosting over a
+  self-managed VM for the cloud API — undifferentiated ops work is a
+  cost, not a feature, for a project this size.
+- Keep the cloud API portable (standard EF Core/Npgsql, no
+  cloud-proprietary services in the application layer) even once a
+  specific host is chosen, so a future migration is a redeploy, not a
+  rewrite.
+- Any deployment doc must clearly mark what's actually provisioned/
+  running today versus a recommended target that hasn't been built yet —
+  `context.md`/STATUS.md already do this correctly for the installer
+  (WiX MSI chosen, not built) and the cloud API's own deployment
+  packaging (none yet); keep that distinction explicit as new
+  infrastructure decisions get made.

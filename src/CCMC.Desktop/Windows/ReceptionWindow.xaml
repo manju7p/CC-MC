@@ -1,0 +1,41 @@
+<Window x:Class="CCMC.Desktop.Windows.ReceptionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CCMC - Milk Reception" Height="560" Width="480"
+        WindowStartupLocation="CenterScreen">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            <TextBlock Text="Milk Reception" FontSize="16" FontWeight="Bold" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Chilling Centre"/>
+            <ComboBox Name="CentreComboBox" DisplayMemberPath="Name" Margin="0,4,0,12"
+                      SelectionChanged="CentreComboBox_SelectionChanged"/>
+
+            <TextBlock Text="Source"/>
+            <ComboBox Name="SourceComboBox" DisplayMemberPath="Name" Margin="0,4,0,12"/>
+
+            <TextBlock Text="Vehicle"/>
+            <ComboBox Name="VehicleComboBox" DisplayMemberPath="VehicleNumber" Margin="0,4,0,16"/>
+
+            <Button Name="ReadDevicesButton" Content="Read Devices" Height="32" Click="ReadDevicesButton_Click" Margin="0,0,0,8"/>
+            <TextBlock Name="WeightStatusTextBlock" Foreground="DarkOrange" TextWrapping="Wrap" Margin="0,0,0,4"/>
+            <TextBlock Name="QualityStatusTextBlock" Foreground="DarkOrange" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+            <TextBlock Text="Quantity (kg)"/>
+            <TextBox Name="QuantityTextBox" Margin="0,4,0,12"/>
+
+            <TextBlock Text="FAT (%)"/>
+            <TextBox Name="FatTextBox" Margin="0,4,0,12"/>
+
+            <TextBlock Text="SNF (%)"/>
+            <TextBox Name="SnfTextBox" Margin="0,4,0,12"/>
+
+            <TextBlock Text="Temperature (°C)"/>
+            <TextBox Name="TemperatureTextBox" Margin="0,4,0,16"/>
+
+            <Button Name="SaveButton" Content="Validate and Save Reception" Height="36" Click="SaveButton_Click"/>
+
+            <TextBlock Name="ResultTextBlock" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"/>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
