@@ -345,10 +345,11 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v2.2 — authoritative source of
-                                            truth; §20-23 added/updated
-                                            this session, see "Scope
-                                            Decisions (v2.1–v2.2)" below)
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v3.0 — FINALIZED, authoritative
+                                            source of truth; §20-24 added/
+                                            updated this session, see
+                                            "Scope Decisions (v2.1–v3.0)"
+                                            below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
@@ -481,11 +482,12 @@ a consumer of any of these files):
 - Do not commit or push anything from a session working on this repo
   unless explicitly asked.
 - **Do not build chilling-tank/batch tracking, bulk storage tank
-  telemetry, CIP, or plant/equipment monitoring** — explicit v2.1 scope
-  decision (BRD §22), not an oversight. Checked against six MCC/chilling-
-  centre software vendors (Everest, KVR, TecXpert, ProcuPort, Stellapps
-  SmartCC, NanoDairy); none of them build this either — see "Scope
-  Decisions (v2.1)" below.
+  telemetry, CIP *telemetry* (chemical usage, temperature/time curves),
+  or plant/equipment monitoring** — explicit scope decision (BRD §22),
+  held up against six vendors and TUMUL's real RFP. A lightweight CIP
+  *compliance log* (date/operator/result, no telemetry) is a separate,
+  approved MVP item — see "Scope Decisions (v2.1–v3.0)" below, #2 and #6.
+  Do not conflate the two.
 - **Do not build farmer-level payment, per-farmer rate charts, or farmer
   settlement** — that belongs to the upstream BMC/VLC tier, not this
   Chilling Centre application (BRD §20).
@@ -495,56 +497,88 @@ a consumer of any of these files):
   before reconciliation, since reconciliation depends on dispatch data
   existing.
 
-## Scope Decisions (v2.1–v2.2)
+## Scope Decisions (v2.1–v3.0) — BRD finalized at v3.0
 
 This session reviewed the BRD against how privately-owned Milk Chilling
-Centres actually operate in India (not Bulk Milk Coolers, and not a
-cooperative federation the size of KMF), and against six vendors already
-selling software at this exact tier. Four decisions came out of that
-review and are now encoded in BRD §20–§23 (v2.1/v2.2) as well as here:
+Centres actually operate in India, against six vendors already selling
+software at this tier, and — in the v3.0 pass — against real Karnataka/
+Tamil Nadu evidence (TUMUL's full ERP RFP, BAMUL's operating scale,
+Aavin's live-deployed stack), validated across both a private-CC lens and
+a cooperative-federation (KMF/Aavin) lens. The resulting decisions are
+encoded in BRD §20–§24 as well as here:
 
 1. **Confirmed tier: Chilling Centre, not BMC.** See "Product" above.
-2. **Out of scope, by decision (BRD §22):** chilling-tank/batch tracking
-   (tank assignment, inlet/outlet temperature, chilling start/end, lot
-   tracking), bulk storage tank telemetry (level, temperature, age,
-   utilisation), CIP (clean-in-place cycle logging), and plant/equipment
-   monitoring (chiller, compressor, pumps, tank sensors, power/failure
-   events). Rationale: none of six independently-reviewed MCC/chilling-
-   centre vendors — Everest Instruments, KVR Technologies, TecXpert, Sort
-   String/ProcuPort, Stellapps SmartCC, NanoDairy — publicly build any of
-   this either, including Stellapps SmartCC, whose product is explicitly
-   a cloud layer for *monitoring* chilling centres. Six independent
-   vendors agreeing on the same boundary reads as a market pattern (tank/
-   CIP/equipment telemetry sold separately, by plant-automation/SCADA
-   firms) rather than a gap unique to this BRD. This device model stays
-   scoped to exactly the weighing scale and milk analyser (BRD §5) —
-   no additional sensor/telemetry device categories are being added.
-3. **Deferred, not descoped (BRD §22, note under §10):** laboratory
-   quality tests beyond FAT/SNF/CLR/Temperature — acidity, Clot-on-
-   Boiling (COB), antibiotic/adulteration screening — and a lab workflow
-   distinct from reception. No verified measurement instrument or
-   protocol exists for these yet; revisit once one is identified, no
-   fixed date.
-4. **In scope, and part of MVP (BRD §17, §23 "Superseded" note — v2.2,
-   originally Post-MVP under v2.1):** outbound tanker dispatch to the
-   processing plant, and reconciliation/closing-stock reporting. Both are
-   real, vendor-proven capabilities (TecXpert and ProcuPort build both;
-   Everest builds dispatch) and require no new device/hardware — pure
-   workflow and reporting additions on top of the existing reception +
-   sync architecture, reusing the idempotent-create pattern (reception)
-   and the durable-outbox pattern (override) that are each already built
-   once. Estimated ~2–3 developer-weeks combined. Build dispatch first;
-   reconciliation depends on dispatch data existing.
-5. **Working assumption, not yet confirmed:** dispatch's composite
-   FAT/SNF is computed as a weighted average of receptions since the
-   last dispatch — arithmetic over already-captured reception data, no
-   tank sensor, consistent with the §22 out-of-scope decision. Confirm
-   this with whoever owns the product call before dispatch UI work
-   starts; the alternative is manual entry at dispatch time.
+2. **Out of scope, by decision (BRD §22):** chilling-tank/batch tracking,
+   bulk storage tank telemetry, CIP **telemetry** (chemical usage,
+   temperature/time curves — a lightweight CIP compliance *log* is
+   different and is in MVP, see #6 below), and plant/equipment monitoring
+   (chiller, compressor, pumps, tank sensors, power/failure events).
+   Rationale: none of six independently-reviewed MCC/chilling-centre
+   vendors build this — see the BRD for the full vendor list — and this
+   held even after being checked directly against TUMUL's real RFP; the
+   one item TUMUL asked for that touches CIP turned out to be exactly the
+   kind of record-keeping now in MVP, not the telemetry that's excluded.
+   Device model stays scoped to exactly the weighing scale and milk
+   analyser (BRD §5) — no additional sensor/telemetry device categories.
+3. **Deferred, not descoped, priority raised (v3.0) (BRD §22, note under
+   §10):** laboratory quality tests beyond FAT/SNF/CLR/Temperature —
+   acidity, Clot-on-Boiling (COB), antibiotic/adulteration screening —
+   and a lab workflow distinct from reception. Still gated on no verified
+   measurement instrument/protocol existing (not a policy choice), but
+   both TUMUL's RFP and Aavin's live field deployment confirm this is
+   already-expected in the field, not speculative — treat as top priority
+   the moment device/instrument work resumes.
+4. **In scope, part of MVP (BRD §17):** outbound tanker dispatch to the
+   processing plant (now including tare/gross tanker weight fields — v3.0
+   refinement from TUMUL), and reconciliation/closing-stock reporting (now
+   tracking FAT/SNF variance, not just quantity — same source). Both
+   require no new device/hardware, reusing the idempotent-create pattern
+   (reception) and durable-outbox pattern (override) already built once.
+5. **Confirmed:** dispatch's composite FAT/SNF is computed as a weighted
+   average of receptions since the last dispatch — no tank sensor
+   involved, consistent with the §22 out-of-scope decision.
+6. **New in v3.0, approved and added to MVP (BRD §24):** a lightweight
+   CIP compliance log (date, tank/line id, operator, result — record-
+   keeping only, not the telemetry excluded in #2); device calibration
+   tracking for the scale/analyser with a due-date alert; an optional
+   parent-BMC/route code field on `Source` (blank for a private CC,
+   populated for a cooperative-tier deployment); a read-only current
+   rate-chart reference display at reception (no computation, no farmer
+   ledger — confirmed this does not cross the farmer-payment boundary in
+   #7); and an outbound-notification hook/abstraction (interface only —
+   no SMS gateway wired in this pass, see #8).
+7. **Confirmed still out of scope, unchanged by v3.0 validation:**
+   farmer/pourer payment computation, recoveries against loans/feed/AI/
+   vet advances, society incentive calculation, and full rate-chart
+   authorship/approval — all structurally upstream of a Chilling Centre
+   in both the private-CC and cooperative-federation lens (even TUMUL's
+   own RFP authors its price chart centrally, not at the CC).
+8. **Explicitly considered and excluded from MVP (v3.0):** a real SMS
+   send-path (gateway account/integration) — only the notification hook
+   ships now; and an offline-media (USB/pen-drive) sync fallback for
+   zero-connectivity sites — low priority for the private-CC target,
+   revisit only if a specific pilot site has no connectivity option at
+   all.
+
+**Evidence base for v3.0** (see BRD §24 for full detail): a full 171-page
+ERP RFP from TUMUL (Tumkur District Co-operative Milk Producers Societies'
+Union, KMF-affiliated, Karnataka — extracted as `CC.pdf`, not committed to
+this repo), BAMUL's real operating scale (Bengaluru, Karnataka — 7
+chilling centres, 14.0 LLPD, 246 bulk milk coolers), and Aavin's
+live-deployed stack (Tamil Nadu — cloud-connected analysers tendered at
+1,397 locations, 45 BMCs already live in Madurai, quality-based pricing
+already operating). No public RFP exists for a private operator,
+structurally — the private-CC lens rests on the six-vendor landscape
+instead. Karnataka's and Tamil Nadu's e-procurement portals gate actual
+tender documents behind login; only listing metadata was reachable for
+any other district union, which is why this evidence base rests on one
+full RFP plus two independent real-operations sources rather than
+multiple full RFPs — judged sufficient to finalize on, not a gap to
+revisit without a specific reason.
 
 Full vendor-by-vendor detail (confidence level, what was verified vs.
 vendor-claimed, and the per-capability coverage grid) lives in the BRD
-§20–§23, not duplicated here — read those sections directly rather than
+§20–§24, not duplicated here — read those sections directly rather than
 re-deriving vendor claims from memory.
 
 ## Open Questions
