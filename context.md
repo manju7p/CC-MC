@@ -345,10 +345,10 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v3.0 — FINALIZED, authoritative
-                                            source of truth; §20-24 added/
-                                            updated this session, see
-                                            "Scope Decisions (v2.1–v3.0)"
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v4.0 — authoritative source of
+                                            truth, MVP narrowed; §20-24
+                                            amended this session, see
+                                            "Scope Decisions (v2.1–v4.0)"
                                             below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
@@ -484,20 +484,26 @@ a consumer of any of these files):
 - **Do not build chilling-tank/batch tracking, bulk storage tank
   telemetry, CIP *telemetry* (chemical usage, temperature/time curves),
   or plant/equipment monitoring** — explicit scope decision (BRD §22),
-  held up against six vendors and TUMUL's real RFP. A lightweight CIP
-  *compliance log* (date/operator/result, no telemetry) is a separate,
-  approved MVP item — see "Scope Decisions (v2.1–v3.0)" below, #2 and #6.
-  Do not conflate the two.
+  held up against six vendors and TUMUL's real RFP.
 - **Do not build farmer-level payment, per-farmer rate charts, or farmer
   settlement** — that belongs to the upstream BMC/VLC tier, not this
   Chilling Centre application (BRD §20).
-- **Outbound tanker dispatch and reconciliation/closing-stock reporting
-  are now part of the MVP** (v2.2 — moved in from Post-MVP; see BRD §17,
-  §23 "Superseded" note, and "Scope Decisions" below). Build dispatch
-  before reconciliation, since reconciliation depends on dispatch data
-  existing.
+- **Do not build outbound tanker dispatch, reconciliation/closing-stock
+  reporting, device calibration tracking, or a CIP compliance log** —
+  all four were approved into MVP at v2.2/v3.0, then moved to Out of
+  Scope (v4.0) by explicit business decision, not Post-MVP — not
+  currently planned, revisit only if asked. See BRD §22, §23
+  "Superseded again", §24 "Amended", and "Scope Decisions" below, #9.
+- **v4.0 MVP is exactly eight components:** Milk Arrival, Reception &
+  Testing, Quality Decision, Local Save, Held in Chilling Centre
+  (physical stage, no software tracking), Rate Chart Reference,
+  Notification Hook, and Cloud (RBAC/Audit/Dashboard). The optional
+  Source→BMC hierarchy field also remains (zero-cost, blank for a
+  private CC) — it wasn't explicitly named in the v4.0 narrowing
+  instruction either way, so it was kept rather than silently cut;
+  flag if it should go too.
 
-## Scope Decisions (v2.1–v3.0) — BRD finalized at v3.0
+## Scope Decisions (v2.1–v4.0) — MVP narrowed at v4.0
 
 This session reviewed the BRD against how privately-owned Milk Chilling
 Centres actually operate in India, against six vendors already selling
@@ -559,6 +565,18 @@ encoded in BRD §20–§24 as well as here:
    zero-connectivity sites — low priority for the private-CC target,
    revisit only if a specific pilot site has no connectivity option at
    all.
+9. **MVP narrowed (v4.0), by explicit business decision — not a
+   validation finding.** Of #4 and #6 above, four items move from MVP to
+   Out of Scope: outbound tanker dispatch, reconciliation/closing-stock
+   reporting, device calibration tracking, and the CIP compliance log.
+   None of this reverses the v3.0 validation itself (dispatch/
+   reconciliation are still real, vendor-proven capabilities; the CIP log
+   is still correctly distinguished from CIP telemetry) — it's a
+   deliberate choice to ship a smaller MVP first. §17's MVP table now
+   lists exactly: Devices, Reception, Local, Cloud, Source Hierarchy,
+   Rate Chart Reference, Notifications. Held in Chilling Centre continues
+   to be treated purely as a physical/conceptual stage with no dedicated
+   data model, as it always has been.
 
 **Evidence base for v3.0** (see BRD §24 for full detail): a full 171-page
 ERP RFP from TUMUL (Tumkur District Co-operative Milk Producers Societies'
