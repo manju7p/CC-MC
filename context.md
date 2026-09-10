@@ -345,11 +345,11 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v4.0 — authoritative source of
-                                            truth, MVP narrowed; §20-24
-                                            amended this session, see
-                                            "Scope Decisions (v2.1–v4.0)"
-                                            below)
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v5.0 — authoritative source of
+                                            truth; §20-24 amended, new
+                                            §25 (Rate Calculation) added
+                                            this session, see "Scope
+                                            Decisions (v2.1–v5.0)" below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
@@ -494,16 +494,27 @@ a consumer of any of these files):
   Scope (v4.0) by explicit business decision, not Post-MVP — not
   currently planned, revisit only if asked. See BRD §22, §23
   "Superseded again", §24 "Amended", and "Scope Decisions" below, #9.
-- **v4.0 MVP is exactly eight components:** Milk Arrival, Reception &
+- **v5.0 MVP is exactly eight components:** Milk Arrival, Reception &
   Testing, Quality Decision, Local Save, Held in Chilling Centre
-  (physical stage, no software tracking), Rate Chart Reference,
-  Notification Hook, and Cloud (RBAC/Audit/Dashboard). The optional
-  Source→BMC hierarchy field also remains (zero-cost, blank for a
-  private CC) — it wasn't explicitly named in the v4.0 narrowing
-  instruction either way, so it was kept rather than silently cut;
-  flag if it should go too.
+  (physical stage, no software tracking), **Rate Calculation** (renamed
+  from Rate Chart Reference — now a live computation, not just a
+  display, see BRD §25), Notification Hook, and Cloud (RBAC/Audit/
+  Dashboard). The optional Source→BMC hierarchy field also remains
+  (zero-cost, blank for a private CC) — it wasn't explicitly named in
+  the v4.0 narrowing instruction either way, so it was kept rather than
+  silently cut; flag if it should go too.
+- **Rate/Amount calculation is now in scope (v5.0, BRD §25) — farmer
+  settlement is still not.** The formula (ported from a legacy Android
+  app: `MilkCollectionFragment.getAmount()`, `RateFormulaFragment`,
+  branch `offline-db`) computes a Rate and Amount for a single
+  collection from FAT/SNF/Weight against an already-configured Rate
+  Formula (Fat-vs-SNF or TS-based). This is deliberately narrower than
+  "farmer/pourer payment" — no ledger, no advances, no incentive
+  schemes, no settlement cycles. See "Scope Decisions" below, #10, for
+  the precise boundary and why it doesn't reopen §20's farmer-tier
+  exclusion.
 
-## Scope Decisions (v2.1–v4.0) — MVP narrowed at v4.0
+## Scope Decisions (v2.1–v5.0) — Rate Calculation added at v5.0
 
 This session reviewed the BRD against how privately-owned Milk Chilling
 Centres actually operate in India, against six vendors already selling
@@ -577,6 +588,22 @@ encoded in BRD §20–§24 as well as here:
    Rate Chart Reference, Notifications. Held in Chilling Centre continues
    to be treated purely as a physical/conceptual stage with no dedicated
    data model, as it always has been.
+10. **Rate Calculation added to MVP (v5.0), ported from a real reference
+    implementation.** Source: `MilkCollectionFragment.getAmount()`,
+    `RateFormulaFragment` (legacy Android app, branch `offline-db`) —
+    full formula in BRD §25. Two modes selected by `PREFS_RATE_TYPE`:
+    Fat-vs-SNF (`Rate = (Value1+Value2)×0.22×FAT/100 +
+    (Value1+Value2)×0.36×SNF/100 + 0.32`) and TS-based (`Rate =
+    (FAT+SNF)×TS_Rate/100`); both give `Amount = Rate × Weight`, both
+    fall back to `Rate/Amount = 0` if a required input or config value
+    is missing. **The precise boundary that keeps this from reopening
+    §20's farmer-tier exclusion:** this computes Rate/Amount for one
+    collection against an already-configured formula — it does not
+    author rate charts, does not maintain a farmer/pourer ledger, does
+    not handle advances or incentives, and does not run settlement
+    cycles. Those remain out of scope, confirmed unchanged in the same
+    pass (§20, §24 amendment notes). `Rate Chart Reference` in the MVP
+    table (#9 above) is renamed `Rate Calculation` to match.
 
 **Evidence base for v3.0** (see BRD §24 for full detail): a full 171-page
 ERP RFP from TUMUL (Tumkur District Co-operative Milk Producers Societies'
