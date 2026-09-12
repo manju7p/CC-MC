@@ -219,8 +219,9 @@ here).
 login requires at least one prior successful online login, see §20) - you
 need a running instance of the cloud API (§29.6) reachable at the URL
 configured in `src/CCMC.Desktop/appsettings.json` (`CloudApi:BaseUrl`).
-Point it at `http://localhost:5000/` to use the local dev instance from
-§29.
+Point it at `http://localhost:8081/` (the Docker Compose API port — see §29.16
+"Deployment Direction") to use the local dev instance. This is already the
+committed default in `appsettings.json`.
 
 ### 11. Development Credentials
 
@@ -798,12 +799,22 @@ other environment **must** supply both via environment variables
 missing, rather than silently falling back to an insecure default.
 
 **Windows client configuration** - point `src/CCMC.Desktop/appsettings.json`'s
-`CloudApi:BaseUrl` at wherever you run this API, e.g.:
+`CloudApi:BaseUrl` at wherever you run this API. The committed default is
+`http://localhost:8081/` (the Docker Compose port, §29.16) - only change it
+if you're running the API a different way, e.g.:
 ```json
 { "CloudApi": { "BaseUrl": "http://localhost:5000/" } }
 ```
 
-### 29.11 Migrations & Running Locally
+### 29.11 Migrations & Running Locally (without Docker)
+
+> **Docker Compose (§29.16) is the primary, recommended way to run this API** -
+> `docker compose -p cc-mc up -d --build` with `.env.docker`/`.env.neon`. The
+> steps below are a secondary alternative for running the API directly with
+> `dotnet run` against a manually-installed local PostgreSQL (§29.9), useful
+> for debugging the API itself without a container in the loop. If you use
+> this path, remember to point the Windows client's `CloudApi:BaseUrl` at
+> whatever port you pick here (e.g. `5000`), not the Docker default `8081`.
 
 From the repository root, with `dotnet-ef` on `PATH` (§29.8):
 
@@ -940,47 +951,88 @@ multi-stage image (`mcr.microsoft.com/dotnet/sdk:8.0` → `mcr.microsoft.com/dot
 `appsettings.Development.json` (so no dev placeholder secret can ever end
 up in the image, in any environment).
 
-**Docker Compose** (`compose.yaml`, repo root) - local development only,
-project name `cc-mc`:
+**Docker Compose** (`compose.yaml`, repo root) - project name `cc-mc`,
+used for BOTH local-testing modes below (the SAME `api` service
+definition; only which PostgreSQL it talks to changes):
 
-| Service | Container name | Image |
-|---|---|---|
-| API | `cc-mc` | `cc-mc-api` (built from `Dockerfile`) |
-| PostgreSQL | `cc-mc-postgres` | `postgres:16` |
+| Service | Container name | Image | Runs in |
+|---|---|---|---|
+| API | `cc-mc` | `cc-mc-api` (built from `Dockerfile`) | Both modes |
+| PostgreSQL | `cc-mc-postgres` | `postgres:16` | Docker mode only (see below) |
 
 Both run on a dedicated `cc-mc-network` Docker network; the API reaches
-PostgreSQL via the service hostname `cc-mc-postgres`, never `localhost`.
-PostgreSQL has a healthcheck, and the API's `depends_on` waits for it to
-report healthy (not just "started") before starting, since
-`db.Database.Migrate()` runs immediately at API startup. Usage:
-
-```
-docker compose -p cc-mc --env-file .env.local config     # validate
-docker compose -p cc-mc --env-file .env.local up -d --build
-docker compose -p cc-mc --env-file .env.local down        # stop (keeps data)
-```
+local PostgreSQL via the service hostname `cc-mc-postgres`, never
+`localhost`. PostgreSQL has a healthcheck, and the API's `depends_on`
+waits for it to report healthy (not just "started") before starting,
+since `db.Database.Migrate()` runs immediately at API startup.
 
 **Environment configuration** - see `.env.example` for the full reference
-of every variable CCMC.Cloud.Api consumes. Copy the matching template,
-fill in real values, and never commit the filled-in file (all are
-gitignored - see `.gitignore`):
+of every variable CCMC.Cloud.Api consumes. `docker compose` auto-loads a
+file literally named `.env` (no `--env-file` flag needed) - switching
+mode means copying the mode-specific file over it (PowerShell):
 
-| Template (committed, placeholders only) | Copy to (gitignored, real values) | Used for |
+| File | Committed? | Copy to `.env` for... |
 |---|---|---|
-| `.env.example` | — (reference only, not meant to be copied directly) | Documents every variable name |
-| `.env.local.example` | `.env.local` | Local Docker Compose (`Host=cc-mc-postgres`) |
-| `.env.production.example` | `.env.production` | Neon / eventual Render deployment (`Host=<neon-host>`) |
+| `.env.example` | Yes (placeholders only) | — reference only, never copied directly |
+| `.env.docker` | **No** (gitignored) | Mode A: API → local `cc-mc-postgres` |
+| `.env.neon` | **No** (gitignored) | Mode B: API → Neon PostgreSQL |
+
+**Mode A — Docker** (API → local PostgreSQL):
+
+```powershell
+Copy-Item .env.docker .env -Force
+docker compose -p cc-mc down
+docker compose -p cc-mc up -d --build
+```
+
+Result: `WPF → http://localhost:8081 → cc-mc → cc-mc-postgres`. `.env.docker`
+sets `COMPOSE_PROFILES=docker`, which activates the `cc-mc-postgres`
+service's Compose profile.
+
+**Mode B — Neon** (API → Neon PostgreSQL, no local Postgres container):
+
+```powershell
+Copy-Item .env.neon .env -Force
+docker compose -p cc-mc down
+docker compose -p cc-mc up -d --build
+```
+
+Result: `WPF → http://localhost:8081 → cc-mc → Neon PostgreSQL`.
+`.env.neon` deliberately omits `COMPOSE_PROFILES`, so the `cc-mc-postgres`
+service's profile is never activated and Compose does not start a
+redundant local PostgreSQL container - verified directly (`docker compose
+-p cc-mc ps` shows only `cc-mc` running in this mode).
+
+In both modes, verify with:
+
+```powershell
+docker compose -p cc-mc config   # validate
+docker compose -p cc-mc ps       # confirm which services are running
+curl http://localhost:8081/health
+curl http://localhost:8081/health/db
+```
 
 The variables themselves never change name or meaning between
-environments - only their values:
+environments - only their values (`.env.docker`/`.env.neon` set them,
+`.env.example` documents them):
 
-- `ASPNETCORE_ENVIRONMENT` - `Development` (local) or `Production` (Neon/Render)
+- `ASPNETCORE_ENVIRONMENT` - `Development` (Docker mode) or `Production` (Neon)
+- `ASPNETCORE_URLS` - `http://0.0.0.0:8080` in both (never `localhost`-only)
 - `ConnectionStrings__CcmcDb` - standard Npgsql keyword connection string; only the `Host` (and, for Neon, `Ssl Mode=Require`) differs
-- `Jwt__Secret` - a real, unique-per-environment random string; never reused between local and production
+- `Jwt__Secret` - a real, unique-per-environment random string; never reused between modes
+- `Jwt__Issuer`/`Jwt__Audience` - optional; both modes leave these unset and rely on `JwtOptions`' built-in defaults
 
-**Never commit** a filled-in `.env`, `.env.local`, or `.env.production`
-file, and never paste a real connection string or secret into this
-README, any other tracked file, or a commit message.
+**The Windows client** (`src/CCMC.Desktop/appsettings.json`,
+`CloudApi:BaseUrl`) always points at `http://localhost:8081/` in both
+modes - it talks to the locally running `cc-mc` container either way; only
+what's *behind* `cc-mc` changes. This was previously left at a stale
+`http://localhost:5000/` (the old pre-Docker `dotnet run` default), which
+was the root cause of the client always falling back to offline mode -
+see STATUS.md "Application Bug Fixes" for the full diagnosis.
+
+**Never commit** a filled-in `.env`, `.env.docker`, or `.env.neon` file,
+and never paste a real connection string or secret into this README, any
+other tracked file, or a commit message.
 
 **Neon PostgreSQL** is now the production database target (project
 `fancy-cherry-25725711`, branch `production`) - set up via the Neon CLI

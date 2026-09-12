@@ -256,10 +256,14 @@ hard-coded.
 See "Cloud Responsibilities" above for the full current contract. Base
 URL is configured via `CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`
 - environment-specific values (dev vs. prod cloud endpoint) are an
-operator/deployment concern, not hard-coded. For the cloud API built in
-this repo (§29 of README.md), point it at wherever that's running, e.g.
-`http://localhost:5000/` for a local dev instance started with
-`dotnet run --project src/CCMC.Cloud.Api/CCMC.Cloud.Api.csproj --urls http://localhost:5000`.
+operator/deployment concern, not hard-coded. The committed default,
+and the primary/recommended way to run the cloud API, is
+`http://localhost:8081/` via Docker Compose (`docker compose -p cc-mc up -d
+--build` with `.env.docker`/`.env.neon` - see README.md §29.16 and
+HOW_TO_RUN.md). Running the API directly with `dotnet run --urls
+http://localhost:5000` (README.md §29.11) remains a valid secondary
+alternative for debugging the API without a container, but requires
+pointing `CloudApi:BaseUrl` at that port instead.
 
 **Important, verified wire-format fact:** the cloud's TypeORM `decimal`
 columns (`quantityKg`, `fat`, `snf`, `temperature` on reception;
@@ -718,6 +722,20 @@ runs against either database, controlled only by which environment file
 (`.env.local` vs `.env.production`, both gitignored - see
 `.env.example`/`.env.local.example`/`.env.production.example`) is
 supplied - no source-code difference between local and production.
+**Update (2026-09-12, later same day)**: the environment file naming above
+is superseded - it's now `.env`/`.env.docker`/`.env.neon`/`.env.example`,
+switched via `Copy-Item .env.docker .env -Force` or `Copy-Item .env.neon
+.env -Force` (PowerShell) followed by `docker compose -p cc-mc up -d
+--build`; Neon mode uses a Compose profile to skip starting
+`cc-mc-postgres` entirely rather than a second compose file. Also this
+day: a real user manually tested the WPF app and found 6 real bugs, 5 of
+which shared one root cause (`CCMC.Desktop/appsettings.json`'s
+`CloudApi:BaseUrl` was stale at `http://localhost:5000/` instead of the
+actual Docker-mapped `http://localhost:8081/`, causing every login to
+silently fall back to offline mode and therefore never sync master data,
+including rate-formula-settings). All six fixed - see STATUS.md
+"Application Bug Fixes" for the full root-cause writeup.
+
 **Render deployment is the next step, not done yet.** One real, reported-
 not-worked-around limitation: Neon/production currently has zero users
 and no administrative bootstrap mechanism (`DevelopmentSeeder` correctly

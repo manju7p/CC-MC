@@ -57,6 +57,18 @@ public enum CloudMutationOutcome
 public sealed record CloudOverrideResult(CloudMutationOutcome Outcome, ReceptionTransactionDto? Transaction, string? ErrorMessage);
 
 /// <summary>
+/// A 403 (the caller's role lacks SOURCE_CREATE/VEHICLE_CREATE) is a Terminal
+/// outcome, same as any other authoritative rejection - see
+/// CloudMutationOutcome's existing OverrideReceptionAsync usage for the same
+/// status-code classification this mirrors. The caller (SourcesWindow/
+/// VehiclesWindow) surfaces ErrorMessage directly rather than assuming
+/// success.
+/// </summary>
+public sealed record CloudCreateSourceResult(CloudMutationOutcome Outcome, SourceDto? Source, string? ErrorMessage);
+
+public sealed record CloudCreateVehicleResult(CloudMutationOutcome Outcome, VehicleDto? Vehicle, string? ErrorMessage);
+
+/// <summary>
 /// The Windows app's only path to the cloud. Implemented by
 /// CCMC.Infrastructure's HttpCloudApiClient against the existing NestJS API
 /// contract documented in context.md - NOT a new/invented contract. No
@@ -77,6 +89,12 @@ public interface ICloudApiClient
 
     Task<CloudOverrideResult> OverrideReceptionAsync(
         string accessToken, int cloudTransactionId, OverrideReceptionRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>POST /sources - gated server-side by SOURCE_CREATE (Manager/Admin only, per DevelopmentSeeder's role grants). Never assume success client-side; the server remains the real authorization boundary.</summary>
+    Task<CloudCreateSourceResult> CreateSourceAsync(string accessToken, CreateSourceRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>POST /vehicles - gated server-side by VEHICLE_CREATE (Manager/Admin only, per DevelopmentSeeder's role grants).</summary>
+    Task<CloudCreateVehicleResult> CreateVehicleAsync(string accessToken, CreateVehicleRequestDto request, CancellationToken cancellationToken);
 
     Task<DashboardSummaryDto> GetDashboardSummaryAsync(string accessToken, int? centreId, CancellationToken cancellationToken);
 }

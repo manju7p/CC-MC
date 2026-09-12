@@ -37,6 +37,31 @@ public sealed class VehicleDto
     [JsonPropertyName("centreId")] public required int CentreId { get; init; }
 }
 
+/// <summary>Mirrors the cloud's SourcesController.CreateSourceRequest exactly - POST /sources, gated by SOURCE_CREATE (Manager/Admin - see PermissionCodes/DevelopmentSeeder).</summary>
+public sealed class CreateSourceRequestDto
+{
+    [JsonPropertyName("code")] public required string Code { get; init; }
+    [JsonPropertyName("name")] public required string Name { get; init; }
+    [JsonPropertyName("location")] public string? Location { get; init; }
+    [JsonPropertyName("contact")] public string? Contact { get; init; }
+    [JsonPropertyName("milkType")] public string? MilkType { get; init; }
+    [JsonPropertyName("centreId")] public required int CentreId { get; init; }
+}
+
+/// <summary>Mirrors the cloud's VehiclesController.CreateVehicleRequest exactly - POST /vehicles, gated by VEHICLE_CREATE (Manager/Admin - see PermissionCodes/DevelopmentSeeder).</summary>
+public sealed class CreateVehicleRequestDto
+{
+    [JsonPropertyName("vehicleNumber")] public required string VehicleNumber { get; init; }
+    [JsonPropertyName("tankerNumber")] public string? TankerNumber { get; init; }
+    [JsonPropertyName("driverName")] public string? DriverName { get; init; }
+    [JsonPropertyName("driverMobile")] public string? DriverMobile { get; init; }
+
+    [JsonPropertyName("capacityKg"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? CapacityKg { get; init; }
+
+    [JsonPropertyName("centreId")] public required int CentreId { get; init; }
+}
+
 public sealed class QualityRuleDto
 {
     [JsonPropertyName("id")] public required int Id { get; init; }

@@ -144,6 +144,12 @@ public class AuthenticationServiceTests
         public Task<CloudOverrideResult> OverrideReceptionAsync(
             string accessToken, int cloudTransactionId, CCMC.Contracts.Dtos.OverrideReceptionRequestDto request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<CloudCreateSourceResult> CreateSourceAsync(
+            string accessToken, CCMC.Contracts.Dtos.CreateSourceRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        public Task<CloudCreateVehicleResult> CreateVehicleAsync(
+            string accessToken, CCMC.Contracts.Dtos.CreateVehicleRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task<CCMC.Contracts.Dtos.DashboardSummaryDto> GetDashboardSummaryAsync(
             string accessToken, int? centreId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();

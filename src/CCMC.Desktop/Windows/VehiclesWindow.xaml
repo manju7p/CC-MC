@@ -1,29 +1,94 @@
 <Window x:Class="CCMC.Desktop.Windows.VehiclesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Vehicles" Height="500" Width="760" MinHeight="320" MinWidth="520"
+        Title="CCMC - Vehicles" Height="640" Width="800" MinHeight="480" MinWidth="600"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Margin="0,0,0,14">
-            <TextBlock Text="Vehicles" Style="{StaticResource TitleText}"/>
-            <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
-                       Text="Vehicles are managed in the cloud and cached locally for offline reception (read-only here)."/>
-        </StackPanel>
-        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="0">
-            <DataGrid Name="VehiclesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Vehicle #" Binding="{Binding VehicleNumber}"/>
-                    <DataGridTextColumn Header="Tanker #" Binding="{Binding TankerNumber}"/>
-                    <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="*"/>
-                    <DataGridTextColumn Header="Mobile" Binding="{Binding DriverMobile}"/>
-                    <DataGridTextColumn Header="Capacity (kg)" Binding="{Binding CapacityKg}"/>
-                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
-    </Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="300"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                <TextBlock Text="Vehicles" Style="{StaticResource TitleText}"/>
+                <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                           Text="Vehicles are managed in the cloud and cached locally for offline reception."/>
+            </StackPanel>
+
+            <!-- Add Vehicle - visible only to users whose role grants VEHICLE_CREATE (Manager/Admin).
+                 Client-side UX convenience only; the server independently enforces the same permission. -->
+            <Border Grid.Row="1" Name="AddVehiclePanel" Style="{StaticResource CardBorder}" Margin="0,0,0,14" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="ADD VEHICLE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Chilling Centre" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="AddVehicleCentreComboBox" DisplayMemberPath="Name"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Vehicle Number" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="AddVehicleNumberTextBox"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Tanker Number" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="AddVehicleTankerNumberTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Capacity (kg)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="AddVehicleCapacityTextBox"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Driver Name" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="AddVehicleDriverNameTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Driver Mobile" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="AddVehicleDriverMobileTextBox"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Button Name="AddVehicleButton" Content="Add Vehicle" Height="34" Width="140" HorizontalAlignment="Left"
+                            Style="{StaticResource PrimaryButton}" Click="AddVehicleButton_Click"/>
+                    <TextBlock Name="AddVehicleResultTextBlock" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="0">
+                <DataGrid Name="VehiclesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Vehicle #" Binding="{Binding VehicleNumber}"/>
+                        <DataGridTextColumn Header="Tanker #" Binding="{Binding TankerNumber}"/>
+                        <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="*"/>
+                        <DataGridTextColumn Header="Mobile" Binding="{Binding DriverMobile}"/>
+                        <DataGridTextColumn Header="Capacity (kg)" Binding="{Binding CapacityKg}"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </Window>

@@ -1,16 +1,25 @@
-# CC-MC local Docker Compose project - two services, one project ("cc-mc").
+# CC-MC local Docker Compose project ("cc-mc") - the SAME image/service
+# definition serves both local-testing modes; only which PostgreSQL the API
+# talks to changes, controlled entirely by which file is copied to `.env`
+# (PowerShell):
 #
-# Usage (see .env.local.example - copy it to .env.local and fill in a local
-# password/secret first):
+#   Copy-Item .env.docker .env -Force   # Mode A: API -> local cc-mc-postgres
+#   Copy-Item .env.neon .env -Force     # Mode B: API -> Neon PostgreSQL
 #
-#   docker compose -p cc-mc --env-file .env.local config   # validate
-#   docker compose -p cc-mc --env-file .env.local up -d --build
-#   docker compose -p cc-mc --env-file .env.local down      # stop (keeps the named volume)
+# Then, either mode:
 #
-# This is LOCAL-ONLY. Production configuration (Neon PostgreSQL, and
-# eventually Render for the API) is supplied the same way - via environment
-# variables - but through .env.production, never through this file. See
-# README.md "Environment Configuration" / "Docker Compose".
+#   docker compose -p cc-mc config          # validate
+#   docker compose -p cc-mc up -d --build
+#   docker compose -p cc-mc down             # stop (keeps the named volume)
+#
+# See .env.example for what each variable means and README.md "Environment
+# Configuration" / "Docker Compose" for the full walkthrough.
+#
+# `.env` is Docker Compose's own default env file - no `--env-file` flag
+# needed. `.env.docker` additionally sets COMPOSE_PROFILES=docker, which
+# activates the "docker" profile below and starts cc-mc-postgres;
+# `.env.neon` omits it, so Neon mode does NOT start a redundant local
+# PostgreSQL container.
 name: cc-mc
 
 services:
@@ -22,26 +31,42 @@ services:
     container_name: cc-mc
     ports:
       - "${API_HOST_PORT:-8081}:8080"
+    env_file:
+      - .env
     environment:
+      # Required, validated explicitly here (in addition to whatever env_file
+      # already provided) so a missing value fails fast with a clear message
+      # rather than a confusing downstream error.
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__CcmcDb: ${ConnectionStrings__CcmcDb:?Set ConnectionStrings__CcmcDb in .env.local (see .env.local.example)}
-      Jwt__Secret: ${Jwt__Secret:?Set Jwt__Secret in .env.local (see .env.local.example)}
+      ConnectionStrings__CcmcDb: ${ConnectionStrings__CcmcDb:?Set ConnectionStrings__CcmcDb in .env - copy .env.docker or .env.neon to .env first (see .env.example)}
+      Jwt__Secret: ${Jwt__Secret:?Set Jwt__Secret in .env - copy .env.docker or .env.neon to .env first (see .env.example)}
     depends_on:
       postgres:
-        # Not just "container started" - waits for PostgreSQL to actually
-        # accept connections (healthcheck below), since db.Database.Migrate()
-        # runs immediately at API startup and would otherwise race a
-        # not-yet-ready database.
+        # required: false - so Neon mode (where the "docker" profile, and
+        # therefore this service, is never started) does not fail to start
+        # the API just because it depends on a service that was
+        # deliberately never brought up.
         condition: service_healthy
+        required: false
     networks:
       - cc-mc-network
 
   postgres:
     image: postgres:16
     container_name: cc-mc-postgres
+    profiles:
+      - docker
     environment:
+      # NOTE: Compose interpolates every service's variables at parse time,
+      # even one gated behind an inactive profile (verified directly - a
+      # `:?required` guard here fails `up`/`build` in Neon mode even though
+      # this service never starts) - so POSTGRES_PASSWORD uses a soft
+      # `:-` default, not `:?`. It's genuinely required only when the
+      # "docker" profile is active (.env.docker always sets a real value);
+      # an empty/placeholder value here is harmless in Neon mode since this
+      # container is never started.
       POSTGRES_USER: ${POSTGRES_USER:-ccmc_docker}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local (see .env.local.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-not-used-outside-docker-profile}
       POSTGRES_DB: ${POSTGRES_DB:-ccmc_cloud_docker}
     ports:
       - "${POSTGRES_HOST_PORT:-55433}:5432"

@@ -32,6 +32,8 @@
                     <DataGridTextColumn Header="Water" Binding="{Binding Water}"/>
                     <DataGridTextColumn Header="Protein" Binding="{Binding Protein}"/>
                     <DataGridTextColumn Header="Temp" Binding="{Binding Temperature}"/>
+                    <DataGridTextColumn Header="Rate" Binding="{Binding Rate, StringFormat={}{0:F2}}"/>
+                    <DataGridTextColumn Header="Amount" Binding="{Binding Amount, StringFormat={}{0:F2}}"/>
                     <DataGridTextColumn Header="Reading Source" Binding="{Binding ReadingSource}"/>
                     <DataGridTextColumn Header="Reason" Binding="{Binding Reason}" Width="180"/>
                     <DataGridTextColumn Header="Captured At" Binding="{Binding CapturedAt}"/>

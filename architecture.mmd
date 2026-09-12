@@ -1,0 +1,147 @@
+%% CC-MC — Complete System Architecture (checkpoint 2026-09-13)
+%% CURRENT = built and verified in this repo today.
+%% FUTURE  = designed for, not yet built/deployed (Render hosting).
+%% Generated from direct source inspection, not from prior documentation.
+
+flowchart TB
+
+    subgraph PHYS["PHYSICAL DEVICES (CURRENT — software path verified, hardware serial link only Videocon-verified)"]
+        SCALE["Videocon Weighing Scale<br/>COM4, 2400 baud, 8N1, no flow control<br/>(physically verified)"]
+        ANALYSER["Ekomilk Milkana KAM98-2A<br/>29-digit parenthesised frame<br/>(payload decode verified on 2 sample frames;<br/>physical serial link NOT yet verified)"]
+    end
+
+    subgraph DESKTOP["CCMC.Desktop (WPF, .NET 8, code-behind, no MVVM)"]
+        UI["Windows: LoginWindow, MainWindow,<br/>ReceptionWindow, ReceptionHistoryWindow,<br/>SourcesWindow, VehiclesWindow, ..."]
+        SESSION["Session (in-memory only)<br/>AccessToken / User / IsOffline"]
+    end
+
+    subgraph SERIAL["CCMC.Infrastructure — Serial + Devices"]
+        SCM["SerialConnectionManager<br/>one owner per COM port<br/>(SerialPortOwnershipException)"]
+        ADAPT_S["VideoconWeighingScaleAdapter"]
+        ADAPT_A["EkomilkKam98A2AAnalyserAdapter"]
+        PARSE_S["VideoconWeightFrameParser"]
+        PARSE_A["Kam98A2AAnalyserFrameParser"]
+        PROTOEX["DeviceProtocolNotEstablishedException /<br/>DeviceParseException<br/>(never fabricates a reading)"]
+    end
+
+    subgraph DOMAIN["CCMC.Domain"]
+        WR["WeightReading"]
+        MQR["MilkQualityReading"]
+        RATECALC["RateCalculationService<br/>(Fat-vs-SNF / TS-based)"]
+    end
+
+    subgraph APP["CCMC.Application"]
+        RWS["ReceptionWorkflowService<br/>ReadDevices → Validate → CalculateRate<br/>→ QualityValidation → Persist"]
+        QVS["QualityValidationService<br/>(advisory suggestion only)"]
+        AUTHSVC["AuthenticationService<br/>(online-first, offline-fallback)"]
+        MDSYNC["MasterDataSyncService.PullAsync"]
+        SYNCENGINE["SyncEngineService.TickAsync<br/>(skipped when Session.IsOffline)"]
+    end
+
+    subgraph INFRA["CCMC.Infrastructure — Persistence + Sync + Auth"]
+        SQLITE[("SQLite — %LOCALAPPDATA%\CCMC\ccmc.db<br/>WAL + synchronous=FULL + foreign_keys=ON")]
+        SCHEMAMIG["SchemaMigrator<br/>001 InitialSchema → 002 OfflineAndOverrideSync<br/>→ 003 AnalyserFields → 004 RateCalculation"]
+        OUTBOX[("outbox_records / override_outbox<br/>Pending→Processing→Synced/Failed")]
+        OFFLINECRED[("offline_credentials<br/>Argon2id hash + DPAPI(CurrentUser)-protected blob<br/>password NEVER stored")]
+        HTTPCLIENT["HttpCloudApiClient<br/>CloudReceptionOutcome / CloudMutationOutcome<br/>(Success/Duplicate/Conflict/AuthRetryable/Retryable/Terminal)"]
+    end
+
+    subgraph CONTRACTS["CCMC.Contracts (shared client+cloud)"]
+        DTOS["DTOs, PermissionCodes (14 codes),<br/>JSON converters"]
+    end
+
+    subgraph CLOUDAPI["CCMC.Cloud.Api (ASP.NET Core 8)"]
+        CTRL["Controllers: Auth, Centres, Sources, Vehicles,<br/>QualityRules, RateFormulaSettings,<br/>Reception, Overrides, Dashboard, AuditLogs, Health"]
+        PERMATTR["[RequirePermission] + PermissionAuthorizationHandler<br/>fails closed"]
+        CENTREGUARD["CentreAccessGuard<br/>(server-side centre scoping — authoritative)"]
+        JWTGEN["JwtTokenGenerator<br/>HMAC-SHA256, 8h expiry,<br/>Issuer/Audience via IOptions&lt;JwtOptions&gt;"]
+        PWHASH["PasswordHasherAdapter<br/>ASP.NET Identity PasswordHasher (PBKDF2)"]
+    end
+
+    subgraph CLOUDAPP["CCMC.Cloud.Application"]
+        CLOUDAUTH["Cloud AuthenticationService<br/>timing-safe dummy-hash verify"]
+        RECEPTIONSVC["Cloud Reception service<br/>idempotency-key duplicate detection"]
+    end
+
+    subgraph CLOUDDOMAIN["CCMC.Cloud.Domain — Entities"]
+        ENT["User, Role, Permission, RolePermission, UserRole,<br/>UserCentreAssignment, ChillingCentre, Source, Vehicle,<br/>QualityRule, RateFormulaSettings,<br/>MilkReceptionTransaction, TransactionOverride, AuditLog"]
+    end
+
+    subgraph CLOUDINFRA["CCMC.Cloud.Infrastructure"]
+        EFCORE["CcmcDbContext (Npgsql provider)<br/>3 migrations: InitialCreate → AddMilkAnalyserFields<br/>→ AddRateFormulaCalculation"]
+        SEEDER["DevelopmentSeeder<br/>ONLY runs when ASPNETCORE_ENVIRONMENT=Development"]
+    end
+
+    subgraph PG_DOCKER["PostgreSQL — Docker mode (CURRENT)"]
+        PGDOCKER[("cc-mc-postgres container<br/>postgres:16, profile: docker<br/>host 55433 → container 5432")]
+    end
+
+    subgraph PG_NEON["PostgreSQL — Neon mode (CURRENT)"]
+        PGNEON[("Neon Postgres<br/>project fancy-cherry-25725711<br/>branch: production<br/>0 users — DevelopmentSeeder never ran")]
+    end
+
+    subgraph DOCKERHOST["Docker Compose — project 'cc-mc' (CURRENT)"]
+        APICONTAINER["cc-mc container<br/>host 8081 → container 8080<br/>image cc-mc-api (multi-stage: sdk:8.0 build → aspnet:8.0 runtime)"]
+    end
+
+    subgraph RENDER["Render (FUTURE — NOT deployed)"]
+        RENDERAPI["CCMC.Cloud.Api on Render<br/>HTTPS public endpoint"]
+    end
+
+    %% Device → domain flow
+    SCALE -->|serial bytes| ADAPT_S --> PARSE_S -->|"decoded frame"| WR
+    ANALYSER -->|serial bytes| ADAPT_A --> PARSE_A -->|"decoded 29-digit payload"| MQR
+    SCM -.->|"exclusive port ownership"| ADAPT_S
+    SCM -.->|"exclusive port ownership"| ADAPT_A
+    PARSE_S -.->|"no complete/valid frame"| PROTOEX
+    PARSE_A -.->|"no complete/valid frame"| PROTOEX
+
+    WR --> RWS
+    MQR --> RWS
+    RWS --> QVS
+    QVS -->|"advisory suggestion only<br/>(cannot itself persist ACCEPT)"| RWS
+    RWS --> RATECALC
+    RATECALC -->|"Rate, Amount<br/>(full precision Rate used for Amount)"| RWS
+    RWS -->|"operator's explicit Accept/Hold decision"| SQLITE
+    SQLITE --> OUTBOX
+
+    UI --> AUTHSVC
+    UI --> SESSION
+    AUTHSVC -->|"online"| HTTPCLIENT
+    AUTHSVC -->|"network failure only"| OFFLINECRED
+    OFFLINECRED -.->|"IsOffline=true, AccessToken empty"| SESSION
+    HTTPCLIENT -.->|"IsOffline=false, real JWT"| SESSION
+    SESSION -.->|"gates"| SYNCENGINE
+    SESSION -.->|"gates"| MDSYNC
+
+    SCHEMAMIG --> SQLITE
+    MDSYNC -->|"pull centres/sources/vehicles/<br/>quality-rules/rate-formula-settings"| SQLITE
+    OUTBOX --> SYNCENGINE
+    SYNCENGINE -->|"idempotency-key retry, exponential backoff"| HTTPCLIENT
+
+    HTTPCLIENT -->|"HTTPS/HTTP + Bearer JWT<br/>(WPF NEVER connects to PostgreSQL directly)"| CTRL
+    CTRL --> PERMATTR --> CENTREGUARD
+    CTRL --> CLOUDAUTH
+    CLOUDAUTH --> PWHASH
+    CLOUDAUTH --> JWTGEN
+    CTRL --> RECEPTIONSVC
+    RECEPTIONSVC --> EFCORE
+    EFCORE --> ENT
+    SEEDER -.->|"Development only"| EFCORE
+
+    EFCORE -->|"Docker mode: ConnectionStrings__CcmcDb<br/>points at cc-mc-postgres"| PGDOCKER
+    EFCORE -->|"Neon mode: ConnectionStrings__CcmcDb<br/>points at Neon, TLS"| PGNEON
+
+    APICONTAINER --> CLOUDAPI
+    DOCKERHOST -.->|"COMPOSE_PROFILES=docker"| PG_DOCKER
+    DOCKERHOST -.->|".env.neon (no docker profile)<br/>postgres service entirely skipped"| PG_NEON
+
+    UI -->|"CloudApi:BaseUrl = http://localhost:8081/<br/>(identical in both Docker and Neon mode)"| APICONTAINER
+
+    RENDERAPI -.->|"FUTURE: same CCMC.Cloud.Api image,<br/>HTTPS instead of localhost:8081"| PGNEON
+    UI -.->|"FUTURE: BaseUrl → Render HTTPS URL"| RENDERAPI
+
+    classDef current fill:#1f6f43,stroke:#134d2e,color:#fff;
+    classDef future fill:#7a7a7a,stroke:#4d4d4d,color:#fff,stroke-dasharray: 5 5;
+    class PHYS,DESKTOP,SERIAL,DOMAIN,APP,INFRA,CONTRACTS,CLOUDAPI,CLOUDAPP,CLOUDDOMAIN,CLOUDINFRA,PG_DOCKER,PG_NEON,DOCKERHOST current;
+    class RENDER,RENDERAPI future;

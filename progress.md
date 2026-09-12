@@ -3,6 +3,8 @@
 > Analysis date: 2026-09-12 (original audit); **updated 2026-09-12 following implementation of BRD v5.0 §25 Milk Rate Calculation** — see the "Update" callouts throughout, especially §4 and §14. BRD analyzed: `Doc/CCMC_BRD_and_Technical_Design_v2.docx`, **v5.0** ("Rate Calculation Added to MVP"), read in full (both the Business Requirements section §1–§25 and the embedded Technical Design Document §1–§31). Branch analyzed: `windows-application`. The original analysis below was read-only; the Rate Calculation feature was implemented in a separate, later pass (real code, real tests, real end-to-end verification against a live PostgreSQL) — this document was then updated to match, per that task's own documentation-consistency requirement.
 >
 > Where this document conflicts with `context.md` / `STATUS.md`, this document defers to the BRD for **scope** (per `CLAUDE.md`) but to **direct source-code inspection** for **implementation status** — several claims in `STATUS.md` were found to be stale (see §14 "Stale documentation found" below) and were not taken at face value.
+>
+> **Update (2026-09-13):** development is paused here as a deliberate checkpoint (documentation-only session, no code changes). See §19 "Checkpoint (2026-09-13)" at the end of this document for what changed since the analysis above, and `architecture.mmd` / `HOW_TO_RUN.md` / `STATUS.md`'s own "Checkpoint (2026-09-13)" section for the full current picture.
 
 ## 1. Current Architecture
 
@@ -11,7 +13,7 @@ As implemented today, matching the BRD's Technical Design section almost exactly
 ```
 RS232 Devices (Videocon scale, Ekomilk KAM98-2A analyser)
         ↓
-CCMC.Desktop (WPF, MVVM)
+CCMC.Desktop (WPF, code-behind — no MVVM)
         ↓
 CCMC.Application  (reception workflow, orchestration)
         ↓
@@ -301,7 +303,7 @@ Research conducted 2026-09-12, cross-checked against official pricing/docs pages
 
 ## 16. Recommended MVP Hosting
 
-**Update (2026-09-12):** the Neon half of this recommendation is now actually set up (project `fancy-cherry-25725711`, branch `production`) and verified — migrations apply cleanly, health checks pass. `CCMC.Cloud.Api` is containerized (`Dockerfile` + `compose.yaml`) and verified running locally against both a local Docker PostgreSQL and against Neon, controlled purely by environment variables (`.env.local` vs `.env.production` — see `.env.example`). **Render deployment itself has not happened yet** — that remains the next and final step to reach the architecture below. See STATUS.md "Docker Compose + Neon Setup" for the full verification detail, including one real limitation: Neon/production currently has zero users and no administrative bootstrap mechanism (by design — `DevelopmentSeeder` correctly never runs there), which blocks testing an authenticated endpoint against Neon until a real production user exists.
+**Update (2026-09-12):** the Neon half of this recommendation is now actually set up (project `fancy-cherry-25725711`, branch `production`) and verified — migrations apply cleanly, health checks pass. `CCMC.Cloud.Api` is containerized (`Dockerfile` + `compose.yaml`) and verified running locally against both a local Docker PostgreSQL and against Neon, controlled purely by environment variables (now `.env`/`.env.docker`/`.env.neon`, switched via `Copy-Item .env.docker .env -Force` / `Copy-Item .env.neon .env -Force` — see `.env.example`). **Render deployment itself has not happened yet** — that remains the next and final step to reach the architecture below. See STATUS.md "Docker Compose + Neon Setup" and "Application Bug Fixes" for the full verification detail, including two real, honestly-reported items: (1) Neon/production currently has zero users and no administrative bootstrap mechanism (by design — `DevelopmentSeeder` correctly never runs there), which blocks testing an authenticated endpoint against Neon until a real production user exists; (2) a real user manually tested the WPF client and found 6 bugs (5 sharing one root cause — a stale `CloudApi:BaseUrl` pointing at port 5000 instead of the actual Docker-mapped 8081), all fixed and verified via a real end-to-end harness — see STATUS.md for the full root-cause writeup.
 
 **Backend: Render (Web Service, Docker deploy). Database: Neon (PostgreSQL, free plan).**
 
@@ -360,4 +362,79 @@ Ordered by what most directly closes remaining BRD-vs-implementation gaps for MV
 5. **Implement the Source Hierarchy field and the Notification hook/abstraction** — both explicitly in MVP scope (§17), both small, neither has any code yet.
 6. **Build a minimal Receipt/Result view** to close the BRD's Final Solution Vision (§19) end-state — Rate/Amount now exist (see item 1) and would be shown on it.
 7. **Physically test the Ekomilk KAM98-2A analyser** against real hardware to upgrade its status from software-verified to hardware-verified, once a unit is available.
+
+## 19. Checkpoint (2026-09-13)
+
+Chronological summary of what happened since §17/§18 above were written,
+so this document remains a complete record without needing to be re-derived
+from git log.
+
+**Dockerization (2026-09-12, completed before this checkpoint):** items 2-4
+of §17's Deployment Blockers were resolved — `Dockerfile` (multi-stage,
+`sdk:8.0` build → `aspnet:8.0` runtime) and `compose.yaml` (project `cc-mc`,
+containers `cc-mc`/`cc-mc-postgres`, network `cc-mc-network`) were added and
+verified running; the cloud test suite (35 tests) was confirmed passing
+against a real Postgres; Neon project `fancy-cherry-25725711` (branch
+`production`) was linked and confirmed reachable with migrations applying
+successfully.
+
+**Environment repair + application bug fixes (2026-09-12):** manual testing
+of the actual WPF application surfaced 6 real problems, traced to one shared
+root cause plus genuinely independent gaps:
+- **Root cause (5 of 6 symptoms):** `CCMC.Desktop/appsettings.json`'s
+  `CloudApi:BaseUrl` was still `http://localhost:5000/`, a stale pre-Docker
+  default — the real API lives at `http://localhost:8081/` (the Compose
+  host port). This caused every online request to fail as a connection
+  refusal, which `AuthenticationService` correctly (by design) classified
+  as a network failure and fell back to offline mode — explaining "login
+  succeeds but shows OFFLINE MODE," the blank rate calculator (master-data
+  sync, including rate-formula settings, is skipped for offline sessions),
+  and "the app appears offline." **Fix:** corrected the `BaseUrl` to
+  `http://localhost:8081/`. No authentication/offline-fallback logic was
+  changed — that design was already correct.
+- **History screen missing Rate/Amount:** pure UI gap, `ReceptionHistoryWindow.xaml`
+  never had the columns bound. Fixed by adding `Rate`/`Amount`/`ReadingSource`
+  `DataGridTextColumn`s — no data-layer or calculation change.
+- **No Source/Vehicle management UI for Manager/Admin:** the server already
+  enforced `SOURCE_CREATE`/`VEHICLE_CREATE` correctly; the client simply had
+  no UI or `ICloudApiClient` methods to use it. Fixed by adding
+  `CreateSourceAsync`/`CreateVehicleAsync` (mirroring the existing
+  `OverrideReceptionAsync` status-classification pattern) and an Add
+  Source/Vehicle panel in each window, gated client-side (UX-only) by the
+  same permission codes the server already required.
+- **Enter key not submitting login:** `LoginButton` was missing
+  `IsDefault="True"` — WPF's standard default-button mechanism. One-line fix.
+
+Environment file naming was also redesigned in this pass to
+`.env`/`.env.docker`/`.env.neon`/`.env.example` (all three secret-bearing
+files gitignored, only `.env.example` tracked with placeholders), and
+`compose.yaml`'s `postgres` service was made to skip entirely (not just idle)
+in Neon mode via Compose `profiles: [docker]`.
+
+All fixes were verified via a real end-to-end scratch harness exercising the
+actual production service classes against the real running Docker API
+(30/30 checks passed) — see `STATUS.md` "Application Bug Fixes (2026-09-12)"
+for full detail. Literal GUI mouse-click/keyboard interaction remained
+untested (no GUI automation tool available in this environment) and was
+reported as such, not overstated.
+
+**Documentation checkpoint (2026-09-13, this pass):** no code changed.
+`architecture.mmd` was created (full-layer Mermaid diagram, devices through
+Render); `HOW_TO_RUN.md` was fully rewritten (it had remained entirely
+pre-Docker/stale until now); `README.md` and `context.md`'s remaining
+stale `localhost:5000` references were corrected/reframed as a secondary
+non-Docker alternative; `STATUS.md` gained a top-level
+COMPLETE/PARTIAL/NOT-IMPLEMENTED/NEXT checkpoint section; `CLAUDE.md` gained
+an operational-state section for future sessions. `dotnet test CCMC.sln`
+was re-run fresh and confirmed 190/190 passing (155 client + 35 cloud, the
+latter against a disposable local Postgres container).
+
+**Remaining gaps (unchanged, not solved in this pass — see `STATUS.md`
+"Checkpoint (2026-09-13)" for the full list):** no production user-bootstrap
+mechanism for Neon; Render deployment not performed; literal WPF GUI
+automation not available in any environment used so far; physical Ekomilk
+hardware serial link not yet verified.
+
+**Next step:** production admin bootstrap, then Render deployment (see
+`HOW_TO_RUN.md` §9) — explicitly not started in this checkpoint.
 8. **Defer**: Reports module (§16), WiX installer, override-endpoint idempotency key, client-side RBAC UI gating — all real gaps, none blocking a first online MVP test deployment.

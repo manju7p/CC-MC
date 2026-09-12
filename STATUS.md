@@ -8,6 +8,68 @@
 > is the current-state summary that cites specific sections of this file;
 > read this one when you need the *why* and *when* behind a decision
 > `context.md` only references.
+>
+> **Checkpoint update (2026-09-13):** development is paused here
+> deliberately (checkpoint task, no new code). See "Checkpoint (2026-09-13)"
+> immediately below for the current COMPLETE/PARTIAL/NOT IMPLEMENTED/NEXT
+> summary, `architecture.mmd` (repo root) for the full system diagram, and
+> `HOW_TO_RUN.md` for the current Docker/Neon runbook.
+
+## Checkpoint (2026-09-13) — Current Scope
+
+A future session should read this section first, then follow the pointers
+into the rest of this file / `context.md` / `progress.md` for detail.
+
+### COMPLETE
+- WPF client: device abstractions (Videocon scale, Ekomilk KAM98-2A
+  analyser), reception workflow (Accept/Hold/RejectAtReception), rate
+  calculation (Fat-vs-SNF and TS-based, BRD §25), offline-first SQLite
+  persistence + outbox sync, online/offline authentication
+  (Argon2id+DPAPI offline store), master-data sync, Source/Vehicle
+  management UI for Manager/Admin, transaction history with Rate/Amount
+  columns, Enter-key login.
+- Cloud API: full RBAC (14 permission codes, server-side
+  `[RequirePermission]` + `CentreAccessGuard`), JWT auth (HMAC-SHA256, 8h
+  expiry), all master-data/reception/override/dashboard/audit endpoints,
+  idempotent reception sync, EF Core/Npgsql with 3 migrations,
+  Development-only seeder.
+- Dockerization: `cc-mc` (API) + `cc-mc-postgres` containers, Compose
+  profile-based skip of local Postgres in Neon mode, `.env.docker`/
+  `.env.neon`/`.env.example` environment separation (all three
+  secret-bearing files gitignored).
+- Neon linkage: project `fancy-cherry-25725711`, branch `production` —
+  connectivity, TLS, and automatic migrations all verified working.
+- Automated tests: 190/190 passing (155 client + 35 cloud), reverified
+  fresh in this checkpoint session.
+
+### PARTIALLY VERIFIED
+- Physical Ekomilk KAM98-2A hardware: payload **decode** verified against
+  2 real sample frames; the physical serial connection itself has not been
+  verified against real hardware (see "Hardware Verification" below and
+  the parser's own doc comment).
+- Literal WPF GUI mouse-click/keyboard interaction: not testable in any
+  automated environment used so far — verified instead at the service/data
+  layer via real production classes against a real running API (see
+  "Application Bug Fixes (2026-09-12)").
+- Neon authenticated login flow: connectivity/migrations verified, but the
+  full login round-trip cannot be exercised because Neon's `production`
+  branch has zero users (by design — `DevelopmentSeeder` correctly never
+  runs outside `Development`) and no production bootstrap mechanism exists
+  yet.
+
+### NOT IMPLEMENTED
+- Production user bootstrap mechanism (no script/endpoint exists to create
+  the first Admin user against Neon `production`).
+- Render deployment (not performed — see "Next" below).
+- BRD items not yet built: source hierarchy beyond the current flat
+  Source/Vehicle model, notification hooks, printed receipt/result output,
+  reporting screens, WiX MSI installer packaging.
+
+### NEXT
+Production admin bootstrap → Render deployment → point WPF
+`CloudApi:BaseUrl` at the Render HTTPS URL → real-world end-to-end
+verification. None of these have been started; see `HOW_TO_RUN.md` §9 and
+`progress.md` "Next Step".
 
 ## Current Objective
 
@@ -810,6 +872,113 @@ behaves correctly in both environments, controlled entirely by which
 190/190 tests passing, unchanged (this pass touched configuration and
 tooling only, not application code).
 
+**Update (2026-09-12, later same day): the `.env`/`.env.docker`/`.env.neon`
+naming and mechanism described above were superseded** by the "Application
+Bug Fixes" pass immediately below - `compose.yaml` now uses Compose's own
+default `.env` auto-load (via `env_file:`) plus Compose *profiles* to skip
+the local `cc-mc-postgres` service entirely in Neon mode, rather than
+`--env-file .env.local`/`.env.production`. See that section for the
+current, actual mechanism - this note exists so the reasoning trail above
+isn't silently contradicted.
+
+## Application Bug Fixes (2026-09-12)
+
+A user manually tested the actual WPF application (not just the API in
+isolation) and found six real, related problems. Traced end-to-end before
+touching any code, per this pass's own explicit instruction not to treat
+them as independent - five of the six turned out to share one root cause.
+
+**Root cause (bugs "login shows offline", "rate calculator blank", "app
+appears offline"): `src/CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`
+was still `http://localhost:5000/` - the old pre-Docker `dotnet run`
+default - while the actual running backend (Docker Compose's `cc-mc`
+container) is reachable at `http://localhost:8081`.** Confirmed directly
+from the user's own prior session log
+(`%LOCALAPPDATA%\CCMC\logs\ccmc-<date>.log`): every login attempt shows
+`POST http://localhost:5000/auth/login` failing with "actively refused,"
+`AuthenticationService` correctly falling back to its OFFLINE credential
+path (this fallback logic itself was never broken - see
+`AuthenticationService.LoginAsync`'s existing online-first/offline-fallback
+design, unchanged), and `LoginWindow.xaml.cs` correctly skipping the
+master-data pull for an offline session (`if (!result.IsOffline) { ...
+PullAsync... }` - also unchanged, also correct) - which is *why* the rate
+calculator was blank: `RateFormulaSettings` (and everything else) never
+had a chance to sync while every login silently fell back to a stale
+offline cache. Fixed by correcting `BaseUrl` to `http://localhost:8081/`
+(the actual current Docker-mapped host port) - no change to the
+online/offline classification logic itself, which was already correct
+and must not be weakened. Re-verified via a real end-to-end harness using
+the corrected URL: `AuthenticationService.LoginAsync` now returns
+`IsOffline: false` (genuinely online), master data (centres/sources/
+vehicles/quality-rules/rate-formula-settings) syncs successfully, and the
+legitimate offline fallback still works correctly and separately when the
+cloud is *actually* unreachable (tested by pointing at a real unreachable
+address) - confirming this fix did not remove or weaken offline support.
+
+**Rate calculator blank**: root cause was the above (master data never
+synced) - no calculation-logic change was needed or made
+(`RateCalculationService` was already correct, confirmed in the prior
+Rate Calculation pass). Re-verified end-to-end with an explicitly-labeled
+TEST rate configuration (FatVsSnf, Value1=10, Value2=8 - set via the
+existing `PUT /rate-formula-settings` endpoint as the Manager role,
+**not** a fabricated application default) against FAT=4.5/SNF=9.0/
+Weight=45.5: Rate=1.08, Amount=49.20, computed and persisted correctly.
+
+**History missing Rate/Amount**: a pure UI-column omission, not a
+persistence bug - `MilkReceptionTransaction.Rate`/`Amount` (added in the
+earlier Rate Calculation pass) were never wired into
+`ReceptionHistoryWindow.xaml`'s `DataGrid.Columns`. Fixed by adding two
+columns (`{0:F2}`-formatted, matching the reception screen's own
+formatting); no repository/query change needed - confirmed directly that
+`ReceptionRepository.ListRecentAsync` (what this window already calls)
+already returns both fields correctly.
+
+**Manager/Admin cannot add Source/Vehicle**: confirmed via code
+inspection that `SourcesWindow`/`VehiclesWindow` were genuinely read-only
+(matching the known gap already recorded in README.md §29.17/context.md)
+- the cloud API already fully supports `POST /sources`/`POST /vehicles`
+gated by `SOURCE_CREATE`/`VEHICLE_CREATE` (granted to Manager and Admin,
+not Operator, in `DevelopmentSeeder` - unchanged, no new privilege
+invented), but the Windows client had no UI for it and `ICloudApiClient`
+had no method to call it. Added: `CreateSourceRequestDto`/
+`CreateVehicleRequestDto` (`CCMC.Contracts`), `ICloudApiClient.
+CreateSourceAsync`/`CreateVehicleAsync` + `HttpCloudApiClient`
+implementation (mirrors `OverrideReceptionAsync`'s existing status-code
+classification exactly - 401→AuthRetryable, 429/5xx→Retryable, everything
+else including 403→Terminal), and a minimal inline "Add Source"/"Add
+Vehicle" form in each window - visible only when the signed-in user's
+`Permissions` include the relevant `*_CREATE` code (client-side UX only,
+per this repo's existing convention; the server independently and
+authoritatively enforces the same permission regardless of what the
+client shows). After a successful create, the window re-runs
+`MasterDataSyncService.PullAsync` and reloads its own grid, so the new
+record is immediately selectable in Reception, per this pass's explicit
+requirement. Verified end-to-end: Manager can create both; Operator's
+identical attempt is correctly denied (`Terminal` outcome, HTTP 403) -
+not silently treated as successful.
+
+**Enter key does not sign in**: `LoginWindow.xaml`'s `LoginButton` had no
+`IsDefault="True"`. Added it - WPF's native mechanism, so Enter (from
+either the email field or the password box) invokes the exact same
+`LoginButton_Click` handler a mouse click does, with zero duplicated
+authentication logic.
+
+**Verification method, stated precisely per this pass's own "no false
+success" instruction**: a real end-to-end harness (a throwaway console
+program outside this repository, using the exact production
+`AuthenticationService`/`MasterDataSyncService`/`ReceptionWorkflowService`/
+`SyncEngineService`/`ICloudApiClient` code, now configured with the
+corrected `http://localhost:8081/` URL) proved every one of the above at
+the service/data layer, including the Operator-denial case and a full
+offline-capture-then-reconnect-then-sync-with-no-duplicates cycle. The
+actual compiled WPF executable was also launched directly and confirmed
+to start cleanly and display the Sign In window (no crash) - but literal
+mouse-click/Enter-key/visual confirmation of on-screen behavior was
+**not possible** in this environment (no GUI automation tool available
+for a native Windows/WPF app) and is reported as NOT TESTED, not PASS,
+for that specific narrow claim - see the task's own final report for the
+exact PASS/NOT TESTED breakdown.
+
 ## Known Limitations
 
 - **No installer.** `dotnet publish` produces a deployable folder, not an
@@ -1030,7 +1199,13 @@ dotnet publish src/CCMC.Desktop/CCMC.Desktop.csproj -c Release -r win-x64 --self
 # %LocalAppData%\CCMC\captures\
 # %LocalAppData%\CCMC\logs\ccmc-yyyyMMdd.log
 
-# Cloud backend - see README.md §29 for full detail
+# Cloud backend - PRIMARY path is Docker Compose (see HOW_TO_RUN.md, README.md §29.16):
+Copy-Item .env.docker .env -Force   # or .env.neon for Neon mode
+docker compose -p cc-mc up -d --build
+curl http://localhost:8081/health
+curl http://localhost:8081/health/db
+
+# Secondary alternative - running the API directly without Docker (README.md §29.11):
 psql -U postgres -h localhost -c "CREATE DATABASE ccmc_cloud_dev;"
 psql -U postgres -h localhost -c "CREATE DATABASE ccmc_cloud_test;"
 dotnet tool install --global dotnet-ef --version 8.0.11
@@ -1038,4 +1213,5 @@ dotnet ef database update --project src/CCMC.Cloud.Infrastructure/CCMC.Cloud.Inf
 dotnet run --project src/CCMC.Cloud.Api/CCMC.Cloud.Api.csproj --urls http://localhost:5000
 dotnet test tests/CCMC.Cloud.Api.Tests/CCMC.Cloud.Api.Tests.csproj
 # Swagger: http://localhost:5000/swagger   Health: http://localhost:5000/health , /health/db
+# (if running via Docker instead, substitute 8081 for 5000 above)
 ```

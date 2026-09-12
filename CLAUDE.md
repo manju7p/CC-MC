@@ -20,6 +20,84 @@ from "what's true right now" from "what happened and why," on purpose:
   bugs found and fixed, product decisions made and why. Read this when
   `context.md` cites something ("see STATUS.md ...") and you need the
   full story behind it.
+- **`architecture.mmd`** — a full-layer Mermaid diagram (devices → WPF →
+  domain/application/infrastructure → cloud API → PostgreSQL → Docker/Neon
+  → future Render). Read this for the shape of the whole system before
+  diving into any one layer's code.
+- **`HOW_TO_RUN.md`** — the practical runbook: build, test, Docker mode,
+  Neon mode, switching between them, logs, migrations, dev credentials.
+
+## Current operational state (checkpoint 2026-09-13)
+
+Read this section first in any new session — it's the fastest way to avoid
+re-deriving context that already exists.
+
+- **Branch:** `windows-application`. **`pranav-dev`** is a separate,
+  historically unrelated legacy NestJS implementation on its own branch —
+  never checkout, merge, rebase, or modify it. Read-only reference only
+  (`git show pranav-dev:<path>`), and only when explicitly relevant.
+- **Solution:** 11 projects — client (`CCMC.Domain`, `CCMC.Contracts`,
+  `CCMC.Application`, `CCMC.Infrastructure`, `CCMC.Desktop`, `CCMC.Tests`)
+  and cloud (`CCMC.Cloud.Domain`, `CCMC.Cloud.Application`,
+  `CCMC.Cloud.Infrastructure`, `CCMC.Cloud.Api`, `CCMC.Cloud.Api.Tests`).
+  `CCMC.Contracts` is the only project shared across both tiers — the two
+  tiers otherwise have zero code coupling.
+- **Docker:** `docker compose -p cc-mc up -d --build` runs containers
+  `cc-mc` (API, host port `8081`) and `cc-mc-postgres` (Postgres 16, host
+  port `55433`, only created when the `docker` Compose profile is active).
+  The WPF client's `CloudApi:BaseUrl` is always `http://localhost:8081/` —
+  identical in both modes below.
+- **Environment switching:**
+  `Copy-Item .env.docker .env -Force` (local Postgres) or
+  `Copy-Item .env.neon .env -Force` (Neon) before `docker compose up`.
+  `.env`, `.env.docker`, `.env.neon` are real and gitignored; only
+  `.env.example` (placeholders) is tracked. Never put a secret in a tracked
+  file, `compose.yaml`, or `appsettings.json`.
+- **Neon:** project `fancy-cherry-25725711`, branch `production`. Connectivity
+  and automatic migrations are verified working. It currently has **zero
+  users** — `DevelopmentSeeder` correctly never runs outside
+  `ASPNETCORE_ENVIRONMENT=Development`, and no production user-bootstrap
+  mechanism exists yet. Do not create production users or enable the seeder
+  in Production to work around this — it's an open, tracked gap (see
+  `STATUS.md` "Checkpoint" / `HOW_TO_RUN.md` §9).
+- **Rate calculation:** `RateCalculationService` (BRD §25) — Fat-vs-SNF and
+  TS-based formulas, both implemented exactly as specified, full-precision
+  `Rate` used to compute `Amount` (not a rounded intermediate). Config is
+  cached locally per centre and reaches the client via
+  `MasterDataSyncService`. No fabricated defaults — an unconfigured formula
+  computes Rate=0/Amount=0, never a guessed value.
+- **Offline-first:** `Session.IsOffline` gates both `SyncEngineService` and
+  master-data sync. Offline login uses Argon2id + DPAPI
+  (`OfflineCredentialStore`, `CurrentUser` scope) — the raw password is
+  never stored, only the salted hash inside a DPAPI-protected blob. Online
+  login always takes priority; offline is only a fallback on genuine
+  network failure, never on a real (even negative) server response.
+- **Authentication/authorization:** JWT (HMAC-SHA256, 8h expiry, no refresh
+  tokens) carries no roles/permissions/centre claims — those are resolved
+  fresh from the database on every request via
+  `ICurrentUserAccessor`/`RequestUser`. Every protected cloud endpoint
+  carries an explicit `[RequirePermission(code)]` (14 codes total) plus
+  `CentreAccessGuard` for centre scoping — this is the sole real
+  authorization boundary. The Windows client's own permission checks are
+  UX-only convenience, never a security control (see "Security baseline"
+  below).
+- **Recently fixed (2026-09-12):** a stale `CloudApi:BaseUrl`
+  (`localhost:5000` instead of the Docker `localhost:8081`) was the shared
+  root cause of "login shows offline," a blank rate calculator, and "app
+  appears offline." Also fixed: History screen missing Rate/Amount columns,
+  no Source/Vehicle management UI for Manager/Admin (server-side
+  permissions already existed), and Enter key not submitting login
+  (`IsDefault="True"`). Full writeup: `STATUS.md` "Application Bug Fixes
+  (2026-09-12)".
+- **Remaining gaps:** no production user bootstrap for Neon; Render
+  deployment not yet performed; literal WPF GUI mouse/keyboard interaction
+  not verifiable in any environment used so far (verification instead uses
+  real production service classes against a real running API); physical
+  Ekomilk KAM98-2A serial hardware link not yet verified (payload *decode*
+  is verified against real sample frames).
+- **Next intended step:** production admin bootstrap mechanism, then Render
+  deployment — not started. Do not perform Render deployment or invent a
+  production bootstrap without being explicitly asked.
 
 ## Testing philosophy
 

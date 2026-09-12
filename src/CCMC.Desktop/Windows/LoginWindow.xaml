@@ -34,7 +34,7 @@
                            FontSize="12" Margin="0,0,0,10"/>
 
                 <Button Name="LoginButton" Content="Sign In" Height="38" Style="{StaticResource PrimaryButton}"
-                        Click="LoginButton_Click"/>
+                        Click="LoginButton_Click" IsDefault="True"/>
 
                 <TextBlock Name="OfflineHintTextBlock" Style="{StaticResource CaptionText}" Margin="0,16,0,0"
                            Text="Sign-in works online (verified live against the cloud) or, if the cloud is unreachable, offline using credentials cached from your last successful online sign-in on this PC."/>
