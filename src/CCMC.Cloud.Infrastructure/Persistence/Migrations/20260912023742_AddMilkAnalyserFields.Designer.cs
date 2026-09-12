@@ -3,6 +3,7 @@ using System;
 using CCMC.Cloud.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CcmcDbContext))]
-    partial class CcmcDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912023742_AddMilkAnalyserFields")]
+    partial class AddMilkAnalyserFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

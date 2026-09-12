@@ -543,9 +543,50 @@ successfully.
 ## 27. COM port / device issues
 
 Out of scope for this pass (no hardware was connected or required to fix
-login/API startup). See `CLAUDE.md` "Hardware Verification" and "Known
-Limitations" for the current, unchanged state of the Videocon
-scale/COM4/2400 default and the still-undecoded milk analyser.
+login/API startup). See `CLAUDE.md` "Hardware Verification" and STATUS.md
+"Known Limitations" for the current state of the Videocon scale/COM4/2400
+default and the milk analyser (payload decode verified against two real
+samples — see §28 below — physical serial connection still untested).
+
+## 28. Milk Analyser — Manual Test Input (KAM98-2A)
+
+The physical Ekomilk Milkana KAM98-2A analyser is not available in any dev
+environment, so the Reception window (`ReceptionWindow`) has a clearly
+labelled **"Milk Analyser — Manual Test Input"** panel below the quality
+fields, for development/testing only. It feeds the EXACT SAME parser
+(`Kam98A2AAnalyserFrameParser`) a real device read would use — it is not a
+second, fake decode path, and it never pretends the physical analyser is
+connected.
+
+To try it, in the Reception window:
+
+1. Select a Centre / Source / Vehicle (required before saving, not before
+   testing the parser).
+2. Paste one of these two REAL, observed device outputs into the "Raw
+   analyser string" box, then click **Parse / Test**:
+
+   ```
+   (03900830283801210000032404503)
+   ```
+   Expected: Fat 3.9, SNF 8.3, CLR 28.4, Water 1.21, Protein 3.24.
+
+   ```
+   (02500520171638900000020906585)
+   ```
+   Expected: Fat 2.5, SNF 5.2, CLR 17.2, Water 38.9, Protein 2.09.
+
+3. The Fat/SNF/CLR/Water/Protein fields above fill in from the parsed
+   result, and the raw payload is shown verbatim. Temperature is not
+   measured by this device — enter it manually (same as before this
+   analyser existed).
+4. Enter a Quantity, then press **ACCEPT**, **HOLD**, or **REJECT** — one of
+   these three is always required; nothing is accepted automatically just
+   because values are within configured limits (see STATUS.md "Milk
+   Analyser + Quality Decision Flow").
+
+Malformed input (wrong length, non-numeric characters) is rejected with an
+error message, not silently guessed at — see `Kam98A2AAnalyserFrameParserTests`
+for the exact rejection cases this covers.
 
 ---
 

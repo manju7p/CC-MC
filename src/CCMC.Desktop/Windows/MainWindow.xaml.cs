@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly IDeviceManager _deviceManager;
     private readonly SyncEngineService _syncEngineService;
     private readonly AuthenticationService _authenticationService;
+    private readonly ICloudApiClient _cloudApiClient;
 
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -26,7 +27,8 @@ public partial class MainWindow : Window
         IOutboxRepository outboxRepository,
         IDeviceManager deviceManager,
         SyncEngineService syncEngineService,
-        AuthenticationService authenticationService)
+        AuthenticationService authenticationService,
+        ICloudApiClient cloudApiClient)
     {
         InitializeComponent();
         _serviceProvider = serviceProvider;
@@ -35,6 +37,7 @@ public partial class MainWindow : Window
         _deviceManager = deviceManager;
         _syncEngineService = syncEngineService;
         _authenticationService = authenticationService;
+        _cloudApiClient = cloudApiClient;
 
         Loaded += MainWindow_Loaded;
         Closed += (_, _) =>
@@ -61,6 +64,7 @@ public partial class MainWindow : Window
         ReconnectButton.Visibility = isOffline ? Visibility.Visible : Visibility.Collapsed;
 
         await RefreshStatusAsync();
+        await RefreshDashboardSummaryAsync();
 
         _statusTimer.Tick += async (_, _) => await RefreshStatusAsync();
         _statusTimer.Start();
@@ -87,7 +91,51 @@ public partial class MainWindow : Window
         finally
         {
             await RefreshStatusAsync();
+            await RefreshDashboardSummaryAsync(); // a reception may have just synced - reflect it in the cards
         }
+    }
+
+    /// <summary>
+    /// Populates the dashboard summary cards from the cloud's existing
+    /// GET /dashboard/summary endpoint (ICloudApiClient.GetDashboardSummaryAsync -
+    /// already implemented, just never called from any WPF window before this).
+    /// Requires an online session; an offline/missing session or any request
+    /// failure (network, permission, etc.) shows an explanatory caption
+    /// instead of fabricating figures - never invents dashboard data.
+    /// </summary>
+    private async Task RefreshDashboardSummaryAsync()
+    {
+        var session = _sessionStore.Current;
+        if (session is null || session.IsOffline)
+        {
+            SetDashboardUnavailable(session is null ? "Sign in to see today's summary." : "Dashboard summary requires an online session.");
+            return;
+        }
+
+        try
+        {
+            var summary = await _cloudApiClient.GetDashboardSummaryAsync(session.AccessToken, centreId: null, CancellationToken.None);
+            TodayTotalTextBlock.Text = summary.TotalTransactions.ToString();
+            TodayAcceptedTextBlock.Text = summary.Accepted.ToString();
+            TodayHoldTextBlock.Text = summary.Hold.ToString();
+            TodayRejectedTextBlock.Text = summary.Rejected.ToString();
+            DashboardUnavailableTextBlock.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            // Cloud unreachable, permission denied, etc. - show a placeholder, never a crash and never invented numbers.
+            SetDashboardUnavailable("Today's summary is unavailable right now (cloud unreachable or not permitted).");
+        }
+    }
+
+    private void SetDashboardUnavailable(string message)
+    {
+        TodayTotalTextBlock.Text = "—";
+        TodayAcceptedTextBlock.Text = "—";
+        TodayHoldTextBlock.Text = "—";
+        TodayRejectedTextBlock.Text = "—";
+        DashboardUnavailableTextBlock.Text = message;
+        DashboardUnavailableTextBlock.Visibility = Visibility.Visible;
     }
 
     private async Task RefreshStatusAsync()

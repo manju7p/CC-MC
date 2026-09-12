@@ -92,6 +92,7 @@ public static class DtoMapping
     {
         Id = t.Id, TransactionNumber = t.TransactionNumber, CentreId = t.CentreId, SourceId = t.SourceId, VehicleId = t.VehicleId,
         OperatorUserId = t.OperatorUserId, QuantityKg = t.QuantityKg, Fat = t.Fat, Snf = t.Snf, Temperature = t.Temperature,
+        Clr = t.Clr, Water = t.Water, Protein = t.Protein, RawAnalyserPayload = t.RawAnalyserPayload,
         Status = t.Status.ToContract(), ReadingSource = t.ReadingSource.ToContract(), Reason = t.Reason,
         ReceivedAt = t.ReceivedAt.ToString("O"), Outcome = outcome,
     };

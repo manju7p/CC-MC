@@ -181,7 +181,8 @@ public sealed class ReceptionRepository(SqliteConnectionFactory connectionFactor
     private const string SelectColumns = """
         SELECT local_id, transaction_number, centre_id, source_id, vehicle_id, operator_user_id,
                quantity_kg, fat, snf, temperature, status, reading_source, reason,
-               local_idempotency_key, captured_at, created_at, cloud_transaction_id
+               local_idempotency_key, captured_at, created_at, cloud_transaction_id,
+               clr, water, protein, raw_analyser_payload
         FROM local_transactions
         """;
 
@@ -216,11 +217,13 @@ public sealed class ReceptionRepository(SqliteConnectionFactory connectionFactor
             INSERT INTO local_transactions
                 (transaction_number, centre_id, source_id, vehicle_id, operator_user_id,
                  quantity_kg, fat, snf, temperature, status, reading_source, reason,
-                 local_idempotency_key, captured_at, created_at, cloud_transaction_id)
+                 local_idempotency_key, captured_at, created_at, cloud_transaction_id,
+                 clr, water, protein, raw_analyser_payload)
             VALUES
                 ($number, $centreId, $sourceId, $vehicleId, $operatorUserId,
                  $quantityKg, $fat, $snf, $temperature, $status, $readingSource, $reason,
-                 $key, $capturedAt, $createdAt, NULL);
+                 $key, $capturedAt, $createdAt, NULL,
+                 $clr, $water, $protein, $rawAnalyserPayload);
             SELECT last_insert_rowid();
             """;
         command.Parameters.AddWithValue("$number", (object?)transaction.TransactionNumber ?? DBNull.Value);
@@ -238,6 +241,10 @@ public sealed class ReceptionRepository(SqliteConnectionFactory connectionFactor
         command.Parameters.AddWithValue("$key", transaction.LocalIdempotencyKey);
         command.Parameters.AddWithValue("$capturedAt", transaction.CapturedAt.ToString("O"));
         command.Parameters.AddWithValue("$createdAt", transaction.CreatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$clr", (object?)transaction.Clr ?? DBNull.Value);
+        command.Parameters.AddWithValue("$water", (object?)transaction.Water ?? DBNull.Value);
+        command.Parameters.AddWithValue("$protein", (object?)transaction.Protein ?? DBNull.Value);
+        command.Parameters.AddWithValue("$rawAnalyserPayload", (object?)transaction.RawAnalyserPayload ?? DBNull.Value);
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return (long)result!;
@@ -288,6 +295,7 @@ public sealed class ReceptionRepository(SqliteConnectionFactory connectionFactor
         if (existing.Snf != incoming.Snf) conflicts.Add(nameof(existing.Snf));
         if (existing.Temperature != incoming.Temperature) conflicts.Add(nameof(existing.Temperature));
         if (existing.CapturedAt != incoming.CapturedAt) conflicts.Add(nameof(existing.CapturedAt));
+        if (existing.Status != incoming.Status) conflicts.Add(nameof(existing.Status));
         return conflicts;
     }
 
@@ -310,5 +318,9 @@ public sealed class ReceptionRepository(SqliteConnectionFactory connectionFactor
         CapturedAt = DateTimeOffset.Parse(reader.GetString(14)),
         CreatedAt = DateTimeOffset.Parse(reader.GetString(15)),
         CloudTransactionId = reader.IsDBNull(16) ? null : reader.GetInt32(16),
+        Clr = reader.IsDBNull(17) ? null : (decimal)reader.GetDouble(17),
+        Water = reader.IsDBNull(18) ? null : (decimal)reader.GetDouble(18),
+        Protein = reader.IsDBNull(19) ? null : (decimal)reader.GetDouble(19),
+        RawAnalyserPayload = reader.IsDBNull(20) ? null : reader.GetString(20),
     };
 }

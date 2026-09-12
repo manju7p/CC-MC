@@ -1,41 +1,166 @@
 <Window x:Class="CCMC.Desktop.Windows.ReceptionWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Milk Reception" Height="560" Width="480"
+        Title="CCMC - Milk Reception" Height="900" Width="640" MinHeight="600" MinWidth="560"
         WindowStartupLocation="CenterScreen">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="20">
-            <TextBlock Text="Milk Reception" FontSize="16" FontWeight="Bold" Margin="0,0,0,16"/>
+        <StackPanel Margin="24">
+            <TextBlock Text="Milk Reception" Style="{StaticResource TitleText}" Margin="0,0,0,18"/>
 
-            <TextBlock Text="Chilling Centre"/>
-            <ComboBox Name="CentreComboBox" DisplayMemberPath="Name" Margin="0,4,0,12"
-                      SelectionChanged="CentreComboBox_SelectionChanged"/>
+            <!-- Reception details -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="RECEPTION DETAILS" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Chilling Centre" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="CentreComboBox" DisplayMemberPath="Name" Margin="0,0,0,10"
+                                      SelectionChanged="CentreComboBox_SelectionChanged"/>
+                            <TextBlock Text="Source" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="SourceComboBox" DisplayMemberPath="Name"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Vehicle" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="VehicleComboBox" DisplayMemberPath="VehicleNumber"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
-            <TextBlock Text="Source"/>
-            <ComboBox Name="SourceComboBox" DisplayMemberPath="Name" Margin="0,4,0,12"/>
+            <!-- Devices -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="DEVICES" Style="{StaticResource SectionLabelText}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Name="ReadDevicesButton" Content="Read Devices" Width="140" Height="34"
+                                Style="{StaticResource PrimaryButton}" Click="ReadDevicesButton_Click"/>
+                    </Grid>
+                    <TextBlock Name="WeightStatusTextBlock" Style="{StaticResource CaptionText}" Margin="0,10,0,2"/>
+                    <TextBlock Name="QualityStatusTextBlock" Style="{StaticResource CaptionText}" Margin="0,0,0,0"/>
+                </StackPanel>
+            </Border>
 
-            <TextBlock Text="Vehicle"/>
-            <ComboBox Name="VehicleComboBox" DisplayMemberPath="VehicleNumber" Margin="0,4,0,16"/>
+            <!-- Weight -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="WEIGHT" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                    <TextBlock Text="Quantity (kg)" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="QuantityTextBox" Width="180" FontSize="18" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Border>
 
-            <Button Name="ReadDevicesButton" Content="Read Devices" Height="32" Click="ReadDevicesButton_Click" Margin="0,0,0,8"/>
-            <TextBlock Name="WeightStatusTextBlock" Foreground="DarkOrange" TextWrapping="Wrap" Margin="0,0,0,4"/>
-            <TextBlock Name="QualityStatusTextBlock" Foreground="DarkOrange" TextWrapping="Wrap" Margin="0,0,0,12"/>
+            <!-- Milk quality -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="MILK QUALITY" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
 
-            <TextBlock Text="Quantity (kg)"/>
-            <TextBox Name="QuantityTextBox" Margin="0,4,0,12"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="FAT (%)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="FatTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="SNF (%)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="SnfTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="CLR / Density" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="ClrTextBox"/>
+                        </StackPanel>
+                    </Grid>
 
-            <TextBlock Text="FAT (%)"/>
-            <TextBox Name="FatTextBox" Margin="0,4,0,12"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Added Water (%)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="WaterTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Protein (%)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="ProteinTextBox"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="Temperature (°C)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="TemperatureTextBox"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="Temperature is not measured by the milk analyser - enter it manually." Style="{StaticResource CaptionText}" Margin="0,0,0,12"/>
 
-            <TextBlock Text="SNF (%)"/>
-            <TextBox Name="SnfTextBox" Margin="0,4,0,12"/>
+                    <TextBlock Text="Raw analyser payload" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="RawAnalyserPayloadTextBox" IsReadOnly="True" FontFamily="Consolas" FontSize="12"/>
+                </StackPanel>
+            </Border>
 
-            <TextBlock Text="Temperature (°C)"/>
-            <TextBox Name="TemperatureTextBox" Margin="0,4,0,16"/>
+            <!-- Manual analyser test input -->
+            <Border BorderBrush="{StaticResource WarningBrush}" BorderThickness="1.5" CornerRadius="6" Background="{StaticResource WarningSoftBrush}"
+                    Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="MILK ANALYSER — MANUAL TEST / DEVELOPMENT" FontSize="12" FontWeight="Bold"
+                               Foreground="{StaticResource WarningBrush}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,10"
+                               Text="Development/testing fallback ONLY - the physical Ekomilk KAM98-2A analyser is not connected. Type or paste the exact string the device would send (parentheses optional), e.g. (03900830283801210000032404503), then press Parse/Test. This feeds the SAME parser and fills the SAME fields above as a real device read would - it does not simulate a connected device."/>
 
-            <Button Name="SaveButton" Content="Validate and Save Reception" Height="36" Click="SaveButton_Click"/>
+                    <TextBlock Text="Raw analyser string" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="ManualAnalyserInputTextBox" Margin="0,0,0,10" FontFamily="Consolas"/>
+                    <Button Name="ParseManualAnalyserButton" Content="Parse / Test" Height="32" Width="140"
+                            HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}" Click="ParseManualAnalyserButton_Click"/>
+                    <TextBlock Name="ManualAnalyserResultTextBlock" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
 
-            <TextBlock Name="ResultTextBlock" FontWeight="Bold" TextWrapping="Wrap" Margin="0,16,0,0"/>
+            <!-- Quality decision -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="QUALITY DECISION" Style="{StaticResource SectionLabelText}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,12"
+                               Text="ACCEPT, HOLD, or REJECT is always an explicit operator decision - values within configured limits are never accepted automatically."/>
+
+                    <TextBlock Text="Reason / notes (required for REJECT)" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="DecisionReasonTextBox" Margin="0,0,0,14"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Name="AcceptButton" Grid.Column="0" Content="ACCEPT" Height="44"
+                                Style="{StaticResource AcceptButtonStyle}" Click="AcceptButton_Click"/>
+                        <Button Name="HoldButton" Grid.Column="2" Content="HOLD" Height="44"
+                                Style="{StaticResource HoldButtonStyle}" Click="HoldButton_Click"/>
+                        <Button Name="RejectButton" Grid.Column="4" Content="REJECT" Height="44"
+                                Style="{StaticResource RejectButtonStyle}" Click="RejectButton_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardBorder}" Margin="0">
+                <TextBlock Name="ResultTextBlock" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Window>

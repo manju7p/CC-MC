@@ -12,10 +12,13 @@ public class ReceptionTests(CcmcApiFactory factory)
 {
     private static CreateReceptionRequestDto SampleRequest(
         string key, int centreId = 1, int sourceId = 1, int vehicleId = 1,
-        decimal quantity = 45.5m, decimal fat = 4.5m, decimal snf = 9.0m, decimal temp = 5.0m) => new()
+        decimal quantity = 45.5m, decimal fat = 4.5m, decimal snf = 9.0m, decimal temp = 5.0m,
+        TransactionStatus? status = null,
+        decimal? clr = null, decimal? water = null, decimal? protein = null, string? rawAnalyserPayload = null) => new()
     {
         CentreId = centreId, SourceId = sourceId, VehicleId = vehicleId,
         QuantityKg = quantity, Fat = fat, Snf = snf, Temperature = temp, LocalIdempotencyKey = key,
+        Status = status, Clr = clr, Water = water, Protein = protein, RawAnalyserPayload = rawAnalyserPayload,
     };
 
     [Fact]
@@ -77,6 +80,71 @@ public class ReceptionTests(CcmcApiFactory factory)
         var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
         Assert.Equal(TransactionStatus.HOLD, dto!.Status);
         Assert.NotNull(dto.Reason);
+    }
+
+    [Fact]
+    public async Task Create_WithExplicitAcceptStatus_OverridesAutomaticHoldSuggestion()
+    {
+        // The Windows client's own explicit operator decision (ACCEPT/HOLD -
+        // see CLAUDE.md/STATUS.md "Milk Analyser + Quality Decision Flow") is
+        // authoritative once supplied - the cloud's own automatic quality-rule
+        // suggestion (still computed, still logged - dormant, not deleted) is
+        // Hold for this out-of-range fat value, but the request explicitly says
+        // ACCEPTED, so the persisted status must be ACCEPTED, not HOLD.
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var request = SampleRequest($"test-{Guid.NewGuid():N}", fat: 0.5m, status: TransactionStatus.ACCEPTED);
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Equal(TransactionStatus.ACCEPTED, dto!.Status);
+        Assert.Contains("overrides the automatic quality suggestion", dto.Reason);
+    }
+
+    [Fact]
+    public async Task Create_WithExplicitHoldStatus_OverridesAutomaticAcceptSuggestion()
+    {
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        // fat/snf/temp all within range - automatic suggestion would be ACCEPTED.
+        var request = SampleRequest($"test-{Guid.NewGuid():N}", status: TransactionStatus.HOLD);
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Equal(TransactionStatus.HOLD, dto!.Status);
+    }
+
+    [Fact]
+    public async Task Create_WithExplicitRejectedStatus_Returns400()
+    {
+        // Matches the client-side invariant exactly: Rejected is only ever
+        // reachable via an override of a prior Hold, never a direct create.
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var request = SampleRequest($"test-{Guid.NewGuid():N}", status: TransactionStatus.REJECTED);
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_WithAnalyserFields_PersistsAndReturnsThem()
+    {
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var request = SampleRequest(
+            $"test-{Guid.NewGuid():N}", status: TransactionStatus.ACCEPTED,
+            clr: 28.4m, water: 1.21m, protein: 3.24m, rawAnalyserPayload: "(03900830283801210000032404503)");
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Equal(28.4m, dto!.Clr);
+        Assert.Equal(1.21m, dto.Water);
+        Assert.Equal(3.24m, dto.Protein);
+        Assert.Equal("(03900830283801210000032404503)", dto.RawAnalyserPayload);
     }
 
     [Fact]

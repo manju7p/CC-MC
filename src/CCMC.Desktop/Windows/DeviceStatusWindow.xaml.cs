@@ -18,14 +18,14 @@ public partial class DeviceStatusWindow : Window
     private void Refresh()
     {
         ScaleStateTextBlock.Text = $"State: {_deviceManager.WeighingScale?.State.ToString() ?? "Not configured"}";
-        ScaleDetailTextBlock.Text = "Videocon Precision Systems weighing scale. Protocol decoder not yet " +
-            "established - a successful connection test proves the COM port opens; reading a weight will " +
-            "still report 'unavailable' until a verified protocol exists (see CLAUDE.md).";
+        ScaleDetailTextBlock.Text = "Videocon Precision Systems weighing scale. Protocol decoder verified against " +
+            "the physical device - a successful connection test opens the COM port and reads the actual weight.";
 
         AnalyserStateTextBlock.Text = $"State: {_deviceManager.MilkAnalyser?.State.ToString() ?? "Not configured"}";
         AnalyserDetailTextBlock.Text = _deviceManager.MilkAnalyser is null
             ? "No milk analyser configuration has been entered yet - see Device Configuration."
-            : "Milk analyser configured. No verified protocol decoder exists yet (see CLAUDE.md).";
+            : "Ekomilk Milkana KAM98-2A. Payload decode is verified against real device output; the physical " +
+              "serial connection itself has not yet been tested against the hardware - see STATUS.md.";
     }
 
     private async void TestScaleButton_Click(object sender, RoutedEventArgs e)

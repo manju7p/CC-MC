@@ -445,6 +445,90 @@ the verified default - not merely "the interface exists."
   fact. Still needs explicit human confirmation before real protocol work
   starts (see Decisions Pending #1).
 
+## Milk Analyser + Quality Decision Flow (2026-09-12)
+
+The physical Ekomilk Milkana KAM98-2A milk analyser is not available in any
+dev environment (same "no hardware" constraint as the Videocon scale before
+its own verification pass). What changed this pass is that the project owner
+supplied two REAL, observed device outputs directly (not manufacturer
+documentation, not a live serial capture) - enough to derive a confident,
+documented fixed-width field layout without guessing:
+
+```
+(03900830283801210000032404503) -> Fat 3.9  Snf 8.3  Clr 28.4  Water 1.21  Protein 3.24
+(02500520171638900000020906585) -> Fat 2.5  Snf 5.2  Clr 17.2  Water 38.9  Protein 2.09
+```
+
+**Built:**
+- `Kam98A2AAnalyserFrameParser` (`CCMC.Infrastructure.Devices`) - the field
+  mapping, fully documented in its own doc comment, with a captured-string
+  regression test suite (`Kam98A2AAnalyserFrameParserTests`, 15 cases
+  including both real samples verbatim, parentheses/whitespace/CRLF
+  tolerance, and malformed-input rejection - never fabricates a reading).
+  Two entry points share the exact same field-decoding code: `ParseLatest`
+  (byte stream, device path) and `ParsePayload` (a single string, manual-test
+  path) - by construction, manual test input cannot diverge from what the
+  real device path would decode.
+- `EkomilkKam98A2AAnalyserAdapter` (replaces the old `GenericMilkAnalyserAdapter`
+  placeholder) - real connection lifecycle via the existing
+  `SerialConnectionManager`/`RawCaptureLogger` infrastructure (no second
+  serial stack), throws `DeviceParseException` rather than fabricating a
+  reading when no complete frame is present. **The physical serial link
+  itself (COM port, baud rate, real RS232 traffic) has NOT been exercised
+  against the hardware** - only the payload decode is verified against real
+  samples. Do not treat this adapter's existence as proof the serial
+  connection works.
+- `MilkQualityReading.Temperature` is now nullable - the KAM98-2A does not
+  measure temperature at all (never fabricated, same principle `Clr` already
+  used); Water/Protein go into the existing `OptionalParameters` dictionary
+  (no new ad-hoc fields).
+- **Explicit human quality decision, auto-accept retained but dormant.**
+  `QualityValidationService`'s automatic Fat/Snf/Temperature range check
+  (the original "auto-accept" logic) is unchanged and still computed on
+  every save - but `ReceptionWorkflowService.ValidateAndSaveAsync` no longer
+  uses its output as the final `Status`; a `ReceptionDecision` (`Accept`/
+  `Hold`) supplied by the caller does, with the automatic suggestion
+  recorded in `Reason` whenever the operator's decision differs from it.
+  REJECT does not add a new "create as Rejected" path - the existing
+  invariant (`TransactionStatus`'s own doc comment: Rejected only via
+  override of a Hold) is preserved exactly; `RejectAtReceptionAsync` saves
+  as Hold via the same `ValidateAndSaveAsync`, then immediately applies the
+  existing `OverrideAsync` machinery. Both steps are separately audited and
+  separately sync-eligible via their own existing outbox mechanisms -
+  nothing new invented at the persistence layer. Covered by
+  `ReceptionWorkflowServiceTests` (6 cases, real SQLite).
+- **Cloud mirrors the same decision, backward-compatibly.**
+  `CreateReceptionRequestDto`/`CreateReceptionCommand` gained an *optional*
+  `Status` (Accepted/Hold only - a direct Rejected create is rejected with
+  400) plus `Clr`/`Water`/`Protein`/`RawAnalyserPayload`. When supplied, it
+  is authoritative (the cloud's own automatic suggestion is still computed
+  and logged, same dormant treatment as the client); when omitted, the
+  cloud falls back to its pre-existing fully-automatic behavior unchanged -
+  this is why `Create_ValidReception_Returns201WithCreatedOutcome` and
+  `Create_QualityOutOfRange_ReturnsHold_NeverAutoRejects` (both predating
+  this pass, neither sending `Status`) still pass unmodified. New EF Core
+  migration `20260912023742_AddMilkAnalyserFields` (additive, nullable
+  columns only) applied to `ccmc_cloud_dev`. New SQLite migration
+  `Migration003AnalyserFields` (same shape) for the Windows client.
+- **Reception window UI**: added CLR/Water/Protein/raw-payload fields, a
+  clearly-labelled "Milk Analyser - Manual Test Input" panel (raw string ->
+  the exact same parser -> the exact same fields - see HOW_TO_RUN.md), and
+  three explicit ACCEPT/HOLD/REJECT buttons replacing the old single
+  "Validate and Save Reception" button. All prior functionality (centre/
+  source/vehicle selection, Read Devices, weight capture, provenance
+  tracking) is unchanged.
+- Weighing scale integration untouched - confirmed via this session's own
+  app log (`DeviceManager` still reaches `VideoconWeighingScaleAdapter` on
+  COM4/2400 from the existing `DeviceConfiguration` row).
+
+**Not done / explicitly out of scope this pass:**
+- Hardware-in-the-loop verification of the KAM98-2A's actual serial
+  connection (device unavailable - see above).
+- Extending the configurable quality-rule engine to Clr/Water/Protein - no
+  confirmed acceptance thresholds exist for them yet, and inventing some
+  would violate "no invented business rules"; they are captured, displayed,
+  and available for operator judgment, not (yet) auto range-checked.
+
 ## Known Limitations
 
 - **No installer.** `dotnet publish` produces a deployable folder, not an
@@ -478,8 +562,11 @@ the verified default - not merely "the interface exists."
   machine, under the same Windows user account** (DPAPI `CurrentUser`
   scope) - there is no way to provision offline access for an account
   that has never logged in online here.
-- Analyser protocol, and the Videocon/ESSAE discrepancy, remain open (see
-  Hardware Verification).
+- The KAM98-2A analyser's payload decode is now derived and verified against
+  two real observed samples (see "Milk Analyser + Quality Decision Flow"
+  above), but its physical serial connection is still unverified - no
+  hardware-in-the-loop test exists. The Videocon/ESSAE scale discrepancy
+  separately remains open (see Hardware Verification).
 - **Decimal precision relies on SQLite `REAL` (double) columns**, not an
   exact fixed-point type. Empirically verified safe for this domain's
   realistic value ranges (a scratch test round-tripped `4.53`, `9.87`,

@@ -3,13 +3,17 @@ using System.Windows;
 using System.Windows.Controls;
 using CCMC.Application.Abstractions;
 using CCMC.Application.Reception;
+using CCMC.Domain.Devices;
 using CCMC.Domain.Entities;
 using CCMC.Domain.Enums;
+using CCMC.Infrastructure.Devices;
 
 namespace CCMC.Desktop.Windows;
 
 public partial class ReceptionWindow : Window
 {
+    private const string ManualAnalyserDeviceId = "milk-analyser-manual-test";
+
     private readonly ISessionStore _sessionStore;
     private readonly IChillingCentreRepository _centreRepository;
     private readonly ISourceRepository _sourceRepository;
@@ -20,10 +24,11 @@ public partial class ReceptionWindow : Window
 
     /// <summary>
     /// Guards the TextChanged handlers below against firing when THIS class
-    /// programmatically sets a field's .Text after a device read - only a
-    /// genuine operator keystroke should ever mark a reading as manually
-    /// edited. See ReadDevicesButton_Click, which sets this around its own
-    /// .Text assignments.
+    /// programmatically sets a field's .Text after a device read (or a
+    /// manual analyser test parse) - only a genuine operator keystroke
+    /// should ever mark a reading as manually edited. See
+    /// ReadDevicesButton_Click/ParseManualAnalyserButton_Click, which set
+    /// this around their own .Text assignments.
     /// </summary>
     private bool _suppressProvenanceTracking;
 
@@ -46,6 +51,9 @@ public partial class ReceptionWindow : Window
         QuantityTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkWeightEditedManually(); };
         FatTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
         SnfTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
+        ClrTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
+        WaterTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
+        ProteinTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
         TemperatureTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
     }
 
@@ -107,16 +115,16 @@ public partial class ReceptionWindow : Window
 
                 if (result.Quality is { } quality)
                 {
-                    FatTextBox.Text = quality.Fat.ToString(CultureInfo.InvariantCulture);
-                    SnfTextBox.Text = quality.Snf.ToString(CultureInfo.InvariantCulture);
-                    TemperatureTextBox.Text = quality.Temperature.ToString(CultureInfo.InvariantCulture);
+                    PopulateQualityFields(quality);
                     _provenance.RecordQualityFromDevice();
-                    QualityStatusTextBlock.Text = "Quality read from analyser.";
+                    QualityStatusTextBlock.Text = quality.Temperature is null
+                        ? "Quality read from analyser (Fat/SNF/CLR/Water/Protein). Temperature is not measured by this device - enter it manually."
+                        : "Quality read from analyser.";
                     QualityStatusTextBlock.Foreground = System.Windows.Media.Brushes.Green;
                 }
                 else
                 {
-                    QualityStatusTextBlock.Text = $"Analyser unavailable - enter FAT/SNF/Temperature manually. ({result.QualityUnavailableReason})";
+                    QualityStatusTextBlock.Text = $"Analyser unavailable - enter quality manually, or use the Manual Test Input below. ({result.QualityUnavailableReason})";
                     QualityStatusTextBlock.Foreground = System.Windows.Media.Brushes.DarkOrange;
                 }
             }
@@ -131,7 +139,89 @@ public partial class ReceptionWindow : Window
         }
     }
 
-    private async void SaveButton_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Development/testing fallback while the physical KAM98-2A is
+    /// unavailable (see CLAUDE.md / HOW_TO_RUN.md "Milk Analyser Manual Test
+    /// Input"). Feeds the operator-entered raw string through the EXACT SAME
+    /// Kam98A2AAnalyserFrameParser a real device read uses, then populates
+    /// the exact same fields ReadDevicesButton_Click does - this is
+    /// deliberately not a second, parallel decode path.
+    /// </summary>
+    private void ParseManualAnalyserButton_Click(object sender, RoutedEventArgs e)
+    {
+        var input = ManualAnalyserInputTextBox.Text;
+        try
+        {
+            var reading = Kam98A2AAnalyserFrameParser.ParsePayload(input, ManualAnalyserDeviceId, DateTimeOffset.UtcNow);
+
+            _suppressProvenanceTracking = true;
+            try
+            {
+                PopulateQualityFields(reading);
+                _provenance.MarkQualityEditedManually(); // manual test input is never DEVICE provenance
+            }
+            finally
+            {
+                _suppressProvenanceTracking = false;
+            }
+
+            ManualAnalyserResultTextBlock.Text =
+                $"Parsed OK - Fat {reading.Fat}%  SNF {reading.Snf}%  CLR {reading.Clr}  " +
+                $"Water {reading.OptionalParameters!["Water"]}%  Protein {reading.OptionalParameters!["Protein"]}%. " +
+                "Values above have been filled in as MANUAL test input - proceed to a quality decision below.";
+            ManualAnalyserResultTextBlock.Foreground = System.Windows.Media.Brushes.Green;
+        }
+        catch (DeviceParseException ex)
+        {
+            ManualAnalyserResultTextBlock.Text = $"Could not parse: {ex.Message}";
+            ManualAnalyserResultTextBlock.Foreground = System.Windows.Media.Brushes.Red;
+        }
+    }
+
+    private void PopulateQualityFields(CCMC.Domain.ValueObjects.MilkQualityReading quality)
+    {
+        FatTextBox.Text = quality.Fat.ToString(CultureInfo.InvariantCulture);
+        SnfTextBox.Text = quality.Snf.ToString(CultureInfo.InvariantCulture);
+        ClrTextBox.Text = quality.Clr?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        WaterTextBox.Text = TryGetOptionalParameter(quality, "Water")?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        ProteinTextBox.Text = TryGetOptionalParameter(quality, "Protein")?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        if (quality.Temperature is { } temperature)
+        {
+            TemperatureTextBox.Text = temperature.ToString(CultureInfo.InvariantCulture);
+        }
+        RawAnalyserPayloadTextBox.Text = quality.RawData is { Length: > 0 } raw
+            ? System.Text.Encoding.ASCII.GetString(raw)
+            : string.Empty;
+    }
+
+    private static decimal? TryGetOptionalParameter(CCMC.Domain.ValueObjects.MilkQualityReading quality, string key) =>
+        quality.OptionalParameters is { } parameters && parameters.TryGetValue(key, out var value) ? value : null;
+
+    private async void AcceptButton_Click(object sender, RoutedEventArgs e) => await DecideAsync(ReceptionDecision.Accept);
+
+    private async void HoldButton_Click(object sender, RoutedEventArgs e) => await DecideAsync(ReceptionDecision.Hold);
+
+    private async void RejectButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(DecisionReasonTextBox.Text))
+        {
+            ResultTextBlock.Text = "A reason is required to reject a reception.";
+            ResultTextBlock.Foreground = System.Windows.Media.Brushes.Red;
+            return;
+        }
+
+        await DecideAsync(null); // null Decision signals REJECT - see DecideAsync
+    }
+
+    /// <summary>
+    /// Shared validation + save path for all three decision buttons. A null
+    /// <paramref name="decision"/> means REJECT, which - per
+    /// TransactionStatus's own invariant (Rejected only via override of a
+    /// Hold, unchanged) - is not a ReceptionDecision value; it is handled by
+    /// ReceptionWorkflowService.RejectAtReceptionAsync instead (see its doc
+    /// comment).
+    /// </summary>
+    private async Task DecideAsync(ReceptionDecision? decision)
     {
         var session = _sessionStore.Current;
         if (session is null)
@@ -157,7 +247,12 @@ public partial class ReceptionWindow : Window
             return;
         }
 
-        SaveButton.IsEnabled = false;
+        var clr = TryParseDecimal(ClrTextBox.Text, out var clrValue) ? clrValue : (decimal?)null;
+        var water = TryParseDecimal(WaterTextBox.Text, out var waterValue) ? waterValue : (decimal?)null;
+        var protein = TryParseDecimal(ProteinTextBox.Text, out var proteinValue) ? proteinValue : (decimal?)null;
+        var rawAnalyserPayload = string.IsNullOrWhiteSpace(RawAnalyserPayloadTextBox.Text) ? null : RawAnalyserPayloadTextBox.Text;
+
+        SetDecisionButtonsEnabled(false);
         try
         {
             // Resolved from actual edit history (ReadingProvenanceTracker), not
@@ -169,16 +264,24 @@ public partial class ReceptionWindow : Window
 
             var input = new SaveReceptionInput(
                 centre.Id, source.Id, vehicle.Id, session.User.Id,
-                quantity, fat, snf, temperature, readingSource);
+                quantity, fat, snf, temperature, readingSource,
+                decision ?? ReceptionDecision.Hold, // ignored by RejectAtReceptionAsync when decision is null
+                clr, water, protein, rawAnalyserPayload,
+                string.IsNullOrWhiteSpace(DecisionReasonTextBox.Text) ? null : DecisionReasonTextBox.Text);
 
-            var result = await _receptionWorkflowService.ValidateAndSaveAsync(input, CancellationToken.None);
+            var result = decision is { } d
+                ? await _receptionWorkflowService.ValidateAndSaveAsync(input with { Decision = d }, CancellationToken.None)
+                : await _receptionWorkflowService.RejectAtReceptionAsync(input, DecisionReasonTextBox.Text, CancellationToken.None);
 
             ResultTextBlock.Text = result.WasNewlyCreated
                 ? $"Saved locally. Status: {result.Transaction.Status}. Queued for cloud sync."
                 : "This reception was already saved (duplicate save prevented).";
-            ResultTextBlock.Foreground = result.Transaction.Status == TransactionStatus.Hold
-                ? System.Windows.Media.Brushes.DarkOrange
-                : System.Windows.Media.Brushes.Green;
+            ResultTextBlock.Foreground = result.Transaction.Status switch
+            {
+                TransactionStatus.Hold => System.Windows.Media.Brushes.DarkOrange,
+                TransactionStatus.Rejected => System.Windows.Media.Brushes.Red,
+                _ => System.Windows.Media.Brushes.Green,
+            };
         }
         catch (IdempotencyKeyConflictException ex)
         {
@@ -192,8 +295,15 @@ public partial class ReceptionWindow : Window
         }
         finally
         {
-            SaveButton.IsEnabled = true;
+            SetDecisionButtonsEnabled(true);
         }
+    }
+
+    private void SetDecisionButtonsEnabled(bool enabled)
+    {
+        AcceptButton.IsEnabled = enabled;
+        HoldButton.IsEnabled = enabled;
+        RejectButton.IsEnabled = enabled;
     }
 
     private static bool TryParseDecimal(string text, out decimal value) =>

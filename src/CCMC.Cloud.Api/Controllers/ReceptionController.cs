@@ -54,7 +54,9 @@ public sealed class ReceptionController(ReceptionService receptionService, ICurr
             new CreateReceptionCommand(
                 request.CentreId, request.SourceId, request.VehicleId,
                 request.QuantityKg, request.Fat, request.Snf, request.Temperature,
-                request.LocalIdempotencyKey),
+                request.LocalIdempotencyKey,
+                request.Status?.ToDomain(),
+                request.Clr, request.Water, request.Protein, request.RawAnalyserPayload),
             cancellationToken);
 
         var outcome = result.Outcome == CreateReceptionOutcome.Created ? "created" : "duplicate";

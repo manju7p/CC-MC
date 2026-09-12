@@ -32,6 +32,20 @@ public sealed class MilkReceptionTransaction
     /// <summary>NUMERIC(5,2) degrees Celsius.</summary>
     public decimal Temperature { get; set; }
 
+    /// <summary>
+    /// Milk analyser fields beyond Fat/Snf (density/CLR, added-water percent,
+    /// protein) - additive, nullable: not every reception has an analyser
+    /// reading, and rows created before this column existed have none. See
+    /// CCMC.Domain.Entities.MilkReceptionTransaction (Windows client) for the
+    /// matching local-schema fields this mirrors.
+    /// </summary>
+    public decimal? Clr { get; set; }
+    public decimal? Water { get; set; }
+    public decimal? Protein { get; set; }
+
+    /// <summary>The exact analyser payload Fat/Snf/Clr/Water/Protein were decoded from - preserved verbatim.</summary>
+    public string? RawAnalyserPayload { get; set; }
+
     public TransactionStatus Status { get; set; }
     public ReadingSource ReadingSource { get; set; } = ReadingSource.Manual;
     public string? Reason { get; set; }

@@ -15,6 +15,7 @@ public sealed class SchemaMigrator(SqliteConnectionFactory connectionFactory)
     [
         (Migration001InitialSchema.Version, Migration001InitialSchema.Name, Migration001InitialSchema.Sql),
         (Migration002OfflineAndOverrideSync.Version, Migration002OfflineAndOverrideSync.Name, Migration002OfflineAndOverrideSync.Sql),
+        (Migration003AnalyserFields.Version, Migration003AnalyserFields.Name, Migration003AnalyserFields.Sql),
     ];
 
     public void Migrate()

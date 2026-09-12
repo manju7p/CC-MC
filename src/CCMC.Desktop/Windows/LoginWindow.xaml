@@ -1,22 +1,44 @@
 <Window x:Class="CCMC.Desktop.Windows.LoginWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Sign In" Height="360" Width="420"
+        Title="CCMC - Sign In" Height="480" Width="440"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
-    <StackPanel Margin="24">
-        <TextBlock Text="Chilling Centre Milk Collection" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <TextBlock Text="Email" Margin="0,0,0,4"/>
-        <TextBox Name="EmailTextBox" Margin="0,0,0,12" Height="26"/>
+        <!-- Brand band -->
+        <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock Text="CCMC" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextInverseBrush}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Chilling Centre Milk Collection" FontSize="12" Foreground="{StaticResource PrimarySoftBrush}"
+                           HorizontalAlignment="Center" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
 
-        <TextBlock Text="Password" Margin="0,0,0,4"/>
-        <PasswordBox Name="PasswordBox" Margin="0,0,0,12" Height="26"/>
+        <!-- Sign-in card -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="28,-28,28,28" VerticalAlignment="Top">
+            <StackPanel Margin="8">
+                <TextBlock Text="Sign in" Style="{StaticResource HeaderText}" Margin="0,0,0,16"/>
 
-        <TextBlock Name="StatusTextBlock" Foreground="Red" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                <TextBlock Text="Email" Style="{StaticResource FieldLabelText}"/>
+                <TextBox Name="EmailTextBox" Margin="0,0,0,14"/>
 
-        <Button Name="LoginButton" Content="Sign In" Height="32" Click="LoginButton_Click"/>
+                <TextBlock Text="Password" Style="{StaticResource FieldLabelText}"/>
+                <PasswordBox Name="PasswordBox" Margin="0,0,0,10"/>
 
-        <TextBlock Name="OfflineHintTextBlock" Foreground="Gray" FontSize="11" Margin="0,16,0,0" TextWrapping="Wrap"
-                   Text="Sign-in requires an internet connection to the cloud API. Offline sign-in is not yet supported - see CLAUDE.md."/>
-    </StackPanel>
+                <TextBlock Name="StatusTextBlock" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                           FontSize="12" Margin="0,0,0,10"/>
+
+                <Button Name="LoginButton" Content="Sign In" Height="38" Style="{StaticResource PrimaryButton}"
+                        Click="LoginButton_Click"/>
+
+                <TextBlock Name="OfflineHintTextBlock" Style="{StaticResource CaptionText}" Margin="0,16,0,0"
+                           Text="Sign-in works online (verified live against the cloud) or, if the cloud is unreachable, offline using credentials cached from your last successful online sign-in on this PC."/>
+            </StackPanel>
+        </Border>
+    </Grid>
 </Window>

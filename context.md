@@ -212,13 +212,18 @@ assumed compatible.
   Manufacturer-specific logic must not leak into the reception workflow.
 - Exactly one component owns a given physical COM port — never two
   independent readers on the same port.
-- **No parser exists for any device yet.** Nothing may be invented; a
-  real parser is blocked on controlled protocol captures and/or
-  manufacturer documentation (see Open Questions).
+- **Real parsers now exist for both devices** (updated 2026-09-12). The
+  weighing scale (Videocon, verified live) and the milk analyser (Ekomilk
+  Milkana KAM98-2A — `Kam98A2AAnalyserFrameParser`, field layout derived
+  from two real observed device outputs the project owner supplied directly
+  — see STATUS.md "Milk Analyser + Quality Decision Flow"). The KAM98-2A's
+  payload DECODE is verified; its physical SERIAL CONNECTION is not (no
+  hardware-in-the-loop test — device unavailable). Nothing here was invented.
 - Reading models (BRD v2 §10, minimum fields): `WeightReading` = Value,
   Unit, Stable, Timestamp, DeviceId, RawData. `MilkQualityReading` = FAT,
-  SNF, CLR, Temperature, optional parameters, Timestamp, DeviceId,
-  RawData.
+  SNF, CLR, Temperature (nullable — the KAM98-2A does not measure it),
+  optional parameters (Water/Protein land here for the KAM98-2A), Timestamp,
+  DeviceId, RawData.
 
 ## Serial Configuration
 
@@ -231,8 +236,12 @@ hard-coded.
 - **Weighing scale — verified:** COM4, 2400 baud, 8 data bits, no
   parity, 1 stop bit, no flow control. Manufacturer: Videocon Precision
   Systems. Model: unknown. Protocol: unknown/uncaptured.
-- **Milk analyser:** no verified configuration yet — all parameters
-  "Configurable" per BRD v2 §5.2, nothing confirmed.
+- **Milk analyser:** manufacturer/model now known — Ekomilk Milkana
+  KAM98-2A — and its OUTPUT PAYLOAD format is derived from two real observed
+  samples (see STATUS.md "Milk Analyser + Quality Decision Flow"). Serial
+  parameters (COM port, baud rate, etc.) remain unverified — still
+  "Configurable" per BRD v2 §5.2, nothing confirmed — the physical link
+  itself has not been tested.
 - **Unresolved discrepancy:** the legacy gateway docs
   (`docs/gateway-architecture.md` on `pranav-dev`) record a different,
   earlier "CEO-confirmed" configuration — ESSAE equipment, 9600 baud,
@@ -634,8 +643,11 @@ STATUS.md "Product Decisions") and are no longer listed:
 
 1. Videocon vs. ESSAE hardware discrepancy (see "Current Hardware
    Facts") — needs explicit human confirmation.
-2. Milk analyser: no serial configuration or protocol confirmed at all —
-   no vendor even named yet, unlike the scale's verified Videocon/COM4/2400.
+2. Milk analyser: vendor/model now known (Ekomilk Milkana KAM98-2A) and its
+   output payload format is derived from real observed samples (see
+   STATUS.md), but no serial configuration (COM port/baud/etc.) is
+   confirmed and the physical serial link itself is untested — unlike the
+   scale's verified Videocon/COM4/2400.
 3. Whether the cloud API's routes (unprefixed, e.g. `POST /reception`)
    will stay stable, or whether an `/api/v1` prefix will be introduced
    before the Windows app ships — assume current unprefixed routes until

@@ -1,55 +1,87 @@
 <Window x:Class="CCMC.Desktop.Windows.DeviceConfigurationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Device Configuration" Height="640" Width="460"
+        Title="CCMC - Device Configuration" Height="680" Width="500" MinHeight="560" MinWidth="440"
         WindowStartupLocation="CenterScreen">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="20">
-            <TextBlock Text="Device" Margin="0,0,0,4"/>
-            <ComboBox Name="DeviceKindComboBox" Margin="0,0,0,12" SelectionChanged="DeviceKindComboBox_SelectionChanged"/>
+        <StackPanel Margin="24">
+            <TextBlock Text="Device Configuration" Style="{StaticResource TitleText}" Margin="0,0,0,4"/>
+            <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,16"
+                       Text="Configurable serial settings per centre/device - COM4/2400/8-N-1 is only the verified default for the weighing scale, not a fixed requirement. A different chilling centre may use an entirely different COM port, baud rate, or device."/>
 
-            <TextBlock Text="Device / Vendor Name"/>
-            <TextBox Name="NameTextBox" Margin="0,4,0,12"/>
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="Device" Style="{StaticResource FieldLabelText}"/>
+                    <ComboBox Name="DeviceKindComboBox" Margin="0,0,0,14" SelectionChanged="DeviceKindComboBox_SelectionChanged"/>
 
-            <TextBlock Text="COM Port"/>
-            <Grid Margin="0,4,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <ComboBox Grid.Column="0" Name="ComPortComboBox" IsEditable="True" Margin="0,0,8,0"/>
-                <Button Grid.Column="1" Name="RefreshPortsButton" Content="Refresh" Width="70" Click="RefreshPortsButton_Click"/>
-            </Grid>
+                    <TextBlock Text="Device / Vendor Name" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="NameTextBox" Margin="0,0,0,14"/>
 
-            <TextBlock Text="Baud Rate"/>
-            <ComboBox Name="BaudRateComboBox" IsEditable="True" Margin="0,4,0,12"/>
+                    <TextBlock Text="COM Port" Style="{StaticResource FieldLabelText}"/>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" Name="ComPortComboBox" IsEditable="True" Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Name="RefreshPortsButton" Content="Refresh" Width="76" Style="{StaticResource SecondaryButton}" Click="RefreshPortsButton_Click"/>
+                    </Grid>
 
-            <TextBlock Text="Data Bits"/>
-            <ComboBox Name="DataBitsComboBox" Margin="0,4,0,12"/>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Baud Rate" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="BaudRateComboBox" IsEditable="True"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Data Bits" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="DataBitsComboBox"/>
+                        </StackPanel>
+                    </Grid>
 
-            <TextBlock Text="Stop Bits"/>
-            <ComboBox Name="StopBitsComboBox" DisplayMemberPath="Label" Margin="0,4,0,12"/>
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Stop Bits" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="StopBitsComboBox" DisplayMemberPath="Label"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Parity" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="ParityComboBox" DisplayMemberPath="Label"/>
+                        </StackPanel>
+                    </Grid>
 
-            <TextBlock Text="Parity"/>
-            <ComboBox Name="ParityComboBox" DisplayMemberPath="Label" Margin="0,4,0,12"/>
+                    <TextBlock Text="Flow Control" Style="{StaticResource FieldLabelText}"/>
+                    <ComboBox Name="FlowControlComboBox" DisplayMemberPath="Label" Margin="0,0,0,14"/>
 
-            <TextBlock Text="Flow Control"/>
-            <ComboBox Name="FlowControlComboBox" DisplayMemberPath="Label" Margin="0,4,0,12"/>
+                    <TextBlock Text="Read Timeout (ms)" Style="{StaticResource FieldLabelText}"/>
+                    <TextBox Name="ReadTimeoutTextBox" Width="140" Margin="0,0,0,14"/>
 
-            <TextBlock Text="Read Timeout (ms)"/>
-            <TextBox Name="ReadTimeoutTextBox" Margin="0,4,0,12"/>
+                    <CheckBox Name="EnabledCheckBox" Content="Enabled" Margin="0,0,0,18"/>
 
-            <CheckBox Name="EnabledCheckBox" Content="Enabled" Margin="0,0,0,16"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Name="TestConnectionButton" Content="Test Connection" Height="34"
+                                Style="{StaticResource SecondaryButton}" Click="TestConnectionButton_Click"/>
+                        <Button Grid.Column="2" Name="SaveButton" Content="Save" Height="34"
+                                Style="{StaticResource PrimaryButton}" Click="SaveButton_Click"/>
+                    </Grid>
 
-            <UniformGrid Columns="2" Margin="0,0,0,8">
-                <Button Name="TestConnectionButton" Content="Test Connection" Height="32" Margin="0,0,4,0" Click="TestConnectionButton_Click"/>
-                <Button Name="SaveButton" Content="Save" Height="32" Margin="4,0,0,0" Click="SaveButton_Click"/>
-            </UniformGrid>
-
-            <TextBlock Name="StatusTextBlock" Foreground="Green" TextWrapping="Wrap" Margin="0,12,0,0"/>
-
-            <TextBlock Foreground="Gray" FontSize="11" TextWrapping="Wrap" Margin="0,16,0,0"
-                       Text="These are configurable serial settings per centre/device - COM4/2400/8-N-1 is only the verified default for the weighing scale, not a fixed requirement. A different chilling centre may use an entirely different COM port, baud rate, or device."/>
+                    <TextBlock Name="StatusTextBlock" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </Window>

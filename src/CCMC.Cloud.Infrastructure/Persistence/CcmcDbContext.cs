@@ -146,6 +146,12 @@ public sealed class CcmcDbContext(DbContextOptions<CcmcDbContext> options) : DbC
             e.Property(t => t.Fat).HasPrecision(5, 2);
             e.Property(t => t.Snf).HasPrecision(5, 2);
             e.Property(t => t.Temperature).HasPrecision(5, 2);
+            // NUMERIC(5,2): milk analyser fields (Clr up to ~99.99, Water/Protein
+            // percentages) - same precision reasoning as Fat/Snf/Temperature above.
+            e.Property(t => t.Clr).HasPrecision(5, 2);
+            e.Property(t => t.Water).HasPrecision(5, 2);
+            e.Property(t => t.Protein).HasPrecision(5, 2);
+            e.Property(t => t.RawAnalyserPayload).HasMaxLength(64);
             e.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(t => t.ReadingSource).HasConversion<string>().HasMaxLength(20);
             e.Property(t => t.LocalIdempotencyKey).HasMaxLength(200);

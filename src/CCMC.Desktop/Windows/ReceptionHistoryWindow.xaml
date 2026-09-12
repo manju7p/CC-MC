@@ -1,28 +1,43 @@
 <Window x:Class="CCMC.Desktop.Windows.ReceptionHistoryWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Reception History" Height="480" Width="800"
+        Title="CCMC - Reception History" Height="560" Width="1080" MinHeight="360" MinWidth="640"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="12">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <Button Grid.Row="0" Name="RefreshButton" Content="Refresh" Width="100" HorizontalAlignment="Left"
-                Margin="0,0,0,8" Click="RefreshButton_Click"/>
-        <DataGrid Grid.Row="1" Name="TransactionsGrid" AutoGenerateColumns="False" IsReadOnly="True">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Local ID" Binding="{Binding LocalId}"/>
-                <DataGridTextColumn Header="Transaction #" Binding="{Binding TransactionNumber}"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-                <DataGridTextColumn Header="Qty (kg)" Binding="{Binding QuantityKg}"/>
-                <DataGridTextColumn Header="FAT" Binding="{Binding Fat}"/>
-                <DataGridTextColumn Header="SNF" Binding="{Binding Snf}"/>
-                <DataGridTextColumn Header="Temp" Binding="{Binding Temperature}"/>
-                <DataGridTextColumn Header="Reading Source" Binding="{Binding ReadingSource}"/>
-                <DataGridTextColumn Header="Captured At" Binding="{Binding CapturedAt}"/>
-                <DataGridTextColumn Header="Cloud ID" Binding="{Binding CloudTransactionId}"/>
-            </DataGrid.Columns>
-        </DataGrid>
+
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Reception History" Style="{StaticResource TitleText}"/>
+            <Button Grid.Column="1" Name="RefreshButton" Content="Refresh" Width="100" Height="32"
+                    Style="{StaticResource SecondaryButton}" Click="RefreshButton_Click"/>
+        </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="0">
+            <DataGrid Name="TransactionsGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Local ID" Binding="{Binding LocalId}"/>
+                    <DataGridTextColumn Header="Transaction #" Binding="{Binding TransactionNumber}"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                    <DataGridTextColumn Header="Qty (kg)" Binding="{Binding QuantityKg}"/>
+                    <DataGridTextColumn Header="FAT" Binding="{Binding Fat}"/>
+                    <DataGridTextColumn Header="SNF" Binding="{Binding Snf}"/>
+                    <DataGridTextColumn Header="CLR" Binding="{Binding Clr}"/>
+                    <DataGridTextColumn Header="Water" Binding="{Binding Water}"/>
+                    <DataGridTextColumn Header="Protein" Binding="{Binding Protein}"/>
+                    <DataGridTextColumn Header="Temp" Binding="{Binding Temperature}"/>
+                    <DataGridTextColumn Header="Reading Source" Binding="{Binding ReadingSource}"/>
+                    <DataGridTextColumn Header="Reason" Binding="{Binding Reason}" Width="180"/>
+                    <DataGridTextColumn Header="Captured At" Binding="{Binding CapturedAt}"/>
+                    <DataGridTextColumn Header="Cloud ID" Binding="{Binding CloudTransactionId}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
     </Grid>
 </Window>

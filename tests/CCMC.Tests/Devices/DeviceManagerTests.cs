@@ -89,7 +89,7 @@ public class DeviceManagerTests : IDisposable
         await manager.InitializeAsync(CancellationToken.None);
 
         Assert.NotNull(manager.MilkAnalyser);
-        Assert.IsType<GenericMilkAnalyserAdapter>(manager.MilkAnalyser);
+        Assert.IsType<EkomilkKam98A2AAnalyserAdapter>(manager.MilkAnalyser);
     }
 
     [Fact]

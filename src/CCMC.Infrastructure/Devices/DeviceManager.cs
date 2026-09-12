@@ -59,8 +59,8 @@ public sealed class DeviceManager(
             var analyserConfig = await configurationRepository.GetAsync(DeviceKind.MilkAnalyser, cancellationToken);
             if (analyserConfig is not null)
             {
-                MilkAnalyser = new GenericMilkAnalyserAdapter(
-                    connectionManager, analyserConfig.Serial, captureLogger, loggerFactory.CreateLogger<GenericMilkAnalyserAdapter>());
+                MilkAnalyser = new EkomilkKam98A2AAnalyserAdapter(
+                    connectionManager, analyserConfig.Serial, captureLogger, loggerFactory.CreateLogger<EkomilkKam98A2AAnalyserAdapter>());
                 logger.LogInformation(
                     "Milk analyser adapter configured: port={ComPort} baud={BaudRate}",
                     analyserConfig.Serial.ComPort, analyserConfig.Serial.BaudRate);

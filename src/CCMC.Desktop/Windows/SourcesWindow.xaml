@@ -1,23 +1,28 @@
 <Window x:Class="CCMC.Desktop.Windows.SourcesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Sources" Height="440" Width="640"
+        Title="CCMC - Sources" Height="500" Width="720" MinHeight="320" MinWidth="480"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="12">
+    <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Margin="0,0,0,8"
-                    Text="Sources are managed in the cloud and cached locally for offline reception (read-only here)."/>
-        <DataGrid Grid.Row="1" Name="SourcesGrid" AutoGenerateColumns="False" IsReadOnly="True">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Code" Binding="{Binding Code}"/>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}"/>
-                <DataGridTextColumn Header="Location" Binding="{Binding Location}"/>
-                <DataGridTextColumn Header="Milk Type" Binding="{Binding MilkType}"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="Sources" Style="{StaticResource TitleText}"/>
+            <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
+                       Text="Sources are managed in the cloud and cached locally for offline reception (read-only here)."/>
+        </StackPanel>
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="0">
+            <DataGrid Name="SourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Code" Binding="{Binding Code}"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="*"/>
+                    <DataGridTextColumn Header="Milk Type" Binding="{Binding MilkType}"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
     </Grid>
 </Window>
