@@ -227,7 +227,8 @@ The automatic Fat/Snf/Temperature range check (the original "auto-accept" logic)
 
 ## 13. Testing
 
-- **Update (2026-09-12, after Rate Calculation implementation)**: a later session obtained access to a real local PostgreSQL instance (a fresh, isolated `pg_ctl`-managed instance, not the machine's own stopped service) and confirmed the cloud suite genuinely passes. Current, actually-verified counts:
+- **Update (2026-09-12, latest — after Docker/Neon setup + JWT bug fix)**: **Windows client 155/155**, **Cloud 35/35** (+1 discriminating rate-rounding test, +2 JWT configuration regression tests since the figures below were recorded). **`dotnet test CCMC.sln` combined total: 190/190 passed.** Cloud suite run against a real reachable PostgreSQL each time.
+- **Update (2026-09-12, after Rate Calculation implementation)**: a later session obtained access to a real local PostgreSQL instance (a fresh, isolated `pg_ctl`-managed instance, not the machine's own stopped service) and confirmed the cloud suite genuinely passes. Counts at that point:
   - **Windows client** (`tests/CCMC.Tests`): **154/154 passed, 0 failed, 0 skipped** (126 pre-existing + 28 new: `RateCalculationServiceTests.cs` and rate-specific additions to `ReceptionWorkflowServiceTests.cs`/`ReceptionRepositoryTests.cs`/`SchemaMigratorTests.cs`/a new `RateFormulaSettingsRepositoryTests.cs`).
   - **Cloud** (`tests/CCMC.Cloud.Api.Tests`): **33/33 passed, 0 failed, 0 skipped** (20 pre-existing + 13 new: `RateFormulaSettingsTests.cs` and rate-specific additions to `ReceptionTests.cs`), run via real `WebApplicationFactory<Program>` against a real, freshly migrated `ccmc_cloud_test` PostgreSQL database — genuinely verified, not the "structurally sound but unverified" state the original audit had to report.
   - **`dotnet test CCMC.sln` combined total: 187/187 passed.**
@@ -300,6 +301,8 @@ Research conducted 2026-09-12, cross-checked against official pricing/docs pages
 
 ## 16. Recommended MVP Hosting
 
+**Update (2026-09-12):** the Neon half of this recommendation is now actually set up (project `fancy-cherry-25725711`, branch `production`) and verified — migrations apply cleanly, health checks pass. `CCMC.Cloud.Api` is containerized (`Dockerfile` + `compose.yaml`) and verified running locally against both a local Docker PostgreSQL and against Neon, controlled purely by environment variables (`.env.local` vs `.env.production` — see `.env.example`). **Render deployment itself has not happened yet** — that remains the next and final step to reach the architecture below. See STATUS.md "Docker Compose + Neon Setup" for the full verification detail, including one real limitation: Neon/production currently has zero users and no administrative bootstrap mechanism (by design — `DevelopmentSeeder` correctly never runs there), which blocks testing an authenticated endpoint against Neon until a real production user exists.
+
 **Backend: Render (Web Service, Docker deploy). Database: Neon (PostgreSQL, free plan).**
 
 ```
@@ -322,14 +325,18 @@ Tradeoff vs. the primary pick: both require a credit card at signup (GCP for acc
 
 ## 17. Deployment Blockers
 
+**Update (2026-09-12):** both Critical items below are resolved — kept here, marked done, for traceability.
+
 ### Critical
-- **No `Dockerfile` anywhere in the repository** — confirmed via full-repo search. This blocks a container-based deploy to Render/Cloud Run/Container Apps until one is authored (out of scope for this analysis task — this document only reports the gap).
-- **Cloud test suite has never been confirmed passing in any environment reachable in this analysis session** — only ever run against an unreachable Postgres. Before trusting the cloud API as deployment-ready, it should be run once against a real, reachable Postgres instance to confirm the full integration path (migrations, seed gating, idempotency, RBAC) genuinely works end-to-end, not just that the code compiles.
+- ~~No `Dockerfile` anywhere in the repository~~ — **Resolved.** `Dockerfile` + `compose.yaml` now exist, built and verified running (see STATUS.md "Rate/Amount Semantics Verification + Docker" and "Docker Compose + Neon Setup").
+- ~~Cloud test suite has never been confirmed passing in any environment~~ — **Resolved.** 35/35 cloud tests verified passing against a real local PostgreSQL; the API itself additionally verified running against real Neon PostgreSQL.
 
 ### Important
-- **No explicit Kestrel port/URL binding configured** in `Program.cs`/`appsettings.json` — relies on ASP.NET Core defaults and the `ASPNETCORE_URLS`/`PORT` environment variable convention that most PaaS hosts inject automatically; this is likely fine for Render/Cloud Run but has not been verified against any specific host in this session.
-- **No HSTS configured** (`UseHttpsRedirection` is present, so this is defense-in-depth only, not a functional gap).
-- **`[RequirePermission]`-omission fallback is "authenticated user allowed," not "denied"** — currently harmless because every current endpoint is correctly annotated, but there is no structural safety net if a future endpoint is added without the attribute.
+- ~~No explicit Kestrel port/URL binding configured~~ — **Resolved.** `Program.cs` now explicitly honors a `PORT` environment variable (Render's convention), confirmed the container correctly binds `0.0.0.0`/all interfaces regardless.
+- **No HSTS configured** (`UseHttpsRedirection` is present, so this is defense-in-depth only, not a functional gap). Still open.
+- **`[RequirePermission]`-omission fallback is "authenticated user allowed," not "denied"** — currently harmless because every current endpoint is correctly annotated, but there is no structural safety net if a future endpoint is added without the attribute. Still open.
+- **New (found via Docker testing, since fixed): `JwtOptions.Issuer`/`Audience` had no default**, causing every authenticated request to fail with 401 whenever only `Jwt__Secret` was supplied (a very plausible real deployment shape). Fixed by giving `JwtOptions` real defaults and unifying token issuance/validation onto a single `IOptions<JwtOptions>` instance — see STATUS.md for the full writeup. Locked down with 2 new regression tests.
+- **New: Neon/production has no administrative bootstrap mechanism** — `DevelopmentSeeder` correctly never runs there, but this also means there is currently no way to create the first real production user without a manual one-off action. Needs a decision before Render goes live.
 
 ### Optional
 - No rate-limiting on `/auth/login` (brute-force concern, acceptable for a college-project pilot, worth hardening before any real production use).

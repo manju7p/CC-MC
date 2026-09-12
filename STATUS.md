@@ -724,6 +724,92 @@ run against a real reachable PostgreSQL).
 no Neon database created/configured - this was local Docker verification
 only, in preparation for that next step.
 
+## Docker Compose + Neon Setup (2026-09-12)
+
+**Docker Compose**: the manually-`docker run` containers from the
+previous pass (`cc-mc`, `cc-mc-postgres`) were reorganized under a single
+Compose project (`compose.yaml`, repo root, project name `cc-mc`) - same
+container names, same `cc-mc-network`, plus a named volume
+(`cc-mc-postgres-data`, replacing the previous anonymous volume, which
+held only throwaway test data from the prior pass's own verification and
+was safe to discard) and a real PostgreSQL healthcheck so the API's
+`depends_on: condition: service_healthy` actually waits for the database
+to accept connections, not just for the container process to start.
+Verified: `docker compose -p cc-mc --env-file .env.local config` is
+valid, `up -d --build` brings up both services in the correct order
+(Postgres reaches "Healthy" before the API container starts), and
+`/health`/`/health/db` both return 200 through it.
+
+**Environment strategy**: `.env.example` (reference, documents every
+variable), `.env.local.example` -> `.env.local` (local Docker, gitignored),
+`.env.production.example` -> `.env.production` (Neon, gitignored). Same
+variable names everywhere (`ASPNETCORE_ENVIRONMENT`,
+`ConnectionStrings__CcmcDb`, `Jwt__Secret`) - only values differ. `.gitignore`
+updated with an explicit exception (`!.env.*.example`) so the placeholder
+templates are committed while `.env`/`.env.local`/`.env.production`
+(and anything else matching `.env.*`) stay ignored.
+
+**Neon**: linked and deployed to the user-provided project
+(`fancy-cherry-25725711`, branch `production`) via the exact CLI sequence
+supplied (`neon login`, `neon skills -y`, `neon mcp -y`, `neon link`,
+`neon config init`, `neon deploy`), with `neon.ts` set to the exact
+minimal content requested (`defineConfig({})`), not the CLI's own
+auto-generated starter policy. Two real CLI behaviors were discovered and
+corrected, not silently worked around:
+- `neon skills -y` and `neon mcp -y` have side effects beyond this repo:
+  the former wrote `.claude/` + `skills-lock.json` into the repo root
+  (Neon's own agent-skill documentation, no secrets - confirmed by
+  inspection); the latter minted a new, account-wide Neon API key
+  (scoped to everything the account can reach, in every organization) and
+  wrote MCP server configuration into several *global*, outside-this-repo
+  config files (`~/.claude.json`, `~/.gemini/*`, `~/.codex/*`, etc.) -
+  this key is not stored anywhere in this repository, but the user should
+  know it exists (revocable via `neon api-keys revoke <id>`, printed at
+  mint time).
+- Both `neon link` and `neon deploy` default to pulling the branch's Neon
+  variables (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_BRANCH`)
+  directly into a file literally named `.env.local` - which collided with
+  this repo's own use of that filename for LOCAL DOCKER configuration.
+  Each time, the Neon-pulled lines were removed from `.env.local`
+  afterward and the connection info (converted from Postgres URI to
+  Npgsql keyword form, using the unpooled/direct endpoint - simpler and
+  avoids any PgBouncer transaction-pooling interaction with EF Core's
+  migration DDL) was placed in `.env.production` instead, preserving the
+  required separation (local Docker must keep pointing at
+  `cc-mc-postgres`, never Neon).
+
+**Verified against the real Neon `production` branch** (inspected first,
+confirmed empty - zero tables - before running anything): all three
+migrations (`InitialCreate`, `AddMilkAnalyserFields`,
+`AddRateFormulaCalculation`) applied cleanly and in order,
+`__EFMigrationsHistory`/schema confirmed via `neon psql`, `/health` and
+`/health/db` both healthy, `ASPNETCORE_ENVIRONMENT=Production` correctly
+did **not** run `DevelopmentSeeder` (confirmed: `SELECT count(*) FROM
+users` = 0 on Neon), and a login attempt correctly returned 401 rather
+than crashing (proving the full auth code path - including the same
+`IOptions<JwtOptions>` issuance/validation fix from the previous pass -
+executes correctly against Neon).
+
+**Genuine limitation, reported rather than routed around** (per this
+session's own explicit instruction not to enable Development seeding in
+Production or invent a bootstrap mechanism): with zero users in the Neon
+database and no administrative bootstrap path, the full
+login-then-authenticated-endpoint-then-Rate/Amount-persistence chain
+could not be exercised through the live HTTP API against Neon in this
+pass. What *was* verified against Neon: connectivity, migrations, the
+auth pipeline's correctness up to credential lookup, and the seeding
+security boundary. See README.md §29.17 "Known Gaps" for the standing
+consideration this leaves for whoever sets up the first real production
+user.
+
+**Local Docker re-verified working, unaffected**: after all Neon work,
+`cc-mc`/`cc-mc-postgres` (via Compose) still pass `/health`/`/health/db`
+and a seeded local login still succeeds - confirmed the exact same image
+behaves correctly in both environments, controlled entirely by which
+`--env-file` is passed, with zero source-code differences. Full solution:
+190/190 tests passing, unchanged (this pass touched configuration and
+tooling only, not application code).
+
 ## Known Limitations
 
 - **No installer.** `dotnet publish` produces a deployable folder, not an

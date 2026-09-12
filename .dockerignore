@@ -44,3 +44,18 @@ appsettings.*.local.json
 
 # Repo docs not needed for the build.
 *.md
+
+# Neon CLI tooling (neon.ts, node_modules, lock files, agent skills, .neon
+# context) - none of this is needed to build or run CCMC.Cloud.Api; it
+# configures the Neon *database*, not the API image.
+node_modules/
+.claude/
+.neon
+neon.ts
+package.json
+package-lock.json
+skills-lock.json
+
+# Compose files describe how to RUN the image, not how to build it.
+compose.yaml
+docker-compose.yml

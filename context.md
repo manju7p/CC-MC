@@ -707,12 +707,29 @@ including that a reception's Rate/Amount survive a later configuration
 change unchanged. See STATUS.md "Milk Rate Calculation" for the full
 writeup.
 
+**Docker + Docker Compose + Neon (2026-09-12)**: `CCMC.Cloud.Api` is now
+containerized (`Dockerfile`, repo root) and verified in a real Docker
+Compose stack (`compose.yaml`, project `cc-mc`: containers `cc-mc` +
+`cc-mc-postgres`, network `cc-mc-network`). Production PostgreSQL now
+means a real Neon project (`fancy-cherry-25725711`, branch `production`)
+- linked via the Neon CLI, all three migrations verified applying cleanly
+against it, `/health`/`/health/db` both healthy. The exact same image
+runs against either database, controlled only by which environment file
+(`.env.local` vs `.env.production`, both gitignored - see
+`.env.example`/`.env.local.example`/`.env.production.example`) is
+supplied - no source-code difference between local and production.
+**Render deployment is the next step, not done yet.** One real, reported-
+not-worked-around limitation: Neon/production currently has zero users
+and no administrative bootstrap mechanism (`DevelopmentSeeder` correctly
+never runs outside `ASPNETCORE_ENVIRONMENT=Development`, confirmed
+directly against Neon) - see STATUS.md "Docker Compose + Neon Setup" and
+README.md §29.17 for the full detail and what this blocks.
+
 **Full solution:** `dotnet build CCMC.sln` → 0 warnings, 0 errors.
-`dotnet test CCMC.sln` → **187/187 tests passing** (154 Windows-client +
-33 cloud-backend, the cloud suite run against a real PostgreSQL instance) -
-this supersedes the "110/110" figure previously recorded here, which was
-already stale before this update (see STATUS.md for the full test-count
-history).
+`dotnet test CCMC.sln` → **190/190 tests passing** (155 Windows-client +
+35 cloud-backend, the cloud suite run against a real reachable
+PostgreSQL) - this supersedes the "187/187"/"110/110" figures previously
+recorded here (see STATUS.md for the full test-count history).
 
 What is genuinely NOT done (not oversights — each is either blocked on
 external input or an explicit scope cut, see STATUS.md "Known

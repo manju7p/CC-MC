@@ -917,14 +917,90 @@ dotnet test CCMC.sln
 
 ### 29.16 Deployment Direction
 
-Not built in this pass (matches the Windows app's own "installer chosen,
-not built" status - §26). Direction: containerize `CCMC.Cloud.Api` (a
-`Dockerfile` is not yet included), run `dotnet ef database update` as an
-explicit deploy step against the target PostgreSQL instance (rather than
-relying on the automatic `Migrate()`-at-startup behavior used in
-development), and supply `ConnectionStrings__CcmcDb`/`Jwt__Secret` (plus
-`ASPNETCORE_ENVIRONMENT=Production`, which disables Swagger and the
-development seeder) via the hosting platform's secret mechanism.
+**Current status: containerized and verified locally (Docker + Docker
+Compose + a real Neon PostgreSQL database); Render deployment is the next
+step, not done yet.** This supersedes the previous "not built in this
+pass" note - a `Dockerfile` now exists, and the full path from source to
+a running container against a real cloud PostgreSQL has been proven:
+
+```
+Windows WPF ──HTTPS──▶ CCMC.Cloud.Api (same image everywhere) ──Npgsql──▶ PostgreSQL
+                              │
+              Local Docker ───┼─── cc-mc-postgres (Docker Compose)
+              Production ─────┴─── Neon (target: Render, not deployed yet)
+```
+
+The application binary/image is **identical** across every environment;
+only environment variables change. No source-code branch exists for
+"local" vs "production."
+
+**Docker**: `Dockerfile` (repo root) builds `CCMC.Cloud.Api` as a
+multi-stage image (`mcr.microsoft.com/dotnet/sdk:8.0` → `mcr.microsoft.com/dotnet/aspnet:8.0`).
+`.dockerignore` excludes the Windows client projects, `tests/`, and
+`appsettings.Development.json` (so no dev placeholder secret can ever end
+up in the image, in any environment).
+
+**Docker Compose** (`compose.yaml`, repo root) - local development only,
+project name `cc-mc`:
+
+| Service | Container name | Image |
+|---|---|---|
+| API | `cc-mc` | `cc-mc-api` (built from `Dockerfile`) |
+| PostgreSQL | `cc-mc-postgres` | `postgres:16` |
+
+Both run on a dedicated `cc-mc-network` Docker network; the API reaches
+PostgreSQL via the service hostname `cc-mc-postgres`, never `localhost`.
+PostgreSQL has a healthcheck, and the API's `depends_on` waits for it to
+report healthy (not just "started") before starting, since
+`db.Database.Migrate()` runs immediately at API startup. Usage:
+
+```
+docker compose -p cc-mc --env-file .env.local config     # validate
+docker compose -p cc-mc --env-file .env.local up -d --build
+docker compose -p cc-mc --env-file .env.local down        # stop (keeps data)
+```
+
+**Environment configuration** - see `.env.example` for the full reference
+of every variable CCMC.Cloud.Api consumes. Copy the matching template,
+fill in real values, and never commit the filled-in file (all are
+gitignored - see `.gitignore`):
+
+| Template (committed, placeholders only) | Copy to (gitignored, real values) | Used for |
+|---|---|---|
+| `.env.example` | — (reference only, not meant to be copied directly) | Documents every variable name |
+| `.env.local.example` | `.env.local` | Local Docker Compose (`Host=cc-mc-postgres`) |
+| `.env.production.example` | `.env.production` | Neon / eventual Render deployment (`Host=<neon-host>`) |
+
+The variables themselves never change name or meaning between
+environments - only their values:
+
+- `ASPNETCORE_ENVIRONMENT` - `Development` (local) or `Production` (Neon/Render)
+- `ConnectionStrings__CcmcDb` - standard Npgsql keyword connection string; only the `Host` (and, for Neon, `Ssl Mode=Require`) differs
+- `Jwt__Secret` - a real, unique-per-environment random string; never reused between local and production
+
+**Never commit** a filled-in `.env`, `.env.local`, or `.env.production`
+file, and never paste a real connection string or secret into this
+README, any other tracked file, or a commit message.
+
+**Neon PostgreSQL** is now the production database target (project
+`fancy-cherry-25725711`, branch `production`) - set up via the Neon CLI
+(`neon link`, `neon config init` + `neon.ts`, `neon deploy`). Verified:
+all three current migrations apply cleanly to a fresh Neon database,
+`/health` and `/health/db` both return healthy against it, and -
+correctly - `ASPNETCORE_ENVIRONMENT=Production` does **not** create the
+`DevelopmentSeeder`'s demo accounts there (confirmed: the Neon `users`
+table has zero rows). This means **Neon/production currently has no
+users and no administrative bootstrap mechanism** - a real deployment
+consideration to resolve before Render goes live (see §29.17).
+
+**Next step (not done in this pass): deploy this same `cc-mc-api` image
+to Render**, pointing it at Neon via the same `ConnectionStrings__CcmcDb`
+environment variable, using Render's own environment-variable UI (not
+this repo's `.env.production` file, which stays local-only).
+
+Migrations continue to run via the existing automatic
+`db.Database.Migrate()` at startup (see §29.11) - this was verified
+directly against Neon, not just locally.
 
 ### 29.17 Known Gaps
 
@@ -937,4 +1013,14 @@ development seeder) via the hosting platform's secret mechanism.
   contract change would need corresponding client-side work in
   `CCMC.Infrastructure.Sync`, and was not made without an explicit
   instruction to change the Windows client.
+- **No production administrative bootstrap mechanism.** `DevelopmentSeeder`
+  correctly never runs outside `ASPNETCORE_ENVIRONMENT=Development` (by
+  design - see §29.7/§29.15), which was directly verified against the real
+  Neon production database (zero rows in `users`). This is correct and
+  intentional, but it also means there is currently no way to create the
+  *first* real administrative user in a production deployment without
+  either a one-off manual `INSERT`/migration-seeded row or a dedicated
+  bootstrap endpoint/CLI - neither exists yet. Needs a decision before
+  Render goes live; not silently worked around (e.g. by loosening the
+  Development-only seeding boundary).
 - **No installer/containerization** for the API itself yet - see §29.16.
