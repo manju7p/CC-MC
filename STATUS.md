@@ -646,6 +646,84 @@ successfully once reachability is restored, without duplication.
   19's "RECEIPT / REPORT" end state) - the reception screen shows it
   live, but no printable/exportable receipt exists yet.
 
+## Rate/Amount Semantics Verification + Docker (2026-09-12)
+
+**Rate/Amount rounding order, re-verified directly against BRD text
+(not from memory of the earlier pass):** BRD v5.0 section 25.2/25.3
+define `Rate = <formula>` then `Amount = Rate x Weight` as two lines with
+no rounding mentioned; section 25.4 ("Output Formatting") is a separate,
+later section stating both are rounded "before being displayed and used
+for printing/SMS receipts." Read literally, rounding is output formatting
+applied to both already-computed full-precision quantities, not an
+intermediate step feeding back into the Amount formula - i.e. Amount uses
+the FULL-PRECISION Rate, not the 2-decimal-rounded one. `RateCalculationService`
+already implemented it this way; confirmed unchanged, no code correction
+needed. A discriminating regression test was added
+(`Calculate_TsBased_DiscriminatingCase_UsesFullPrecisionRateForAmount_NotRoundedRate`
+in `RateCalculationServiceTests.cs`): FAT=3.00, SNF=4.00, TsRate=15.05,
+Weight=45.5 -> raw Rate 1.0535 (displayed/stored rounded to 1.05), Amount
+from the raw rate = 47.93, Amount if the rounded rate had been used
+instead = 47.78 - genuinely different 2-decimal results, proving which
+code path actually runs rather than merely documenting an assumption.
+
+**Real bug found and fixed via Docker testing** (exactly what this pass
+was for): `JwtOptions.Issuer`/`Audience` were `required string` with no
+default, while `Program.cs`'s token-*validation* setup had its own
+separate hardcoded fallback ("ccmc-cloud-api"/"ccmc-windows-client"). A
+container started with only `Jwt__Secret` supplied (a very plausible real
+deployment shape, and exactly what `.dockerignore` now forces on any
+image build by excluding `appsettings.Development.json`, which is the
+only place Issuer/Audience were previously set) issued tokens with an
+**empty** `aud`/`iss` claim, so every authenticated request after a
+successful login failed with 401 ("The audience 'empty' is invalid") -
+reproduced directly against a real running container before being
+diagnosed. Fixed by giving `JwtOptions.Issuer`/`Audience` the same default
+constants (`JwtOptions.DefaultIssuer`/`DefaultAudience`) Program.cs already
+assumed, and - to close the underlying class of bug, not just today's
+symptom - refactoring `Program.cs` so both token issuance
+(`JwtTokenGenerator`) and validation (`AddJwtBearer`'s
+`TokenValidationParameters`) now resolve Secret/Issuer/Audience from the
+exact same `IOptions<JwtOptions>` instance (via
+`AddOptions<JwtBearerOptions>().Configure<IOptions<JwtOptions>>(...)`)
+instead of two independent `builder.Configuration[...]` reads that could
+silently disagree. Locked down by two new tests
+(`JwtConfigurationTests.cs`, using a dedicated `SecretOnlyJwtApiFactory`
+that supplies only `Jwt:Secret`, mirroring the real container repro
+exactly) - both pass now.
+
+**Docker**: `Dockerfile` (repo root, multi-stage: `dotnet/sdk:8.0` build ->
+`dotnet/aspnet:8.0` runtime) and `.dockerignore` added for `CCMC.Cloud.Api`.
+Built dependency graph verified directly from the `.csproj` files (not
+assumed) - only `CCMC.Contracts` + the four `CCMC.Cloud.*` projects are
+needed; the Windows client projects and `tests/` are excluded entirely.
+`appsettings.Development.json` is excluded from the build context (never
+enters the image, in any environment) - confirmed by inspecting the built
+image's `/app` contents directly. `Program.cs` also now honors a `PORT`
+environment variable (Render's convention) by calling
+`builder.WebHost.UseUrls` when present, falling back unchanged otherwise.
+
+Verified end-to-end against a real container (`cc-mc`, on a dedicated
+`cc-mc-network`) + a real disposable PostgreSQL 16 container
+(`cc-mc-postgres`, not the machine's own `postgresql-x64-16` service,
+left untouched): container starts, binds `http://[::]:8080` (all
+interfaces, not localhost-only), `/health` and `/health/db` both return
+200, EF Core migrations apply for real (`__EFMigrationsHistory` contains
+all three current migrations including `AddRateFormulaCalculation`),
+login issues a correctly-signed token with only `Jwt__Secret` supplied,
+an authenticated `GET /centres` succeeds, a reception's Rate/Amount
+persist through the full HTTP -> Cloud.Application -> EF Core ->
+PostgreSQL path exactly as sent (confirmed both via the API response and
+directly via `psql`), the cloud does not recompute Rate/Amount (proven by
+posting deliberately-inconsistent values and confirming they're stored
+verbatim, not corrected), and the container exits cleanly on `docker stop`
+(SIGTERM, exit code 0, "Application is shutting down..." logged). Full
+solution: 190/190 tests passing (155 client + 35 cloud, the cloud suite
+run against a real reachable PostgreSQL).
+
+**Not done this pass, by explicit instruction**: no deployment to Render,
+no Neon database created/configured - this was local Docker verification
+only, in preparation for that next step.
+
 ## Known Limitations
 
 - **No installer.** `dotnet publish` produces a deployable folder, not an

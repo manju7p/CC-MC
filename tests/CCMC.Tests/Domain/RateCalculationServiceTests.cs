@@ -145,4 +145,42 @@ public class RateCalculationServiceTests
         var result = RateCalculationService.Calculate(new RateCalculationInput(4.5m, 9.0m, 45.5m), globalConfig);
         Assert.Equal(0.68m, result.Rate);
     }
+
+    /// <summary>
+    /// Discriminating case (BRD verification task, Phase 3): a deliberately
+    /// chosen input where "Amount from the full-precision Rate" and "Amount
+    /// from the 2-decimal-rounded Rate" produce genuinely DIFFERENT 2-decimal
+    /// results - proving which code path actually runs, not just that both
+    /// approaches happen to agree.
+    ///
+    /// TS-based mode, FAT=3.00 SNF=4.00 (TS=7.00), TsRate=15.05, Weight=45.5:
+    ///   raw Rate     = (7.00 * 15.05) / 100 = 105.35 / 100 = 1.0535
+    ///   rounded Rate = 1.05 (remainder 0.0035 &lt; 0.005, rounds down)
+    ///   Amount if RAW rate used:     1.0535 * 45.5 = 47.93425 -&gt; rounds to 47.93
+    ///   Amount if ROUNDED rate used: 1.05   * 45.5 = 47.775   -&gt; rounds to 47.78 (exact midpoint, AwayFromZero)
+    /// These differ (47.93 vs 47.78) - a real, provable discrimination, not a coincidence.
+    ///
+    /// BRD v5.0 section 25.2/25.3 defines "Rate = &lt;formula&gt;" then "Amount = Rate x Weight"
+    /// as two lines with NO rounding mentioned yet; section 25.4 ("Output Formatting")
+    /// is introduced only afterward, as a separate step "before being displayed and used
+    /// for printing/SMS receipts" - i.e. rounding is output formatting applied to both
+    /// already-computed full-precision quantities, not an intermediate step that feeds
+    /// back into the Amount formula. Read literally, in that order, BRD requires the
+    /// RAW-rate result (47.93) - which is what RateCalculationService actually returns,
+    /// confirmed here.
+    /// </summary>
+    [Fact]
+    public void Calculate_TsBased_DiscriminatingCase_UsesFullPrecisionRateForAmount_NotRoundedRate()
+    {
+        var config = new RateFormulaConfig(RateFormulaType.TsBased, Value1: null, Value2: null, TsRate: 15.05m);
+
+        var result = RateCalculationService.Calculate(new RateCalculationInput(3.00m, 4.00m, 45.5m), config);
+
+        const decimal amountIfRawRateUsed = 47.93m;
+        const decimal amountIfRoundedRateUsed = 47.78m;
+
+        Assert.Equal(1.05m, result.Rate); // the displayed/stored Rate is still rounded
+        Assert.Equal(amountIfRawRateUsed, result.Amount); // but Amount was derived from the UNROUNDED 1.0535, not 1.05
+        Assert.NotEqual(amountIfRoundedRateUsed, result.Amount); // explicitly rule out the other interpretation
+    }
 }

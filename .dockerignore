@@ -1,0 +1,46 @@
+# Only src/CCMC.Contracts and src/CCMC.Cloud.* plus their .csproj files are
+# needed to build CCMC.Cloud.Api's Docker image (see Dockerfile) - everything
+# else here is excluded to keep the build context small and to guarantee no
+# WPF client code, test project, local database, or secret ever enters the
+# image.
+
+.git/
+.vs/
+.idea/
+
+**/bin/
+**/obj/
+
+# Windows client + tests are not referenced by CCMC.Cloud.Api - never needed for this image.
+src/CCMC.Desktop/
+src/CCMC.Domain/
+src/CCMC.Application/
+src/CCMC.Infrastructure/
+tests/
+
+# Local/dev artifacts that must never enter the image.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+logs/
+publish/
+Doc/
+
+# Development-only configuration containing a placeholder JWT secret and a
+# local connection string - excluded from the build context entirely so it
+# is never present in the image, in any environment. Production configuration
+# comes ONLY from environment variables (ConnectionStrings__CcmcDb, Jwt__Secret,
+# ASPNETCORE_ENVIRONMENT) supplied at `docker run` / hosting-platform time.
+src/CCMC.Cloud.Api/appsettings.Development.json
+
+# Secrets / local env files - never committed, never shipped in an image.
+.env
+.env.*
+appsettings.Local.json
+appsettings.*.local.json
+
+# Repo docs not needed for the build.
+*.md
