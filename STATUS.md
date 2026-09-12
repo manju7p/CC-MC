@@ -47,8 +47,16 @@ curl-verified end-to-end, plus 21 automated integration tests (all
 passing) against a dedicated `ccmc_cloud_test` database. Two real runtime
 bugs were found and fixed via this live testing (JWT claim remapping;
 Npgsql UTC-only `DateTimeOffset` requirement) - see "CC-MC Cloud Backend"
-→ "Fixed Bugs" below. Full solution (`dotnet test CCMC.sln`): **110/110
-tests passing** (89 Windows-client + 21 cloud).
+→ "Fixed Bugs" below.
+
+**Update (2026-09-12): Milk Rate Calculation (BRD v5.0 section 25)
+implemented** - see "Milk Rate Calculation" below for the full writeup.
+Full solution (`dotnet test CCMC.sln`): **187/187 tests passing** (154
+Windows-client + 33 cloud, the cloud suite run against a real local
+PostgreSQL instance, not skipped). The "110/110" figure previously here
+was already stale before this update (it predated the milk-analyser work
+below) - see "Milk Rate Calculation" for how the current count was
+actually verified.
 
 ## Architecture Decisions
 
@@ -528,6 +536,115 @@ documented fixed-width field layout without guessing:
   confirmed acceptance thresholds exist for them yet, and inventing some
   would violate "no invented business rules"; they are captured, displayed,
   and available for operator judgment, not (yet) auto range-checked.
+
+## Milk Rate Calculation (2026-09-12)
+
+BRD v5.0 section 25's live Rate/Amount calculation, ported exactly from
+the BRD's own spec (itself ported from a legacy Android reference
+implementation - `MilkCollectionFragment.getAmount()`/`RateFormulaFragment`,
+not part of this repository, so only the BRD's written formula was
+available to implement against, not any reusable code).
+
+**Built:**
+- `RateCalculationService` (`CCMC.Domain.Services`, client) - pure, static,
+  independently unit-tested (16 cases: both modes, rounding, blank-input
+  and missing-config zero-fallback, boundary values). Implements both BRD
+  modes exactly: Fat-vs-SNF (`Rate = (Value1+Value2)*0.22*(FAT/100) +
+  (Value1+Value2)*0.36*(SNF/100) + 0.32`) and TS-based (`Rate =
+  (FAT+SNF)*TsRate/100`), `Amount = Rate * Weight`, both rounded to 2
+  decimals with `MidpointRounding.AwayFromZero` applied independently to
+  Rate and to Amount (the BRD's own section ordering - formula, then
+  Amount = Rate x Weight, then a separate 25.4 "Output Formatting" step -
+  read literally, not as "round Rate first, then multiply").
+- `RateFormulaSettings` (`RateType`, `Value1?`, `Value2?`, `TsRate?`,
+  nullable `CentreId`) - a new cloud-owned master-data concept, mirroring
+  `QualityRule`'s exact centre-specific-over-global resolution. **No
+  numeric default was seeded anywhere** - the BRD gives no example
+  Value1/Value2/TsRate (unlike section 10's FAT/SNF/Temperature limits),
+  so inventing one would have violated "no fabricated business values."
+  A centre's Rate/Amount is genuinely 0/0 until a Manager/Admin configures
+  it via the new `PUT /rate-formula-settings` endpoint (`RATE_FORMULA_VIEW`/
+  `RATE_FORMULA_CONFIGURE` permissions, granted to Operator(view)/
+  Manager+Admin(view+configure) in `DevelopmentSeeder`, same pattern as
+  `QUALITY_RULE_*`).
+- Synced client-side via the existing `MasterDataSyncService` pattern
+  (`GET /rate-formula-settings` -> local SQLite cache) - rate calculation
+  works fully offline once a centre's formula has been pulled at least once.
+- `ReceptionWorkflowService.ValidateAndSaveAsync` resolves the centre's
+  rate formula settings and computes Rate/Amount at the exact moment of
+  ACCEPT/HOLD (capture time), storing them on the transaction - never
+  recomputed later. A new public `CalculateRateAsync` method is the single
+  shared resolution+calculation path also called by the reception UI's
+  live preview, so the displayed value is structurally guaranteed to match
+  what gets persisted, not just by convention.
+- `ReceptionWindow` gained a "RATE & AMOUNT" card that recalculates live
+  as Weight/FAT/SNF change (including when a device read or the manual
+  analyser test populates those fields programmatically), always
+  re-resolving the freshest locally cached configuration rather than a
+  value cached at window-open time.
+- `Rate`/`Amount` added as **nullable** `decimal?` (not `required`) on
+  `MilkReceptionTransaction`, both client and cloud - the same reasoning
+  as `Clr`/`Water`/`Protein`: a reception saved before this feature
+  existed has `NULL`, distinct from a reception where the calculation
+  legitimately produced `0.00` (BRD's own "not configured" rule). Client:
+  `Migration004RateCalculation` (additive `ALTER TABLE`, SQLite). Cloud:
+  EF Core migration `AddRateFormulaCalculation` (`numeric(10,2)`/
+  `numeric(14,2)`, additive, nullable) - generated with `dotnet ef
+  migrations add` and applied for real against a live local PostgreSQL 16
+  instance during this work (not just written and left unverified).
+- **Cloud trust model matches Clr/Water/Protein exactly**: the cloud does
+  not recompute Rate/Amount - it stores whatever the client computed and
+  sent, verbatim. This is what makes the BRD's own invariant ("a
+  transaction retains the Rate/Amount calculated at collection time even
+  if configuration later changes") hold structurally, confirmed directly
+  (not just asserted) both in `ReceptionWorkflowServiceTests` and in a
+  live end-to-end run: a reception's Rate/Amount were unchanged after the
+  centre's rate formula was reconfigured to a different mode with
+  different numbers.
+
+**Verification performed** (see also `context.md`'s test-count update):
+187/187 tests passing (154 client incl. `RateCalculationServiceTests` and
+rate-specific additions to `ReceptionWorkflowServiceTests`/
+`ReceptionRepositoryTests`/`SchemaMigratorTests`/a new
+`RateFormulaSettingsRepositoryTests`; 33 cloud incl. a new
+`RateFormulaSettingsTests` and rate-specific additions to
+`ReceptionTests`), the cloud suite run against a real, freshly initialized
+local PostgreSQL 16 instance (a throwaway `pg_ctl`-managed data directory,
+not the machine's own stopped `postgresql-x64-16` service, which was left
+untouched). Additionally, a real end-to-end harness (a throwaway console
+program outside this repository) exercised the exact production
+`ReceptionWorkflowService`/`MasterDataSyncService`/`SyncEngineService`/
+`HttpCloudApiClient` code against the real running Cloud API: configured
+both rate modes via the real `PUT /rate-formula-settings` endpoint,
+created receptions and confirmed exact expected Rate/Amount for each
+mode, confirmed SQLite persistence and outbox creation, synced to the
+cloud and confirmed verbatim storage, confirmed no duplication on a
+repeated sync tick, confirmed historical immutability under a
+configuration change, confirmed an unconfigured centre computes 0/0
+rather than fabricating a value, and confirmed a reception created while
+the cloud was genuinely unreachable still saves locally and syncs
+successfully once reachability is restored, without duplication.
+
+**Not done / explicitly out of scope this pass:**
+- A literal mouse-click walkthrough of the WPF `ReceptionWindow` - no GUI
+  automation tool was available for a native Windows/WPF app in this
+  environment. The verification above exercises the identical underlying
+  service code the UI calls (the strongest verification available without
+  that tooling), but the specific claim "the on-screen Rate/Amount labels
+  visibly update on keystroke" rests on code inspection of the
+  `TextChanged` wiring, not an observed screenshot.
+- A WPF UI for **configuring** the rate formula (Rate Type/Value1/Value2/
+  TsRate) - deliberately not built, following the exact same precedent as
+  Sources/Vehicles (the cloud API supports mutation, the Windows client
+  only reads/caches; no client-side master-data-edit UI exists anywhere
+  in this repo yet). Configuration happens via the cloud API directly
+  (`PUT /rate-formula-settings`) until/unless a broader master-data-edit
+  UI is built for all three concepts together.
+- Source Hierarchy field and the Notification hook (BRD section 17) -
+  separate, still-unimplemented MVP gaps, out of scope for this pass.
+- A Receipt/Result view showing Rate/Amount to the operator (BRD section
+  19's "RECEIPT / REPORT" end state) - the reception screen shows it
+  live, but no printable/exportable receipt exists yet.
 
 ## Known Limitations
 

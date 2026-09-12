@@ -22,6 +22,7 @@ public class ReceptionWorkflowServiceTests : IDisposable
 {
     private readonly SqliteTestFixture _fixture = new();
     private readonly QualityRuleRepository _qualityRuleRepository;
+    private readonly RateFormulaSettingsRepository _rateFormulaSettingsRepository;
     private readonly ReceptionRepository _receptionRepository;
     private readonly AuditLogRepository _auditLogRepository;
     private readonly ReceptionWorkflowService _service;
@@ -29,6 +30,7 @@ public class ReceptionWorkflowServiceTests : IDisposable
     public ReceptionWorkflowServiceTests()
     {
         _qualityRuleRepository = new QualityRuleRepository(_fixture.ConnectionFactory);
+        _rateFormulaSettingsRepository = new RateFormulaSettingsRepository(_fixture.ConnectionFactory);
         _receptionRepository = new ReceptionRepository(_fixture.ConnectionFactory);
         _auditLogRepository = new AuditLogRepository(_fixture.ConnectionFactory);
 
@@ -39,7 +41,7 @@ public class ReceptionWorkflowServiceTests : IDisposable
             NullLoggerFactory.Instance);
 
         _service = new ReceptionWorkflowService(
-            deviceManager, _qualityRuleRepository, _receptionRepository, _auditLogRepository,
+            deviceManager, _qualityRuleRepository, _rateFormulaSettingsRepository, _receptionRepository, _auditLogRepository,
             new GuidIdempotencyKeyGenerator(), new SystemClock(), NullLogger<ReceptionWorkflowService>.Instance);
     }
 
@@ -53,6 +55,13 @@ public class ReceptionWorkflowServiceTests : IDisposable
                 new QualityRule { Id = 2, Parameter = QualityParameter.Snf, MinValue = 8.0m, MaxValue = 9.5m, CentreId = null },
                 new QualityRule { Id = 3, Parameter = QualityParameter.Temperature, MinValue = 0m, MaxValue = 10m, CentreId = null },
             ],
+            CancellationToken.None);
+    }
+
+    private async Task SeedRateFormulaSettingsAsync(RateFormulaType rateType, decimal? value1 = null, decimal? value2 = null, decimal? tsRate = null, int? centreId = null)
+    {
+        await _rateFormulaSettingsRepository.ReplaceAllAsync(
+            [new RateFormulaSettings { Id = 1, RateType = rateType, Value1 = value1, Value2 = value2, TsRate = tsRate, CentreId = centreId }],
             CancellationToken.None);
     }
 
@@ -140,5 +149,80 @@ public class ReceptionWorkflowServiceTests : IDisposable
             Input(ReceptionDecision.Hold, reason: "Smells off"), CancellationToken.None);
 
         Assert.Contains("Smells off", result.Transaction.Reason);
+    }
+
+    // --- BRD v5.0 section 25: Milk Rate Calculation --------------------------
+
+    [Fact]
+    public async Task ValidateAndSaveAsync_FatVsSnfConfigured_ComputesAndPersistsRateAndAmount()
+    {
+        await SeedRulesAsync();
+        await SeedRateFormulaSettingsAsync(RateFormulaType.FatVsSnf, value1: 10m, value2: 8m);
+
+        // fat=4.5 snf=9.0 quantity=45.5 (Input()'s defaults):
+        // combined=18; rate = 18*0.22*0.045 + 18*0.36*0.09 + 0.32 = 0.1782 + 0.5832 + 0.32 = 1.0814 -> 1.08
+        // amount = 1.0814 * 45.5 = 49.2037 -> 49.20 (rounded independently from the un-rounded rate - see RateCalculationService's doc comment)
+        var result = await _service.ValidateAndSaveAsync(Input(ReceptionDecision.Accept), CancellationToken.None);
+
+        Assert.Equal(1.08m, result.Transaction.Rate);
+        Assert.Equal(49.20m, result.Transaction.Amount);
+
+        var reloaded = await _receptionRepository.GetByLocalIdAsync(result.Transaction.LocalId, CancellationToken.None);
+        Assert.Equal(1.08m, reloaded!.Rate);
+        Assert.Equal(49.20m, reloaded.Amount);
+    }
+
+    [Fact]
+    public async Task ValidateAndSaveAsync_TsBasedConfigured_ComputesAndPersistsRateAndAmount()
+    {
+        await SeedRulesAsync();
+        await SeedRateFormulaSettingsAsync(RateFormulaType.TsBased, tsRate: 5m);
+
+        // fat=4.5 snf=9.0 quantity=45.5: TS=13.5; rate=(13.5*5)/100=0.675 -> 0.68; amount=0.675*45.5=30.7125 -> 30.71
+        var result = await _service.ValidateAndSaveAsync(Input(ReceptionDecision.Accept), CancellationToken.None);
+
+        Assert.Equal(0.68m, result.Transaction.Rate);
+        Assert.Equal(30.71m, result.Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task ValidateAndSaveAsync_NoRateFormulaConfigured_RateAndAmountAreZero()
+    {
+        await SeedRulesAsync();
+        // Deliberately not calling SeedRateFormulaSettingsAsync - no configuration exists for this centre or globally.
+
+        var result = await _service.ValidateAndSaveAsync(Input(ReceptionDecision.Accept), CancellationToken.None);
+
+        Assert.Equal(0m, result.Transaction.Rate);
+        Assert.Equal(0m, result.Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task ValidateAndSaveAsync_FatVsSnfMissingValue2_RateAndAmountAreZero()
+    {
+        await SeedRulesAsync();
+        await SeedRateFormulaSettingsAsync(RateFormulaType.FatVsSnf, value1: 10m, value2: null);
+
+        var result = await _service.ValidateAndSaveAsync(Input(ReceptionDecision.Accept), CancellationToken.None);
+
+        Assert.Equal(0m, result.Transaction.Rate);
+        Assert.Equal(0m, result.Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task ValidateAndSaveAsync_ConfigurationChangesAfterSave_DoesNotMutateHistoricalTransaction()
+    {
+        await SeedRulesAsync();
+        await SeedRateFormulaSettingsAsync(RateFormulaType.FatVsSnf, value1: 10m, value2: 8m);
+
+        var result = await _service.ValidateAndSaveAsync(Input(ReceptionDecision.Accept), CancellationToken.None);
+        Assert.Equal(1.08m, result.Transaction.Rate);
+
+        // Centre's rate formula changes AFTER this reception was captured and saved.
+        await SeedRateFormulaSettingsAsync(RateFormulaType.FatVsSnf, value1: 100m, value2: 100m);
+
+        var reloaded = await _receptionRepository.GetByLocalIdAsync(result.Transaction.LocalId, CancellationToken.None);
+        Assert.Equal(1.08m, reloaded!.Rate); // unchanged - BRD v5.0 section 25's own invariant
+        Assert.Equal(49.20m, reloaded.Amount);
     }
 }

@@ -130,6 +130,30 @@
                 </StackPanel>
             </Border>
 
+            <!-- Rate and amount (BRD v5.0 section 25) -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="RATE &amp; AMOUNT" Style="{StaticResource SectionLabelText}" Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,12"
+                               Text="Recalculated live from Weight/FAT/SNF against the centre's configured rate formula. Shows 0.00 when the formula is not configured for this centre, or when Weight/FAT/SNF is not yet entered."/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Rate" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Name="RateValueTextBlock" Text="0.00" FontSize="18" FontWeight="SemiBold"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Amount" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Name="AmountValueTextBlock" Text="0.00" FontSize="18" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Quality decision -->
             <Border Style="{StaticResource CardBorder}">
                 <StackPanel>

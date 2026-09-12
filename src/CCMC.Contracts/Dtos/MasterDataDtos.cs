@@ -48,3 +48,21 @@ public sealed class QualityRuleDto
     public required decimal MaxValue { get; init; }
     [JsonPropertyName("centreId")] public int? CentreId { get; init; }
 }
+
+/// <summary>BRD v5.0 section 25 (PREFS_RATE_*) - GET /rate-formula-settings is what the Windows client calls (cached locally for fully-offline rate calculation, same pattern as QualityRuleDto).</summary>
+public sealed class RateFormulaSettingsDto
+{
+    [JsonPropertyName("id")] public required int Id { get; init; }
+    [JsonPropertyName("rateType")] public required RateFormulaType RateType { get; init; }
+
+    [JsonPropertyName("value1"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value1 { get; init; }
+
+    [JsonPropertyName("value2"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value2 { get; init; }
+
+    [JsonPropertyName("tsRate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? TsRate { get; init; }
+
+    [JsonPropertyName("centreId")] public int? CentreId { get; init; }
+}

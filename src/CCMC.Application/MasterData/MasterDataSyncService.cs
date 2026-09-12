@@ -16,7 +16,8 @@ public sealed class MasterDataSyncService(
     IChillingCentreRepository centreRepository,
     ISourceRepository sourceRepository,
     IVehicleRepository vehicleRepository,
-    IQualityRuleRepository qualityRuleRepository)
+    IQualityRuleRepository qualityRuleRepository,
+    IRateFormulaSettingsRepository rateFormulaSettingsRepository)
 {
     public async Task PullAsync(string accessToken, CancellationToken cancellationToken)
     {
@@ -31,6 +32,9 @@ public sealed class MasterDataSyncService(
 
         var rules = await cloudApiClient.GetQualityRulesAsync(accessToken, cancellationToken);
         await qualityRuleRepository.ReplaceAllAsync(rules.Select(MapRule).ToList(), cancellationToken);
+
+        var rateFormulaSettings = await cloudApiClient.GetRateFormulaSettingsAsync(accessToken, cancellationToken);
+        await rateFormulaSettingsRepository.ReplaceAllAsync(rateFormulaSettings.Select(MapRateFormulaSettings).ToList(), cancellationToken);
     }
 
     private static ChillingCentre MapCentre(Contracts.Dtos.ChillingCentreDto dto) => new()
@@ -77,6 +81,21 @@ public sealed class MasterDataSyncService(
         },
         MinValue = dto.MinValue,
         MaxValue = dto.MaxValue,
+        CentreId = dto.CentreId,
+    };
+
+    private static RateFormulaSettings MapRateFormulaSettings(Contracts.Dtos.RateFormulaSettingsDto dto) => new()
+    {
+        Id = dto.Id,
+        RateType = dto.RateType switch
+        {
+            ContractsEnums.RateFormulaType.FAT_VS_SNF => RateFormulaType.FatVsSnf,
+            ContractsEnums.RateFormulaType.TS_BASED => RateFormulaType.TsBased,
+            _ => throw new ArgumentOutOfRangeException(nameof(dto), $"Unknown rate formula type: {dto.RateType}"),
+        },
+        Value1 = dto.Value1,
+        Value2 = dto.Value2,
+        TsRate = dto.TsRate,
         CentreId = dto.CentreId,
     };
 }

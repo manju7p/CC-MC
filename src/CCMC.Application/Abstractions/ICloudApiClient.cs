@@ -70,6 +70,7 @@ public interface ICloudApiClient
     Task<IReadOnlyList<SourceDto>> GetSourcesAsync(string accessToken, CancellationToken cancellationToken);
     Task<IReadOnlyList<VehicleDto>> GetVehiclesAsync(string accessToken, CancellationToken cancellationToken);
     Task<IReadOnlyList<QualityRuleDto>> GetQualityRulesAsync(string accessToken, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RateFormulaSettingsDto>> GetRateFormulaSettingsAsync(string accessToken, CancellationToken cancellationToken);
 
     Task<CloudCreateReceptionResult> CreateReceptionAsync(
         string accessToken, CreateReceptionRequestDto request, CancellationToken cancellationToken);

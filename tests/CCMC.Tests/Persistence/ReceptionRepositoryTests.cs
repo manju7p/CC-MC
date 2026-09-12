@@ -12,7 +12,9 @@ public class ReceptionRepositoryTests : IClassFixture<SqliteTestFixture>
 
     public ReceptionRepositoryTests(SqliteTestFixture fixture) => _fixture = fixture;
 
-    private static MilkReceptionTransaction NewTransaction(string idempotencyKey, decimal quantity = 45.5m, DateTimeOffset? capturedAt = null)
+    private static MilkReceptionTransaction NewTransaction(
+        string idempotencyKey, decimal quantity = 45.5m, DateTimeOffset? capturedAt = null,
+        decimal? rate = null, decimal? amount = null)
     {
         var now = capturedAt ?? DateTimeOffset.UtcNow;
         return new MilkReceptionTransaction
@@ -25,12 +27,60 @@ public class ReceptionRepositoryTests : IClassFixture<SqliteTestFixture>
             Fat = 4.5m,
             Snf = 9.0m,
             Temperature = 5.0m,
+            Rate = rate,
+            Amount = amount,
             Status = TransactionStatus.Accepted,
             ReadingSource = ReadingSource.Manual,
             LocalIdempotencyKey = idempotencyKey,
             CapturedAt = now,
             CreatedAt = now,
         };
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithRateAndAmount_PersistsAndReturnsThemExactly()
+    {
+        var repo = new ReceptionRepository(_fixture.ConnectionFactory);
+        var key = $"test-{Guid.NewGuid():N}";
+
+        var created = await repo.CreateAsync(NewTransaction(key, rate: 1.08m, amount: 49.20m), CancellationToken.None);
+        Assert.Equal(1.08m, created.Transaction.Rate);
+        Assert.Equal(49.20m, created.Transaction.Amount);
+
+        var reloaded = await repo.GetByLocalIdAsync(created.Transaction.LocalId, CancellationToken.None);
+        Assert.Equal(1.08m, reloaded!.Rate);
+        Assert.Equal(49.20m, reloaded.Amount);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithoutRateConfigured_PersistsZeroNotNull()
+    {
+        // Distinguishes "the calculation ran and produced 0" (BRD's own rule
+        // for an unconfigured formula) from "this row predates the feature"
+        // (genuinely NULL) - see MilkReceptionTransaction.Rate's doc comment.
+        var repo = new ReceptionRepository(_fixture.ConnectionFactory);
+        var key = $"test-{Guid.NewGuid():N}";
+
+        var created = await repo.CreateAsync(NewTransaction(key, rate: 0m, amount: 0m), CancellationToken.None);
+
+        var reloaded = await repo.GetByLocalIdAsync(created.Transaction.LocalId, CancellationToken.None);
+        Assert.Equal(0m, reloaded!.Rate);
+        Assert.Equal(0m, reloaded.Amount);
+        Assert.NotNull(reloaded.Rate);
+        Assert.NotNull(reloaded.Amount);
+    }
+
+    [Fact]
+    public async Task CreateAsync_PreExistingStyleRowWithoutRate_LeavesRateAndAmountNull()
+    {
+        var repo = new ReceptionRepository(_fixture.ConnectionFactory);
+        var key = $"test-{Guid.NewGuid():N}";
+
+        var created = await repo.CreateAsync(NewTransaction(key), CancellationToken.None); // rate/amount both null (default)
+
+        var reloaded = await repo.GetByLocalIdAsync(created.Transaction.LocalId, CancellationToken.None);
+        Assert.Null(reloaded!.Rate);
+        Assert.Null(reloaded.Amount);
     }
 
     [Fact]

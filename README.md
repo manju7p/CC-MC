@@ -669,6 +669,8 @@ All routes verified against the Windows client's actual
 | `PATCH /vehicles/{id}` | `VEHICLE_EDIT` | |
 | `GET /quality-rules` | `QUALITY_RULE_VIEW` | Centre-specific + global rules |
 | `PATCH /quality-rules/{id}` | `QUALITY_RULE_CONFIGURE` | No create endpoint - rules are seeded/managed by id |
+| `GET /rate-formula-settings` | `RATE_FORMULA_VIEW` | BRD v5.0 §25 - centre-specific + global rate formula config; synced to the Windows client for offline calculation |
+| `PUT /rate-formula-settings` | `RATE_FORMULA_CONFIGURE` | Upsert by centre (body's `centreId` may be `null` for the global default) - no numeric default is ever seeded, so Rate/Amount is 0 until this is called at least once for a centre |
 | `GET /reception` | `RECEPTION_VIEW` | Centre-scoped list |
 | `GET /reception/{id}` | `RECEPTION_VIEW` | `403` if outside caller's centre access |
 | `POST /reception` | `RECEPTION_CREATE` | Idempotent create - see §29.6. Returns **201** for both `created` and `duplicate` outcomes (never 200), matching the client's `HttpResponseClassifier` |

@@ -14,11 +14,13 @@ public class ReceptionTests(CcmcApiFactory factory)
         string key, int centreId = 1, int sourceId = 1, int vehicleId = 1,
         decimal quantity = 45.5m, decimal fat = 4.5m, decimal snf = 9.0m, decimal temp = 5.0m,
         TransactionStatus? status = null,
-        decimal? clr = null, decimal? water = null, decimal? protein = null, string? rawAnalyserPayload = null) => new()
+        decimal? clr = null, decimal? water = null, decimal? protein = null, string? rawAnalyserPayload = null,
+        decimal? rate = null, decimal? amount = null) => new()
     {
         CentreId = centreId, SourceId = sourceId, VehicleId = vehicleId,
         QuantityKg = quantity, Fat = fat, Snf = snf, Temperature = temp, LocalIdempotencyKey = key,
         Status = status, Clr = clr, Water = water, Protein = protein, RawAnalyserPayload = rawAnalyserPayload,
+        Rate = rate, Amount = amount,
     };
 
     [Fact]
@@ -145,6 +147,54 @@ public class ReceptionTests(CcmcApiFactory factory)
         Assert.Equal(1.21m, dto.Water);
         Assert.Equal(3.24m, dto.Protein);
         Assert.Equal("(03900830283801210000032404503)", dto.RawAnalyserPayload);
+    }
+
+    [Fact]
+    public async Task Create_WithRateAndAmount_PersistsAndReturnsThemVerbatim()
+    {
+        // BRD v5.0 section 25: Rate/Amount are computed by the Windows client
+        // at capture time and trusted verbatim - the cloud does not recompute them.
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var request = SampleRequest($"test-{Guid.NewGuid():N}", status: TransactionStatus.ACCEPTED, rate: 1.08m, amount: 49.20m);
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Equal(1.08m, dto!.Rate);
+        Assert.Equal(49.20m, dto.Amount);
+
+        var fetched = await client.GetFromJsonAsync<ReceptionTransactionDto>($"reception/{dto.Id}");
+        Assert.Equal(1.08m, fetched!.Rate);
+        Assert.Equal(49.20m, fetched.Amount);
+    }
+
+    [Fact]
+    public async Task Create_WithoutRateAndAmount_PersistsNull()
+    {
+        // An older client, or a reception predating this feature client-side, must still round-trip cleanly.
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var request = SampleRequest($"test-{Guid.NewGuid():N}");
+
+        var response = await client.PostAsJsonAsync("reception", request);
+
+        var dto = await response.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Null(dto!.Rate);
+        Assert.Null(dto.Amount);
+    }
+
+    [Fact]
+    public async Task Create_SameIdempotencyKeySameRateAndAmount_ReturnsDuplicateNotConflict()
+    {
+        var client = await factory.CreateAuthenticatedClientAsync("operator1@ccmc.local", "Operator@12345");
+        var key = $"test-{Guid.NewGuid():N}";
+
+        var first = await client.PostAsJsonAsync("reception", SampleRequest(key, rate: 1.08m, amount: 49.20m));
+        var second = await client.PostAsJsonAsync("reception", SampleRequest(key, rate: 1.08m, amount: 49.20m));
+
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var secondDto = await second.Content.ReadFromJsonAsync<ReceptionTransactionDto>();
+        Assert.Equal("duplicate", secondDto!.Outcome);
     }
 
     [Fact]

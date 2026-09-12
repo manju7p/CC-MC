@@ -49,6 +49,20 @@ public sealed class CreateReceptionRequestDto
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RawAnalyserPayload { get; init; }
 
+    /// <summary>
+    /// BRD v5.0 section 25 Rate/Amount, computed by the Windows client at
+    /// capture time and trusted verbatim by the cloud (same treatment as
+    /// Clr/Water/Protein) - additive/optional so an older client that
+    /// predates this field still round-trips.
+    /// </summary>
+    [JsonPropertyName("rate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Rate { get; init; }
+
+    [JsonPropertyName("amount"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Amount { get; init; }
+
     [JsonPropertyName("localIdempotencyKey")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LocalIdempotencyKey { get; init; }
@@ -91,6 +105,12 @@ public sealed class ReceptionTransactionDto
     public decimal? Protein { get; init; }
 
     [JsonPropertyName("rawAnalyserPayload")] public string? RawAnalyserPayload { get; init; }
+
+    [JsonPropertyName("rate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Rate { get; init; }
+
+    [JsonPropertyName("amount"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Amount { get; init; }
 
     [JsonPropertyName("status")] public required TransactionStatus Status { get; init; }
     [JsonPropertyName("readingSource")] public required ReadingSource ReadingSource { get; init; }

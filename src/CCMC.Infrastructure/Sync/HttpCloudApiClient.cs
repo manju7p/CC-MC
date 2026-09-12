@@ -95,6 +95,9 @@ public sealed class HttpCloudApiClient(HttpClient httpClient, ILogger<HttpCloudA
     public Task<IReadOnlyList<QualityRuleDto>> GetQualityRulesAsync(string accessToken, CancellationToken cancellationToken) =>
         GetListAsync<QualityRuleDto>("quality-rules", accessToken, cancellationToken);
 
+    public Task<IReadOnlyList<RateFormulaSettingsDto>> GetRateFormulaSettingsAsync(string accessToken, CancellationToken cancellationToken) =>
+        GetListAsync<RateFormulaSettingsDto>("rate-formula-settings", accessToken, cancellationToken);
+
     public async Task<CloudCreateReceptionResult> CreateReceptionAsync(
         string accessToken, CreateReceptionRequestDto request, CancellationToken cancellationToken)
     {

@@ -695,9 +695,24 @@ found via this live testing and fixed — see STATUS.md "CC-MC Cloud
 Backend" for the full writeup, and README.md §29 for architecture/exact
 commands.
 
+**Milk Rate Calculation (BRD v5.0 §25) implemented 2026-09-12** — the live
+Rate/Amount calculation per collection (Fat-vs-SNF and TS-based modes),
+centre-scoped `RateFormulaSettings` configuration (cloud-owned, synced to
+the client like `QualityRule`, no fabricated default values), wired into
+`ReceptionWorkflowService` and the reception UI, persisted on both SQLite
+and PostgreSQL as nullable columns (so a pre-existing reception is
+distinguishable from one where the calculation legitimately produced
+zero). Verified end-to-end against a real local PostgreSQL instance,
+including that a reception's Rate/Amount survive a later configuration
+change unchanged. See STATUS.md "Milk Rate Calculation" for the full
+writeup.
+
 **Full solution:** `dotnet build CCMC.sln` → 0 warnings, 0 errors.
-`dotnet test CCMC.sln` → **110/110 tests passing** (89 Windows-client + 21
-cloud-backend).
+`dotnet test CCMC.sln` → **187/187 tests passing** (154 Windows-client +
+33 cloud-backend, the cloud suite run against a real PostgreSQL instance) -
+this supersedes the "110/110" figure previously recorded here, which was
+already stale before this update (see STATUS.md for the full test-count
+history).
 
 What is genuinely NOT done (not oversights — each is either blocked on
 external input or an explicit scope cut, see STATUS.md "Known

@@ -23,6 +23,7 @@ public sealed class CcmcDbContext(DbContextOptions<CcmcDbContext> options) : DbC
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<QualityRule> QualityRules => Set<QualityRule>();
+    public DbSet<RateFormulaSettings> RateFormulaSettings => Set<RateFormulaSettings>();
     public DbSet<MilkReceptionTransaction> MilkReceptionTransactions => Set<MilkReceptionTransaction>();
     public DbSet<TransactionOverride> TransactionOverrides => Set<TransactionOverride>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -132,6 +133,25 @@ public sealed class CcmcDbContext(DbContextOptions<CcmcDbContext> options) : DbC
             e.HasOne(q => q.Centre).WithMany().HasForeignKey(q => q.CentreId).OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<RateFormulaSettings>(e =>
+        {
+            e.ToTable("rate_formula_settings");
+            e.HasKey(r => r.Id);
+            e.Property(r => r.RateType).HasConversion<string>().HasMaxLength(20);
+            // NUMERIC(10,2): rate-formula price components (Value1/Value2/TsRate) -
+            // generous headroom above any realistic per-unit rupee value, same
+            // reasoning as Vehicle.CapacityKg.
+            e.Property(r => r.Value1).HasPrecision(10, 2);
+            e.Property(r => r.Value2).HasPrecision(10, 2);
+            e.Property(r => r.TsRate).HasPrecision(10, 2);
+            // One row per centre (null = one global default) - same
+            // centre-specific-over-global convention as QualityRule, and the
+            // same NULLS-DISTINCT looseness on the global row that QualityRule's
+            // own unique index already accepts (see QualityRule's index above).
+            e.HasIndex(r => r.CentreId).IsUnique();
+            e.HasOne(r => r.Centre).WithMany().HasForeignKey(r => r.CentreId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         // --- Reception -----------------------------------------------------
         modelBuilder.Entity<MilkReceptionTransaction>(e =>
         {
@@ -152,6 +172,11 @@ public sealed class CcmcDbContext(DbContextOptions<CcmcDbContext> options) : DbC
             e.Property(t => t.Water).HasPrecision(5, 2);
             e.Property(t => t.Protein).HasPrecision(5, 2);
             e.Property(t => t.RawAnalyserPayload).HasMaxLength(64);
+            // NUMERIC(10,2)/(14,2): Rate is a per-unit price (same headroom as
+            // RateFormulaSettings' Value1/Value2/TsRate); Amount = Rate x
+            // QuantityKg needs more headroom for the product.
+            e.Property(t => t.Rate).HasPrecision(10, 2);
+            e.Property(t => t.Amount).HasPrecision(14, 2);
             e.Property(t => t.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(t => t.ReadingSource).HasConversion<string>().HasMaxLength(20);
             e.Property(t => t.LocalIdempotencyKey).HasMaxLength(200);

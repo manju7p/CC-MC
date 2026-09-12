@@ -67,6 +67,7 @@ public sealed record SaveReceptionResult(MilkReceptionTransaction Transaction, b
 public sealed class ReceptionWorkflowService(
     IDeviceManager deviceManager,
     IQualityRuleRepository qualityRuleRepository,
+    IRateFormulaSettingsRepository rateFormulaSettingsRepository,
     IReceptionRepository receptionRepository,
     IAuditLogRepository auditLogRepository,
     IIdempotencyKeyGenerator idempotencyKeyGenerator,
@@ -187,6 +188,14 @@ public sealed class ReceptionWorkflowService(
             "Reception decided for centre {CentreId}: operator decision={Decision} automatic suggestion={SuggestedStatus} (reason: {Reason})",
             input.CentreId, decidedStatus, suggestion.Status, suggestion.Reason ?? "n/a");
 
+        // BRD v5.0 section 25: Rate/Amount computed once, here, at capture
+        // time - resolved from whatever rate formula settings are locally
+        // cached for this centre right now (works fully offline, same as
+        // quality-rule resolution above). Never recomputed later from a
+        // possibly-changed configuration (see MilkReceptionTransaction's doc
+        // comment on Rate/Amount).
+        var rateResult = await CalculateRateAsync(input.CentreId, input.Fat, input.Snf, input.QuantityKg, cancellationToken);
+
         var now = clock.UtcNow;
         var transaction = new MilkReceptionTransaction
         {
@@ -202,6 +211,8 @@ public sealed class ReceptionWorkflowService(
             Water = input.Water,
             Protein = input.Protein,
             RawAnalyserPayload = input.RawAnalyserPayload,
+            Rate = rateResult.Rate,
+            Amount = rateResult.Amount,
             Status = decidedStatus,
             ReadingSource = input.ReadingSource,
             Reason = reason,
@@ -255,6 +266,24 @@ public sealed class ReceptionWorkflowService(
             ?? throw new InvalidOperationException($"Reception transaction {saved.Transaction.LocalId} not found locally immediately after being rejected.");
 
         return new SaveReceptionResult(rejected, saved.WasNewlyCreated);
+    }
+
+    /// <summary>
+    /// The single resolution+calculation path used both here (at save time)
+    /// and by the reception UI's live preview (see ReceptionWindow), so the
+    /// displayed Rate/Amount can never diverge from what gets persisted -
+    /// both read the exact same locally cached rate formula settings through
+    /// this same method.
+    /// </summary>
+    public async Task<RateCalculationResult> CalculateRateAsync(
+        int centreId, decimal? fat, decimal? snf, decimal? quantityKg, CancellationToken cancellationToken)
+    {
+        var settings = await rateFormulaSettingsRepository.ResolveForCentreAsync(centreId, cancellationToken);
+        var config = settings is null
+            ? null
+            : new RateFormulaConfig(settings.RateType, settings.Value1, settings.Value2, settings.TsRate);
+
+        return RateCalculationService.Calculate(new RateCalculationInput(fat, snf, quantityKg), config);
     }
 
     private static string? BuildReason(ReceptionDecision decision, QualityValidationResult suggestion, string? operatorReason)

@@ -53,6 +53,19 @@ public sealed class MilkReceptionTransaction
     /// </summary>
     public string? RawAnalyserPayload { get; init; }
 
+    /// <summary>
+    /// BRD v5.0 section 25 Rate/Amount, computed once at capture time from
+    /// Fat/Snf/QuantityKg against the centre's rate formula settings resolved
+    /// at that moment (see ReceptionWorkflowService.ValidateAndSaveAsync) -
+    /// never recomputed from today's configuration. Nullable, not required,
+    /// for the same reason Clr/Water/Protein are: a reception saved before
+    /// this feature existed simply has neither value, distinct from a
+    /// reception where the calculation legitimately produced 0 (BRD's own
+    /// "not configured" rule - see RateCalculationService).
+    /// </summary>
+    public decimal? Rate { get; init; }
+    public decimal? Amount { get; init; }
+
     public required TransactionStatus Status { get; set; }
     public required ReadingSource ReadingSource { get; init; }
     public string? Reason { get; set; }

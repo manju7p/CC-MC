@@ -46,6 +46,18 @@ public sealed class MilkReceptionTransaction
     /// <summary>The exact analyser payload Fat/Snf/Clr/Water/Protein were decoded from - preserved verbatim.</summary>
     public string? RawAnalyserPayload { get; set; }
 
+    /// <summary>
+    /// BRD v5.0 section 25 Rate/Amount - trusted verbatim from the Windows
+    /// client, the same treatment as Fat/Snf/Clr/Water/Protein: these were
+    /// computed once at capture time (possibly fully offline) against
+    /// whatever rate formula settings were locally cached then, and that
+    /// historical value must be preserved even if the cloud's own
+    /// RateFormulaSettings later change - the cloud does not, and must not,
+    /// recompute them independently on sync.
+    /// </summary>
+    public decimal? Rate { get; set; }
+    public decimal? Amount { get; set; }
+
     public TransactionStatus Status { get; set; }
     public ReadingSource ReadingSource { get; set; } = ReadingSource.Manual;
     public string? Reason { get; set; }

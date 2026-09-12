@@ -29,14 +29,16 @@ public static class DevelopmentSeeder
         ["Operator"] =
         [
             PermissionCodes.SourceView, PermissionCodes.VehicleView, PermissionCodes.QualityRuleView,
+            PermissionCodes.RateFormulaView,
             PermissionCodes.ReceptionView, PermissionCodes.ReceptionCreate, PermissionCodes.DashboardView,
         ],
-        // Manager: additionally configures master data/quality rules, resolves HOLDs, views audit.
+        // Manager: additionally configures master data/quality rules/rate formula, resolves HOLDs, views audit.
         ["Manager"] =
         [
             PermissionCodes.SourceView, PermissionCodes.SourceCreate, PermissionCodes.SourceEdit,
             PermissionCodes.VehicleView, PermissionCodes.VehicleCreate, PermissionCodes.VehicleEdit,
             PermissionCodes.QualityRuleView, PermissionCodes.QualityRuleConfigure,
+            PermissionCodes.RateFormulaView, PermissionCodes.RateFormulaConfigure,
             PermissionCodes.ReceptionView, PermissionCodes.ReceptionCreate, PermissionCodes.ReceptionOverride,
             PermissionCodes.DashboardView, PermissionCodes.AuditView,
         ],
@@ -46,6 +48,7 @@ public static class DevelopmentSeeder
             PermissionCodes.SourceView, PermissionCodes.SourceCreate, PermissionCodes.SourceEdit,
             PermissionCodes.VehicleView, PermissionCodes.VehicleCreate, PermissionCodes.VehicleEdit,
             PermissionCodes.QualityRuleView, PermissionCodes.QualityRuleConfigure,
+            PermissionCodes.RateFormulaView, PermissionCodes.RateFormulaConfigure,
             PermissionCodes.ReceptionView, PermissionCodes.ReceptionCreate, PermissionCodes.ReceptionOverride,
             PermissionCodes.DashboardView, PermissionCodes.AuditView,
         ],

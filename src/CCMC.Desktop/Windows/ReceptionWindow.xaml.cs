@@ -55,6 +55,41 @@ public partial class ReceptionWindow : Window
         WaterTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
         ProteinTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
         TemperatureTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
+
+        // BRD v5.0 section 25: "Rate is recalculated live as soon as FAT, SNF,
+        // and Weight are entered." Fires on both a genuine keystroke and a
+        // programmatic .Text assignment (device read / manual analyser test
+        // parse both set .Text directly) - either way the inputs changed and
+        // the preview must reflect it. Uses ReceptionWorkflowService.CalculateRateAsync -
+        // the exact same resolution+calculation path used at save time - so
+        // this preview can never diverge from what actually gets persisted.
+        QuantityTextBox.TextChanged += async (_, _) => await RecalculateRatePreviewAsync();
+        FatTextBox.TextChanged += async (_, _) => await RecalculateRatePreviewAsync();
+        SnfTextBox.TextChanged += async (_, _) => await RecalculateRatePreviewAsync();
+    }
+
+    /// <summary>
+    /// Re-resolves rate formula settings from the local cache on every call
+    /// (not cached in this window) so the preview always reflects the same
+    /// freshest locally-cached configuration ValidateAndSaveAsync will read
+    /// at the moment of ACCEPT/HOLD - see this method's callers.
+    /// </summary>
+    private async Task RecalculateRatePreviewAsync()
+    {
+        if (CentreComboBox.SelectedItem is not ChillingCentre centre)
+        {
+            RateValueTextBlock.Text = "0.00";
+            AmountValueTextBlock.Text = "0.00";
+            return;
+        }
+
+        var fat = TryParseDecimal(FatTextBox.Text, out var fatValue) ? fatValue : (decimal?)null;
+        var snf = TryParseDecimal(SnfTextBox.Text, out var snfValue) ? snfValue : (decimal?)null;
+        var weight = TryParseDecimal(QuantityTextBox.Text, out var weightValue) ? weightValue : (decimal?)null;
+
+        var result = await _receptionWorkflowService.CalculateRateAsync(centre.Id, fat, snf, weight, CancellationToken.None);
+        RateValueTextBlock.Text = result.Rate.ToString("F2", CultureInfo.InvariantCulture);
+        AmountValueTextBlock.Text = result.Amount.ToString("F2", CultureInfo.InvariantCulture);
     }
 
     private async void ReceptionWindow_Loaded(object sender, RoutedEventArgs e)
@@ -84,6 +119,7 @@ public partial class ReceptionWindow : Window
 
         SourceComboBox.ItemsSource = await _sourceRepository.ListByCentreAsync(centre.Id, CancellationToken.None);
         VehicleComboBox.ItemsSource = await _vehicleRepository.ListByCentreAsync(centre.Id, CancellationToken.None);
+        await RecalculateRatePreviewAsync(); // rate formula settings are centre-scoped - a centre change can change the result
     }
 
     private async void ReadDevicesButton_Click(object sender, RoutedEventArgs e)
@@ -274,7 +310,7 @@ public partial class ReceptionWindow : Window
                 : await _receptionWorkflowService.RejectAtReceptionAsync(input, DecisionReasonTextBox.Text, CancellationToken.None);
 
             ResultTextBlock.Text = result.WasNewlyCreated
-                ? $"Saved locally. Status: {result.Transaction.Status}. Queued for cloud sync."
+                ? $"Saved locally. Status: {result.Transaction.Status}. Rate: {result.Transaction.Rate:F2}  Amount: {result.Transaction.Amount:F2}. Queued for cloud sync."
                 : "This reception was already saved (duplicate save prevented).";
             ResultTextBlock.Foreground = result.Transaction.Status switch
             {

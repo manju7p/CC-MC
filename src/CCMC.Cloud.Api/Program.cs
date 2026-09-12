@@ -46,6 +46,7 @@ builder.Services.AddScoped<CentreService>();
 builder.Services.AddScoped<SourceService>();
 builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<QualityRuleService>();
+builder.Services.AddScoped<RateFormulaSettingsService>();
 builder.Services.AddScoped<DashboardService>();
 
 // --- Authentication (JWT Bearer) --------------------------------------------

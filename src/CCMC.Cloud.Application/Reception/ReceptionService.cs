@@ -16,7 +16,8 @@ public sealed record CreateReceptionCommand(
     decimal QuantityKg, decimal Fat, decimal Snf, decimal Temperature,
     string? LocalIdempotencyKey,
     TransactionStatus? Status = null,
-    decimal? Clr = null, decimal? Water = null, decimal? Protein = null, string? RawAnalyserPayload = null);
+    decimal? Clr = null, decimal? Water = null, decimal? Protein = null, string? RawAnalyserPayload = null,
+    decimal? Rate = null, decimal? Amount = null);
 
 public enum CreateReceptionOutcome { Created, Duplicate }
 
@@ -136,6 +137,11 @@ public sealed class ReceptionService(
             Water = cmd.Water,
             Protein = cmd.Protein,
             RawAnalyserPayload = cmd.RawAnalyserPayload,
+            // Trusted verbatim from the client, same treatment as Fat/Snf/Clr/
+            // Water/Protein - see MilkReceptionTransaction.Rate's doc comment
+            // for why the cloud never recomputes these independently.
+            Rate = cmd.Rate,
+            Amount = cmd.Amount,
             Status = decidedStatus,
             ReadingSource = ReadingSource.Manual,
             Reason = reason,

@@ -88,11 +88,32 @@ public static class DtoMapping
         Id = rule.Id, Parameter = rule.Parameter.ToContract(), MinValue = rule.MinValue, MaxValue = rule.MaxValue, CentreId = rule.CentreId,
     };
 
+    public static ContractsEnums.RateFormulaType ToContract(this DomainEnums.RateFormulaType rateType) => rateType switch
+    {
+        DomainEnums.RateFormulaType.FatVsSnf => ContractsEnums.RateFormulaType.FAT_VS_SNF,
+        DomainEnums.RateFormulaType.TsBased => ContractsEnums.RateFormulaType.TS_BASED,
+        _ => throw new ArgumentOutOfRangeException(nameof(rateType)),
+    };
+
+    public static DomainEnums.RateFormulaType ToDomain(this ContractsEnums.RateFormulaType rateType) => rateType switch
+    {
+        ContractsEnums.RateFormulaType.FAT_VS_SNF => DomainEnums.RateFormulaType.FatVsSnf,
+        ContractsEnums.RateFormulaType.TS_BASED => DomainEnums.RateFormulaType.TsBased,
+        _ => throw new ArgumentOutOfRangeException(nameof(rateType)),
+    };
+
+    public static RateFormulaSettingsDto ToDto(this RateFormulaSettings settings) => new()
+    {
+        Id = settings.Id, RateType = settings.RateType.ToContract(), Value1 = settings.Value1,
+        Value2 = settings.Value2, TsRate = settings.TsRate, CentreId = settings.CentreId,
+    };
+
     public static ReceptionTransactionDto ToDto(this MilkReceptionTransaction t, string? outcome = null) => new()
     {
         Id = t.Id, TransactionNumber = t.TransactionNumber, CentreId = t.CentreId, SourceId = t.SourceId, VehicleId = t.VehicleId,
         OperatorUserId = t.OperatorUserId, QuantityKg = t.QuantityKg, Fat = t.Fat, Snf = t.Snf, Temperature = t.Temperature,
         Clr = t.Clr, Water = t.Water, Protein = t.Protein, RawAnalyserPayload = t.RawAnalyserPayload,
+        Rate = t.Rate, Amount = t.Amount,
         Status = t.Status.ToContract(), ReadingSource = t.ReadingSource.ToContract(), Reason = t.Reason,
         ReceivedAt = t.ReceivedAt.ToString("O"), Outcome = outcome,
     };

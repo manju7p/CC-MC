@@ -181,6 +181,8 @@ public sealed class SyncEngineService(
             Water = transaction.Water,
             Protein = transaction.Protein,
             RawAnalyserPayload = transaction.RawAnalyserPayload,
+            Rate = transaction.Rate,
+            Amount = transaction.Amount,
             LocalIdempotencyKey = transaction.LocalIdempotencyKey, // never regenerated - see docstring
         };
 

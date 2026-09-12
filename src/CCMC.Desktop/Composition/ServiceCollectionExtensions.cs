@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISourceRepository, SourceRepository>();
         services.AddSingleton<IVehicleRepository, VehicleRepository>();
         services.AddSingleton<IQualityRuleRepository, QualityRuleRepository>();
+        services.AddSingleton<IRateFormulaSettingsRepository, RateFormulaSettingsRepository>();
         services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
         services.AddSingleton<IDeviceConfigurationRepository, DeviceConfigurationRepository>();
         services.AddSingleton<IOfflineCredentialStore, OfflineCredentialStore>();
