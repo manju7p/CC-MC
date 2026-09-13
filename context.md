@@ -358,11 +358,12 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v5.0 — authoritative source of
-                                            truth; §20-24 amended, new
-                                            §25 (Rate Calculation) added
-                                            this session, see "Scope
-                                            Decisions (v2.1–v5.0)" below)
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v6.0 — authoritative source of
+                                            truth; §10/§18 amended this
+                                            session to document that
+                                            Quality Decision is manual,
+                                            not automatic — see "Scope
+                                            Decisions (v2.1–v6.0)" below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
@@ -526,8 +527,19 @@ a consumer of any of these files):
   schemes, no settlement cycles. See "Scope Decisions" below, #10, for
   the precise boundary and why it doesn't reopen §20's farmer-tier
   exclusion.
+- **Quality Decision is manual, not automatic (v6.0, BRD §10/§18).**
+  Verified directly against `ReceptionWorkflowService` source, not
+  assumed: `QualityValidationService` still computes a suggested
+  ACCEPTED/HOLD/REJECTED result, but it's advisory only — the `Status`
+  actually persisted on the transaction is the operator's own explicit
+  decision. The system never auto-applies its own suggestion; a human
+  must always press it. This was found already implemented in code from
+  the latest pull, undocumented in the BRD until this pass — the BRD's
+  workflow diagrams (§1, §9, §12, §19: "Validate Quality" flowing into
+  "ACCEPT/HOLD/REJECT") are still shape-accurate, they just didn't say
+  who decides. See "Scope Decisions" below, #11.
 
-## Scope Decisions (v2.1–v5.0) — Rate Calculation added at v5.0
+## Scope Decisions (v2.1–v6.0) — Quality Decision clarified at v6.0
 
 This session reviewed the BRD against how privately-owned Milk Chilling
 Centres actually operate in India, against six vendors already selling
@@ -617,6 +629,15 @@ encoded in BRD §20–§24 as well as here:
     cycles. Those remain out of scope, confirmed unchanged in the same
     pass (§20, §24 amendment notes). `Rate Chart Reference` in the MVP
     table (#9 above) is renamed `Rate Calculation` to match.
+11. **Quality Decision documented as manual, not automatic (v6.0) — a
+    documentation fix, not a scope change.** The behavior already existed
+    in code before this BRD pass; §10/§18 amended to state it explicitly.
+    `QualityValidationService`'s computed ACCEPTED/HOLD/REJECTED result
+    is advisory only — the operator's own explicit decision is what's
+    persisted, the system never auto-applies its own suggestion. Applies
+    to every "Validate"/"Validate Quality" workflow step in the BRD (§1,
+    §9, §12, §19) — their diagram shape is unchanged, only the mechanics
+    needed spelling out.
 
 **Evidence base for v3.0** (see BRD §24 for full detail): a full 171-page
 ERP RFP from TUMUL (Tumkur District Co-operative Milk Producers Societies'
