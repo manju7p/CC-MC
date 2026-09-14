@@ -757,12 +757,25 @@ silently fall back to offline mode and therefore never sync master data,
 including rate-formula-settings). All six fixed - see STATUS.md
 "Application Bug Fixes" for the full root-cause writeup.
 
-**Render deployment is the next step, not done yet.** One real, reported-
-not-worked-around limitation: Neon/production currently has zero users
-and no administrative bootstrap mechanism (`DevelopmentSeeder` correctly
-never runs outside `ASPNETCORE_ENVIRONMENT=Development`, confirmed
-directly against Neon) - see STATUS.md "Docker Compose + Neon Setup" and
-README.md §29.17 for the full detail and what this blocks.
+**Render deployment is the next step, not done yet.** The prior blocker
+here - Neon/production having zero users and no administrative bootstrap
+mechanism - was resolved 2026-09-15: `ProductionBootstrapSeeder`
+(env-var-gated, a no-op unless `Bootstrap:AdminEmail` is configured) now
+exists and was used to create one Admin, one Manager, one Operator, and
+one Chilling Centre in Neon `production`, verified directly against Neon
+(correct role/permission counts, correct centre scoping, real PBKDF2
+password hashes). `DevelopmentSeeder` is unchanged and still never runs
+outside `ASPNETCORE_ENVIRONMENT=Development`. See STATUS.md "Neon
+Production Bootstrap (2026-09-15)" for the full writeup, HOW_TO_RUN.md §9
+for how to bootstrap a further account/centre, and STATUS.md's own note
+there about a real secret-exposure incident (Neon DB password, JWT
+secret, bootstrap passwords) whose rotation the project owner deferred to
+themselves - treat those credentials as compromised until rotation is
+confirmed. What remains genuinely open: no in-app password-change/reset
+endpoint exists anywhere (rotation requires direct DB access), the actual
+`POST /auth/login` round-trip against Neon's new accounts has not been
+exercised (data-layer verification only, by explicit choice), and Render
+deployment itself has not started.
 
 **Full solution:** `dotnet build CCMC.sln` → 0 warnings, 0 errors.
 `dotnet test CCMC.sln` → **190/190 tests passing** (155 Windows-client +

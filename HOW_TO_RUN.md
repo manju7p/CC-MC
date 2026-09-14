@@ -7,7 +7,9 @@
 > It supersedes the pre-Docker workflow this file previously described (bare
 > `dotnet run` on port 5000, manual local PostgreSQL install) — that workflow
 > is gone; Docker Compose is now the only supported way to run the Cloud API.
-> Render deployment does **not** exist yet — see §9.
+> **Update (2026-09-15):** §9 now documents the production account bootstrap
+> mechanism (done — Neon `production` has real Admin/Manager/Operator
+> accounts). Render deployment itself does **not** exist yet — see §10.
 
 ---
 
@@ -191,18 +193,56 @@ and in `STATUS.md`/`README.md` — never used in production, and Neon's
 
 ---
 
-## 9. Production (Render) — NOT yet complete
+## 9. Production account bootstrap (done, 2026-09-15)
+
+Neon's `production` branch now has real accounts — see
+`STATUS.md` "Neon Production Bootstrap (2026-09-15)" for the full writeup.
+This runs via `ProductionBootstrapSeeder`
+(`src/CCMC.Cloud.Infrastructure/Seed/ProductionBootstrapSeeder.cs`), wired
+into `Program.cs` right after migrations, in **any** environment — but it
+is a complete no-op unless `Bootstrap:AdminEmail` configuration is present.
+
+To bootstrap a new account/centre (e.g. a second Chilling Centre later):
+
+1. Add `Bootstrap__*` variables to `.env.neon` (never `.env.docker` or a
+   committed file) — see the commented block in `.env.example` for the
+   full list and format. At minimum: `Bootstrap__AdminEmail`,
+   `Bootstrap__AdminFullName`, `Bootstrap__AdminPassword` (12+ characters).
+   A Manager/Operator additionally needs `Bootstrap__CentreCode` +
+   `Bootstrap__CentreName` (both, together) plus their own
+   `Bootstrap__ManagerEmail`/`Bootstrap__OperatorEmail` triplets.
+2. `Copy-Item .env.neon .env -Force` then `docker compose -p cc-mc up -d --build`.
+3. Check `docker compose -p cc-mc logs api` for `Production bootstrap:
+   created <Role> account <email>.` lines (no password is ever logged) —
+   or `already exists - left unchanged` if that email already exists
+   (existing users' password hashes are never overwritten).
+4. Remove the `Bootstrap__*` block from `.env.neon` once done — the
+   seeder doesn't need it again, and leaving real passwords in a file
+   (even a gitignored one) is unnecessary exposure.
+5. Switch back to Docker mode for local dev: `Copy-Item .env.docker .env -Force`
+   then `docker compose -p cc-mc up -d --build`.
+
+**Known gap, unchanged by this mechanism:** there is still no in-app
+password-change/reset endpoint anywhere in the cloud API. Rotating a
+password (bootstrap-issued or otherwise) requires direct database access
+using the same `IPasswordHasher` (`PasswordHasherAdapter`, ASP.NET Core
+Identity PBKDF2) the app itself uses at runtime — there is no script for
+this yet either.
+
+**Security note:** treat every value under a `Bootstrap__*` variable as a
+real production credential the moment it's set — same handling as
+`Jwt__Secret`/`ConnectionStrings__CcmcDb` (env vars only, gitignored files
+only, never printed, never committed). A bootstrap password should be
+strong and unique, not a reused dev-seed-style password.
+
+## 10. Production (Render) — NOT yet complete
 
 Render deployment has **not** been performed. What exists today: the same
 `Dockerfile`/image builds and runs correctly locally against Neon
 (§6, verified) — that is the artifact a future Render deployment would
-publish. What's still missing before Render can go live:
+publish, and Neon `production` now has real accounts (§9). What's still
+missing before Render can go live:
 
-- **Production user bootstrap.** Neon's `production` branch has zero users
-  and `DevelopmentSeeder` correctly never runs outside Development — there is
-  currently no mechanism (script, one-time endpoint, or otherwise) to create
-  the first Admin user in Production. This is a genuine open prerequisite,
-  not yet solved.
 - Actual Render service creation/deployment and its own environment variable
   configuration (`ConnectionStrings__CcmcDb`, `Jwt__Secret`, etc., set via
   Render's dashboard/CLI, not committed anywhere).

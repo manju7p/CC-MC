@@ -14,6 +14,11 @@
 > immediately below for the current COMPLETE/PARTIAL/NOT IMPLEMENTED/NEXT
 > summary, `architecture.mmd` (repo root) for the full system diagram, and
 > `HOW_TO_RUN.md` for the current Docker/Neon runbook.
+>
+> **Update (2026-09-15):** the "Production user bootstrap mechanism" item
+> below is now done — see "Neon Production Bootstrap (2026-09-15)" further
+> down for the full writeup. `NOT IMPLEMENTED`/`NEXT` in the checkpoint
+> below are updated accordingly; nothing else in this checkpoint changed.
 
 ## Checkpoint (2026-09-13) — Current Scope
 
@@ -51,25 +56,31 @@ into the rest of this file / `context.md` / `progress.md` for detail.
   automated environment used so far — verified instead at the service/data
   layer via real production classes against a real running API (see
   "Application Bug Fixes (2026-09-12)").
-- Neon authenticated login flow: connectivity/migrations verified, but the
-  full login round-trip cannot be exercised because Neon's `production`
-  branch has zero users (by design — `DevelopmentSeeder` correctly never
-  runs outside `Development`) and no production bootstrap mechanism exists
-  yet.
+- Neon authenticated login flow: connectivity/migrations verified end-to-end
+  at the data layer (real accounts now exist with real PBKDF2 hashes,
+  correct role/permission counts, correct centre scoping) — the actual
+  `POST /auth/login` round-trip against Neon was deliberately not exercised
+  in this session (the human operator chose to keep the bootstrap password
+  out of the session rather than pass it through a curl command), so it
+  remains "verified at the data layer, not yet a live login" until someone
+  logs in for real (WPF client or a manual request) using the bootstrap
+  credentials.
 
 ### NOT IMPLEMENTED
-- Production user bootstrap mechanism (no script/endpoint exists to create
-  the first Admin user against Neon `production`).
 - Render deployment (not performed — see "Next" below).
+- A password-change/reset endpoint — still genuinely absent (see "Neon
+  Production Bootstrap (2026-09-15)" below); rotating any account's
+  password today requires direct database access, not the app.
 - BRD items not yet built: source hierarchy beyond the current flat
   Source/Vehicle model, notification hooks, printed receipt/result output,
   reporting screens, WiX MSI installer packaging.
 
 ### NEXT
-Production admin bootstrap → Render deployment → point WPF
-`CloudApi:BaseUrl` at the Render HTTPS URL → real-world end-to-end
-verification. None of these have been started; see `HOW_TO_RUN.md` §9 and
-`progress.md` "Next Step".
+Render deployment → point WPF `CloudApi:BaseUrl` at the Render HTTPS URL →
+real-world end-to-end verification, including a real first login against
+Neon's now-real Admin/Manager/Operator accounts. See `HOW_TO_RUN.md` §9 and
+`progress.md` "Next Step". Production user bootstrap itself is done — see
+"Neon Production Bootstrap (2026-09-15)" below.
 
 ## Current Objective
 
@@ -979,8 +990,100 @@ for a native Windows/WPF app) and is reported as NOT TESTED, not PASS,
 for that specific narrow claim - see the task's own final report for the
 exact PASS/NOT TESTED breakdown.
 
+## Neon Production Bootstrap (2026-09-15)
+
+Closes the "no production user bootstrap mechanism" gap recorded in the
+2026-09-13 checkpoint and `HOW_TO_RUN.md` §9. Repository/DB state was
+inspected first (Neon MCP tools + `docker exec ... psql`), not assumed:
+
+- **Neon (`fancy-cherry-25725711`, branch `production`) before this pass:**
+  schema fully migrated (all 3 EF Core migrations present in
+  `__EFMigrationsHistory`, matching the repo's migration chain exactly) but
+  every table had zero rows — confirming `context.md`/`HOW_TO_RUN.md` were
+  accurate, not stale.
+- **Local Docker Postgres (`ccmc_cloud_docker`) inspected for reusable
+  data:** 4 users, 2 centres, 9 reception transactions, 1 override, 23
+  audit logs — all unambiguously `DevelopmentSeeder` output plus manual QA
+  testing (duplicate/near-duplicate transaction rows from button-mash
+  testing on 2026-09-12/09-14). Judged not real business data and
+  deliberately **not** migrated to Neon, per this pass's own instruction
+  not to blindly copy dev/test data into production.
+- **New mechanism:** `ProductionBootstrapSeeder`
+  (`src/CCMC.Cloud.Infrastructure/Seed/ProductionBootstrapSeeder.cs`) +
+  `ProductionBootstrapOptions` (same folder), invoked from `Program.cs`
+  after migrations run, in **any** environment, but only when
+  `Bootstrap:AdminEmail` configuration is present — absent (the default),
+  it is a complete no-op. Every identity/credential comes from
+  `Bootstrap__*` environment variables (documented, placeholders only, in
+  `.env.example`) — nothing is invented. Idempotent: re-running with the
+  same config on a later startup detects existing users by email and
+  leaves their `PasswordHash` untouched (never resets a real password
+  silently) — logs "already exists, left unchanged" instead.
+  `DevelopmentSeeder`'s own role/permission grants and upsert helpers were
+  extracted into a new shared `SeedHelpers` (RBAC grants) so the two
+  seeders cannot drift apart on what each role can do — `DevelopmentSeeder`
+  itself is otherwise unchanged (same dev-only accounts/centres/quality
+  rules it always seeded), and both were reverified passing (190/190)
+  after the refactor.
+- **Validation, fail-fast, before any DB write:** `ProductionBootstrapOptions.FromConfiguration`
+  throws immediately if a Manager/Operator email is supplied without both
+  `Bootstrap:CentreCode`/`Bootstrap:CentreName` (never an unscoped
+  operational account), or if any supplied password is missing or under 12
+  characters. This caught a real mistake during this session's own run —
+  the human-supplied `Bootstrap__AdminPassword` was 11 characters; the
+  container correctly crashed with a clear `InvalidOperationException`
+  instead of creating a weak Admin account, the length gap was fixed, and
+  the retry succeeded.
+- **Bootstrapped into Neon `production` this session** (per explicit
+  human decisions on centre/accounts/password-supply-method): one
+  Chilling Centre (`BLR-CC-01` / "Chilling Centre - Bangalore" — reused
+  the same placeholder identity as the dev seed, by the human's own
+  choice, to be renamed later once a real centre identity is known), one
+  Admin (`admin@ccmc.local`, `AllCentres=true`), one Manager and one
+  Operator (`manager1@ccmc.local` / `operator1@ccmc.local`, both scoped to
+  `BLR-CC-01`), plus the same BRD §10 global quality rules
+  (FAT 3.0–6.0, SNF 8.0–10.0, Temperature 0.0–10.0) `DevelopmentSeeder`
+  already used — a documented business rule, not a fabricated default.
+  Verified directly against Neon after the run: correct role/permission
+  counts (Admin 15, Manager 15, Operator 7 — matching `SeedHelpers.RolePermissions`
+  exactly), correct centre scoping, and real ASP.NET Core Identity PBKDF2
+  hashes (`AQAAAAIA...` format prefix, not plaintext) — not merely "the
+  container didn't crash."
+- **`RateFormulaSettings` deliberately not seeded** for production, same as
+  `DevelopmentSeeder` — the BRD's own "no fabricated defaults" rule (see
+  "Milk Rate Calculation" above): a Manager must configure it for real
+  through the app once one exists.
+- **Real, not yet closed, security incident from this same session:** a
+  diagnostic shell command intended only to check line numbers
+  (`grep -n ""` over `.env.neon`) printed the file's full contents —
+  including the real Neon DB password, the JWT signing secret, and all
+  three bootstrap account passwords (weak/predictable ones, following the
+  dev-seed pattern) — into this session's own transcript. Disclosed to the
+  human immediately; offered to rotate all three account passwords (and
+  flagged the DB password/JWT secret as needing rotation too) — the human
+  chose to handle rotation themselves outside this session. **Until that
+  rotation happens, treat `admin@ccmc.local`/`manager1@ccmc.local`/
+  `operator1@ccmc.local`'s current passwords, the Neon connection string,
+  and `Jwt__Secret` as compromised, not merely "worth rotating eventually."**
+- **`.env.neon`'s `Bootstrap__*` block removed after successful bootstrap**
+  (human's own choice, offered because the seeder is idempotent and
+  doesn't need the block again) — if a second centre/account is bootstrapped
+  later, re-add fresh `Bootstrap__*` lines with new values per
+  `.env.example`'s documented shape.
+- **Still not done, deliberately out of this pass's scope:** an in-app
+  password-change/reset endpoint (still genuinely absent — see "Known
+  Limitations" below, new bullet), a real login round-trip against Neon
+  (data-layer verification only - see "Checkpoint" PARTIALLY VERIFIED
+  above), and Render deployment itself (unchanged, still not started).
+
 ## Known Limitations
 
+- **No password-change/reset endpoint exists anywhere in the cloud API**
+  (confirmed by inspection, not assumed — no controller, no
+  `AuthenticationService` method). Rotating any account's password today
+  (bootstrap or otherwise) requires direct database access with the same
+  `IPasswordHasher` used at runtime — see "Neon Production Bootstrap
+  (2026-09-15)".
 - **No installer.** `dotnet publish` produces a deployable folder, not an
   MSI/EXE setup experience. WiX MSI is the chosen direction (see "Product
   Decisions") but not built. Framework-dependent publish was used (not

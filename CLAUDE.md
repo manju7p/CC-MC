@@ -54,12 +54,21 @@ re-deriving context that already exists.
   `.env.example` (placeholders) is tracked. Never put a secret in a tracked
   file, `compose.yaml`, or `appsettings.json`.
 - **Neon:** project `fancy-cherry-25725711`, branch `production`. Connectivity
-  and automatic migrations are verified working. It currently has **zero
-  users** — `DevelopmentSeeder` correctly never runs outside
-  `ASPNETCORE_ENVIRONMENT=Development`, and no production user-bootstrap
-  mechanism exists yet. Do not create production users or enable the seeder
-  in Production to work around this — it's an open, tracked gap (see
-  `STATUS.md` "Checkpoint" / `HOW_TO_RUN.md` §9).
+  and automatic migrations are verified working. **Update (2026-09-15):**
+  no longer zero users — a production bootstrap mechanism now exists
+  (`ProductionBootstrapSeeder`, env-var-gated via `Bootstrap:AdminEmail`,
+  a no-op unless configured) and was used to create one Admin, one
+  Manager, and one Operator account plus one Chilling Centre (`BLR-CC-01`,
+  a placeholder identity by explicit human choice — rename once the real
+  centre is known). `DevelopmentSeeder` still correctly never runs outside
+  `ASPNETCORE_ENVIRONMENT=Development`; the two mechanisms are independent
+  and share their RBAC grants via `SeedHelpers`. See `STATUS.md` "Neon
+  Production Bootstrap (2026-09-15)" / `HOW_TO_RUN.md` §9 for the full
+  writeup, including a real secret-exposure incident from that session
+  (Neon DB password, JWT secret, and all three bootstrap passwords printed
+  into a session transcript by a careless diagnostic command) whose
+  rotation the human deferred to themselves — treat those credentials as
+  compromised until confirmed rotated.
 - **Rate calculation:** `RateCalculationService` (BRD §25) — Fat-vs-SNF and
   TS-based formulas, both implemented exactly as specified, full-precision
   `Rate` used to compute `Amount` (not a rounded intermediate). Config is
@@ -89,15 +98,23 @@ re-deriving context that already exists.
   permissions already existed), and Enter key not submitting login
   (`IsDefault="True"`). Full writeup: `STATUS.md` "Application Bug Fixes
   (2026-09-12)".
-- **Remaining gaps:** no production user bootstrap for Neon; Render
-  deployment not yet performed; literal WPF GUI mouse/keyboard interaction
-  not verifiable in any environment used so far (verification instead uses
+- **Remaining gaps:** Render deployment not yet performed; no in-app
+  password-change/reset endpoint exists anywhere (rotating any account's
+  password today requires direct database access with the same
+  `IPasswordHasher` the app uses at runtime); a real `POST /auth/login`
+  round-trip against Neon's now-real accounts has not actually been
+  exercised (verified at the data layer only, by the human's own choice —
+  see `STATUS.md`); literal WPF GUI mouse/keyboard interaction not
+  verifiable in any environment used so far (verification instead uses
   real production service classes against a real running API); physical
   Ekomilk KAM98-2A serial hardware link not yet verified (payload *decode*
   is verified against real sample frames).
-- **Next intended step:** production admin bootstrap mechanism, then Render
-  deployment — not started. Do not perform Render deployment or invent a
-  production bootstrap without being explicitly asked.
+- **Next intended step:** Render deployment — not started. Do not perform
+  Render deployment without being explicitly asked. Production user
+  bootstrap itself is done (see the Neon bullet above); if a new
+  centre/account needs bootstrapping later, reuse
+  `ProductionBootstrapSeeder` via `Bootstrap__*` env vars (see
+  `HOW_TO_RUN.md` §9) rather than inventing a new mechanism.
 
 ## Testing philosophy
 

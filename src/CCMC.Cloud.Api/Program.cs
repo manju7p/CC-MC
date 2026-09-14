@@ -202,6 +202,19 @@ using (var scope = app.Services.CreateScope())
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await DevelopmentSeeder.SeedAsync(db, passwordHasher, logger);
     }
+
+    // Production account bootstrap - runs in ANY environment, but only when
+    // Bootstrap:AdminEmail is actually configured (Bootstrap__* env vars).
+    // Absent (the default), this is a complete no-op - see
+    // ProductionBootstrapOptions/ProductionBootstrapSeeder for the full
+    // rationale. Never invents an identity/credential; every value comes
+    // from configuration the operator supplied.
+    var bootstrapOptions = ProductionBootstrapOptions.FromConfiguration(builder.Configuration);
+    if (bootstrapOptions is not null)
+    {
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await ProductionBootstrapSeeder.SeedAsync(db, passwordHasher, logger, bootstrapOptions);
+    }
 }
 
 app.Logger.LogInformation("CCMC Cloud API starting up.");
