@@ -3,6 +3,44 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CCMC - Vehicles" Height="720" Width="880" MinHeight="520" MinWidth="660"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <!-- Row card - same visual language as Reception History / Sources. Column widths
+             mirror the header row below. -->
+        <DataTemplate x:Key="VehicleRowTemplate">
+            <Border Style="{StaticResource AlternatingRowBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.6*" MinWidth="140"/>
+                        <ColumnDefinition Width="2*" MinWidth="160"/>
+                        <ColumnDefinition Width="1.2*" MinWidth="110"/>
+                        <ColumnDefinition Width="1*" MinWidth="100"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding VehicleNumber}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TankerNumberText}" Style="{StaticResource CaptionText}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding DriverNameText}"/>
+                        <TextBlock Text="{Binding DriverMobileText}" Style="{StaticResource CaptionText}"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Text="{Binding CapacityText}" VerticalAlignment="Center" Style="{StaticResource CaptionText}"/>
+
+                    <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                        <Border Style="{Binding StatusChipBorderStyle}" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding StatusGlyph}" Style="{Binding StatusChipIconStyle}"/>
+                                <TextBlock Text="{Binding StatusText}" Style="{Binding StatusChipTextStyle}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -21,17 +59,11 @@
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <Grid Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="300"/>
-                </Grid.RowDefinitions>
+            <StackPanel Margin="24">
 
                 <!-- Add Vehicle - visible only to users whose role grants VEHICLE_CREATE (Manager/Admin).
                      Client-side UX convenience only; the server independently enforces the same permission. -->
-                <Border Grid.Row="0" Name="AddVehiclePanel" Style="{StaticResource CardBorder}" Margin="0,0,0,14" Visibility="Collapsed">
+                <Border Name="AddVehiclePanel" Style="{StaticResource CardBorder}" Visibility="Collapsed">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,6,0"/>
@@ -97,16 +129,16 @@
                 </Border>
 
                 <!-- Search -->
-                <Border Grid.Row="1" Style="{StaticResource CardBorder}">
+                <Border Style="{StaticResource CardBorder}">
                     <Grid>
                         <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="Search by vehicle number, tanker number, or driver"/>
+                                 ToolTip="Search by vehicle number, tanker number, or driver" AutomationProperties.Name="Search vehicles"/>
                         <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
                                    Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="2" Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">
+                <Border Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">
                     <StackPanel>
                         <TextBlock Text="&#xE804;" Style="{StaticResource EmptyStateIconText}"/>
                         <TextBlock Text="No vehicles found" Style="{StaticResource EmptyStateTitleText}"/>
@@ -115,19 +147,27 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="0" Name="GridBorder">
-                    <DataGrid Name="VehiclesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Vehicle #" Binding="{Binding VehicleNumber}"/>
-                            <DataGridTextColumn Header="Tanker #" Binding="{Binding TankerNumber}"/>
-                            <DataGridTextColumn Header="Driver" Binding="{Binding DriverName}" Width="*"/>
-                            <DataGridTextColumn Header="Mobile" Binding="{Binding DriverMobile}"/>
-                            <DataGridTextColumn Header="Capacity (kg)" Binding="{Binding CapacityKg}"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
-            </Grid>
+                <StackPanel Name="ListPanel">
+                    <!-- Column header labels - widths mirror VehicleRowTemplate above. -->
+                    <Border Style="{StaticResource ListHeaderBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.6*" MinWidth="140"/>
+                                <ColumnDefinition Width="2*" MinWidth="160"/>
+                                <ColumnDefinition Width="1.2*" MinWidth="110"/>
+                                <ColumnDefinition Width="1*" MinWidth="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="VEHICLE" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="1" Text="DRIVER" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="2" Text="CAPACITY" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="3" Text="STATUS" Style="{StaticResource SectionLabelText}"/>
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource ListContainerBorder}">
+                        <ItemsControl Name="VehiclesItemsControl" ItemTemplate="{StaticResource VehicleRowTemplate}"/>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </Window>

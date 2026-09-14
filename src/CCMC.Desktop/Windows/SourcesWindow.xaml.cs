@@ -4,6 +4,7 @@ using CCMC.Application.MasterData;
 using CCMC.Contracts.Auth;
 using CCMC.Contracts.Dtos;
 using CCMC.Domain.Entities;
+using CCMC.Domain.Enums;
 
 namespace CCMC.Desktop.Windows;
 
@@ -81,11 +82,14 @@ public partial class SourcesWindow : Window
                 s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 (s.Location?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
 
-        SourcesGrid.ItemsSource = filtered;
+        SourcesItemsControl.ItemsSource = filtered
+            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .Select((s, i) => SourceRow.From(s, i))
+            .ToList();
 
         var showEmpty = filtered.Count == 0;
         EmptyStatePanel.Visibility = showEmpty ? Visibility.Visible : Visibility.Collapsed;
-        GridBorder.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
+        ListPanel.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
         EmptyStateBodyTextBlock.Text = _allSources.Count == 0
             ? "No sources are cached for your accessible centre(s) yet. Sign in online to sync the latest master data."
             : "No sources match this search.";
@@ -155,6 +159,47 @@ public partial class SourcesWindow : Window
         finally
         {
             AddSourceButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Display-shaping only for SourceRowTemplate - formats an existing
+    /// <see cref="CCMC.Domain.Entities.Source"/> for the card-row list. No business/
+    /// validation logic here (CLAUDE.md "business logic stays out of the UI").
+    /// </summary>
+    private sealed class SourceRow
+    {
+        public required string Name { get; init; }
+        public required string Code { get; init; }
+        public required string LocationText { get; init; }
+        public required string MilkTypeText { get; init; }
+        public required string StatusText { get; init; }
+        public required string StatusGlyph { get; init; }
+        public required Style StatusChipBorderStyle { get; init; }
+        public required Style StatusChipIconStyle { get; init; }
+        public required Style StatusChipTextStyle { get; init; }
+        public required bool IsEven { get; init; }
+
+        public static SourceRow From(Source s, int index)
+        {
+            var isActive = s.Status == RecordStatus.Active;
+            var (glyph, borderKey, iconKey, textKey) = isActive
+                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
+                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
+
+            return new SourceRow
+            {
+                Name = s.Name,
+                Code = s.Code,
+                LocationText = string.IsNullOrWhiteSpace(s.Location) ? "—" : s.Location,
+                MilkTypeText = string.IsNullOrWhiteSpace(s.MilkType) ? "—" : s.MilkType,
+                StatusText = s.Status.ToString().ToUpperInvariant(),
+                StatusGlyph = glyph,
+                StatusChipBorderStyle = (Style)System.Windows.Application.Current.FindResource(borderKey),
+                StatusChipIconStyle = (Style)System.Windows.Application.Current.FindResource(iconKey),
+                StatusChipTextStyle = (Style)System.Windows.Application.Current.FindResource(textKey),
+                IsEven = index % 2 == 1,
+            };
         }
     }
 }

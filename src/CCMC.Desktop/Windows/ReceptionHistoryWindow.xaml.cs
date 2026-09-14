@@ -17,6 +17,18 @@ public partial class ReceptionHistoryWindow : Window
     private readonly IReceptionRepository _receptionRepository;
 
     private List<HistoryRow> _allRows = [];
+    private bool _initialFilterApplied;
+
+    /// <summary>
+    /// Set by a caller (MainWindow's Dashboard "Accepted"/"Hold"/"Rejected" cards - see
+    /// MainWindow.xaml.cs's OpenHistoryFiltered) BEFORE calling .Show(), so LoadAsync can
+    /// apply it once the data and StatusFilterComboBox items exist. Must match one of the
+    /// literal option strings in StatusFilterComboBox's ItemsSource below ("Accepted"/
+    /// "Hold"/"Rejected"); null or "All statuses" means no filter (the existing default).
+    /// This reuses the exact same client-side filtering ApplyFilter() already does for the
+    /// user's own manual filter changes - not a second filtering mechanism.
+    /// </summary>
+    public string? InitialStatusFilter { get; set; }
 
     public ReceptionHistoryWindow(
         ISessionStore sessionStore,
@@ -75,6 +87,22 @@ public partial class ReceptionHistoryWindow : Window
             .ToList();
 
         RefreshSummary(_allRows);
+
+        // Apply a Dashboard-supplied initial filter exactly once - a later manual Refresh
+        // (RefreshButton_Click, also routed through LoadAsync) must not keep re-forcing it
+        // over whatever filter the operator has since chosen themselves.
+        if (!_initialFilterApplied && !string.IsNullOrEmpty(InitialStatusFilter))
+        {
+            _initialFilterApplied = true;
+            var items = (string[])StatusFilterComboBox.ItemsSource;
+            var match = items.FirstOrDefault(i => string.Equals(i, InitialStatusFilter, StringComparison.OrdinalIgnoreCase));
+            if (match is not null && !string.Equals(StatusFilterComboBox.SelectedItem as string, match, StringComparison.Ordinal))
+            {
+                StatusFilterComboBox.SelectedItem = match; // triggers Filter_Changed -> ApplyFilter
+                return;
+            }
+        }
+
         ApplyFilter();
     }
 

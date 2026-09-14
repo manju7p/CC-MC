@@ -263,12 +263,40 @@ public partial class MainWindow : Window
     /// unrelated window - see this redesign's window-hierarchy requirement. Still
     /// non-modal (.Show(), not .ShowDialog()) - unchanged from before, so an operator
     /// can still have Reception and History open side by side if they choose.
+    /// Also clamps the window to the work area of whichever monitor it actually opens
+    /// on (WindowScreenFit) - fixes tall windows (Reception) opening partly off-screen
+    /// on smaller/secondary displays, applied here once rather than in every window.
     /// </summary>
     private void ShowOwned(Window window)
     {
         window.Owner = this;
+        window.SourceInitialized += (_, _) => WindowScreenFit.EnsureFitsWorkArea(window);
         window.Show();
     }
+
+    /// <summary>
+    /// Opens Reception History pre-filtered to a status - the Dashboard's Receptions/
+    /// Accepted/Hold/Rejected cards (see MainWindow.xaml) all route through this instead
+    /// of building separate filtered screens. <paramref name="statusFilter"/> is one of
+    /// ReceptionHistoryWindow's own filter option strings ("Accepted"/"Hold"/"Rejected"),
+    /// or null for "Receptions" (all statuses, no filter). Reuses the exact same window
+    /// class/DI registration the sidebar's "Reception History" item already opens - not a
+    /// second, parallel history screen.
+    /// </summary>
+    private void OpenHistoryFiltered(string? statusFilter)
+    {
+        var history = _serviceProvider.GetRequiredService<ReceptionHistoryWindow>();
+        history.InitialStatusFilter = statusFilter;
+        ShowOwned(history);
+    }
+
+    private void ReceptionsCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered(null);
+
+    private void AcceptedCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Accepted");
+
+    private void HoldCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Hold");
+
+    private void RejectedCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Rejected");
 
     private async void LogoutButton_Click(object sender, RoutedEventArgs e)
     {

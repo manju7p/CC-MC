@@ -69,49 +69,49 @@
                     <TextBlock DockPanel.Dock="Top" Text="NAVIGATION" Style="{StaticResource SidebarSectionLabelText}"/>
 
                     <StackPanel DockPanel.Dock="Top">
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="ReceptionButton_Click" ToolTip="Start a new milk reception">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="ReceptionButton_Click" ToolTip="Start a new milk reception" AutomationProperties.Name="Milk Reception">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE710;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Milk Reception" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryButton_Click" ToolTip="Browse past receptions">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryButton_Click" ToolTip="Browse past receptions" AutomationProperties.Name="Reception History">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE917;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Reception History" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SourcesButton_Click" ToolTip="Manage milk sources">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SourcesButton_Click" ToolTip="Manage milk sources" AutomationProperties.Name="Sources">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE707;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Sources" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="VehiclesButton_Click" ToolTip="Manage collection vehicles">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="VehiclesButton_Click" ToolTip="Manage collection vehicles" AutomationProperties.Name="Vehicles">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE804;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Vehicles" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceStatusButton_Click" ToolTip="View scale/analyser connection state">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceStatusButton_Click" ToolTip="View scale/analyser connection state" AutomationProperties.Name="Device Status">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE975;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Device Status" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceConfigButton_Click" ToolTip="Configure serial devices">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceConfigButton_Click" ToolTip="Configure serial devices" AutomationProperties.Name="Device Configuration">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE713;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Device Configuration" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SyncStatusButton_Click" ToolTip="View/trigger cloud synchronization">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SyncStatusButton_Click" ToolTip="View/trigger cloud synchronization" AutomationProperties.Name="Synchronization">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE895;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Synchronization" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsButton_Click" ToolTip="View application configuration">
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsButton_Click" ToolTip="View application configuration" AutomationProperties.Name="Settings">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE946;" Style="{StaticResource SidebarIconText}"/>
                                 <TextBlock Text="Settings" VerticalAlignment="Center"/>
@@ -128,42 +128,54 @@
                     <TextBlock Text="Operational overview for your accessible centre(s)." Style="{StaticResource CaptionText}" Margin="0,0,0,18"/>
 
                     <UniformGrid Name="SummaryCardsPanel" Columns="4" Margin="0,0,0,20">
-                        <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
+                        <Button Style="{StaticResource DashboardCardButtonStyle}" Margin="0,0,10,0" Click="ReceptionsCard_Click"
+                                ToolTip="Open Reception History (all records)"
+                                AutomationProperties.Name="Receptions - open Reception History">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,6,0"/>
                                     <TextBlock Text="RECEPTIONS" Style="{StaticResource SectionLabelText}"/>
                                 </StackPanel>
                                 <TextBlock Name="TodayTotalTextBlock" Text="—" Style="{StaticResource MetricValueText}" Margin="0,6,0,0"/>
+                                <TextBlock Text="View all →" Style="{StaticResource CardActionHintText}"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
+                        </Button>
+                        <Button Style="{StaticResource DashboardCardButtonStyle}" Margin="0,0,10,0" Click="AcceptedCard_Click"
+                                ToolTip="Open Reception History filtered to Accepted"
+                                AutomationProperties.Name="Accepted - open Reception History filtered to Accepted">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE73E;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource SuccessBrush}" Margin="0,0,6,0"/>
                                     <TextBlock Text="ACCEPTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource SuccessBrush}"/>
                                 </StackPanel>
                                 <TextBlock Name="TodayAcceptedTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource SuccessBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="View accepted →" Style="{StaticResource CardActionHintText}"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
+                        </Button>
+                        <Button Style="{StaticResource DashboardCardButtonStyle}" Margin="0,0,10,0" Click="HoldCard_Click"
+                                ToolTip="Open Reception History filtered to Hold"
+                                AutomationProperties.Name="Hold - open Reception History filtered to Hold">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE7BA;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource WarningBrush}" Margin="0,0,6,0"/>
                                     <TextBlock Text="HOLD" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource WarningBrush}"/>
                                 </StackPanel>
                                 <TextBlock Name="TodayHoldTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource WarningBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="View hold →" Style="{StaticResource CardActionHintText}"/>
                             </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource CardBorder}">
+                        </Button>
+                        <Button Style="{StaticResource DashboardCardButtonStyle}" Click="RejectedCard_Click"
+                                ToolTip="Open Reception History filtered to Rejected"
+                                AutomationProperties.Name="Rejected - open Reception History filtered to Rejected">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE711;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource DangerBrush}" Margin="0,0,6,0"/>
                                     <TextBlock Text="REJECTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource DangerBrush}"/>
                                 </StackPanel>
                                 <TextBlock Name="TodayRejectedTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource DangerBrush}" Margin="0,6,0,0"/>
+                                <TextBlock Text="View rejected →" Style="{StaticResource CardActionHintText}"/>
                             </StackPanel>
-                        </Border>
+                        </Button>
                     </UniformGrid>
 
                     <TextBlock Name="DashboardUnavailableTextBlock" Style="{StaticResource CaptionText}" Margin="0,0,0,20" Visibility="Collapsed"/>

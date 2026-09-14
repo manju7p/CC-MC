@@ -5,6 +5,7 @@ using CCMC.Application.MasterData;
 using CCMC.Contracts.Auth;
 using CCMC.Contracts.Dtos;
 using CCMC.Domain.Entities;
+using CCMC.Domain.Enums;
 
 namespace CCMC.Desktop.Windows;
 
@@ -77,11 +78,14 @@ public partial class VehiclesWindow : Window
                 (v.TankerNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 (v.DriverName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
 
-        VehiclesGrid.ItemsSource = filtered;
+        VehiclesItemsControl.ItemsSource = filtered
+            .OrderBy(v => v.VehicleNumber, StringComparer.OrdinalIgnoreCase)
+            .Select((v, i) => VehicleRow.From(v, i))
+            .ToList();
 
         var showEmpty = filtered.Count == 0;
         EmptyStatePanel.Visibility = showEmpty ? Visibility.Visible : Visibility.Collapsed;
-        GridBorder.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
+        ListPanel.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
         EmptyStateBodyTextBlock.Text = _allVehicles.Count == 0
             ? "No vehicles are cached for your accessible centre(s) yet. Sign in online to sync the latest master data."
             : "No vehicles match this search.";
@@ -161,6 +165,49 @@ public partial class VehiclesWindow : Window
         finally
         {
             AddVehicleButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Display-shaping only for VehicleRowTemplate - formats an existing
+    /// <see cref="CCMC.Domain.Entities.Vehicle"/> for the card-row list. No business/
+    /// validation logic here (CLAUDE.md "business logic stays out of the UI").
+    /// </summary>
+    private sealed class VehicleRow
+    {
+        public required string VehicleNumber { get; init; }
+        public required string TankerNumberText { get; init; }
+        public required string DriverNameText { get; init; }
+        public required string DriverMobileText { get; init; }
+        public required string CapacityText { get; init; }
+        public required string StatusText { get; init; }
+        public required string StatusGlyph { get; init; }
+        public required Style StatusChipBorderStyle { get; init; }
+        public required Style StatusChipIconStyle { get; init; }
+        public required Style StatusChipTextStyle { get; init; }
+        public required bool IsEven { get; init; }
+
+        public static VehicleRow From(Vehicle v, int index)
+        {
+            var isActive = v.Status == RecordStatus.Active;
+            var (glyph, borderKey, iconKey, textKey) = isActive
+                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
+                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
+
+            return new VehicleRow
+            {
+                VehicleNumber = v.VehicleNumber,
+                TankerNumberText = string.IsNullOrWhiteSpace(v.TankerNumber) ? "No tanker #" : $"Tanker {v.TankerNumber}",
+                DriverNameText = string.IsNullOrWhiteSpace(v.DriverName) ? "No driver on file" : v.DriverName,
+                DriverMobileText = string.IsNullOrWhiteSpace(v.DriverMobile) ? "—" : v.DriverMobile,
+                CapacityText = v.CapacityKg is { } capacity ? $"{capacity:F0} kg" : "—",
+                StatusText = v.Status.ToString().ToUpperInvariant(),
+                StatusGlyph = glyph,
+                StatusChipBorderStyle = (Style)System.Windows.Application.Current.FindResource(borderKey),
+                StatusChipIconStyle = (Style)System.Windows.Application.Current.FindResource(iconKey),
+                StatusChipTextStyle = (Style)System.Windows.Application.Current.FindResource(textKey),
+                IsEven = index % 2 == 1,
+            };
         }
     }
 }

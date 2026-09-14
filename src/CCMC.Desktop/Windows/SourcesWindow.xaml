@@ -3,6 +3,42 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CCMC - Sources" Height="720" Width="860" MinHeight="520" MinWidth="640"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <!-- Row card - same visual language as Reception History's HistoryRowTemplate (icon-less
+             here since a source has no status equivalent to Accept/Hold/Reject beyond
+             Active/Inactive). Column widths mirror the header row below. -->
+        <DataTemplate x:Key="SourceRowTemplate">
+            <Border Style="{StaticResource AlternatingRowBorder}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2.2*" MinWidth="160"/>
+                        <ColumnDefinition Width="1.8*" MinWidth="140"/>
+                        <ColumnDefinition Width="1.2*" MinWidth="110"/>
+                        <ColumnDefinition Width="1*" MinWidth="100"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Code}" Style="{StaticResource CaptionText}"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Text="{Binding LocationText}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+
+                    <TextBlock Grid.Column="2" Text="{Binding MilkTypeText}" VerticalAlignment="Center" Style="{StaticResource CaptionText}"/>
+
+                    <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                        <Border Style="{Binding StatusChipBorderStyle}" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding StatusGlyph}" Style="{Binding StatusChipIconStyle}"/>
+                                <TextBlock Text="{Binding StatusText}" Style="{Binding StatusChipTextStyle}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -21,18 +57,12 @@
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <Grid Margin="24">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="300"/>
-                </Grid.RowDefinitions>
+            <StackPanel Margin="24">
 
                 <!-- Add Source - visible only to users whose role grants SOURCE_CREATE (Manager/Admin).
                      This is a client-side UX convenience only; the server independently enforces the
                      same permission and remains the real authorization boundary. -->
-                <Border Grid.Row="0" Name="AddSourcePanel" Style="{StaticResource CardBorder}" Margin="0,0,0,14" Visibility="Collapsed">
+                <Border Name="AddSourcePanel" Style="{StaticResource CardBorder}" Visibility="Collapsed">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,6,0"/>
@@ -98,16 +128,16 @@
                 </Border>
 
                 <!-- Search -->
-                <Border Grid.Row="1" Style="{StaticResource CardBorder}">
+                <Border Style="{StaticResource CardBorder}">
                     <Grid>
                         <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="Search by code, name, or location"/>
+                                 ToolTip="Search by code, name, or location" AutomationProperties.Name="Search sources"/>
                         <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
                                    Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="2" Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">
+                <Border Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">
                     <StackPanel>
                         <TextBlock Text="&#xE707;" Style="{StaticResource EmptyStateIconText}"/>
                         <TextBlock Text="No sources found" Style="{StaticResource EmptyStateTitleText}"/>
@@ -116,18 +146,27 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="0" Name="GridBorder">
-                    <DataGrid Name="SourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Code" Binding="{Binding Code}"/>
-                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="*"/>
-                            <DataGridTextColumn Header="Milk Type" Binding="{Binding MilkType}"/>
-                            <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Border>
-            </Grid>
+                <StackPanel Name="ListPanel">
+                    <!-- Column header labels - widths mirror SourceRowTemplate above. -->
+                    <Border Style="{StaticResource ListHeaderBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2.2*" MinWidth="160"/>
+                                <ColumnDefinition Width="1.8*" MinWidth="140"/>
+                                <ColumnDefinition Width="1.2*" MinWidth="110"/>
+                                <ColumnDefinition Width="1*" MinWidth="100"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="SOURCE" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="1" Text="LOCATION" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="2" Text="MILK TYPE" Style="{StaticResource SectionLabelText}"/>
+                            <TextBlock Grid.Column="3" Text="STATUS" Style="{StaticResource SectionLabelText}"/>
+                        </Grid>
+                    </Border>
+                    <Border Style="{StaticResource ListContainerBorder}">
+                        <ItemsControl Name="SourcesItemsControl" ItemTemplate="{StaticResource SourceRowTemplate}"/>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </Window>

@@ -1306,6 +1306,123 @@ verification, not a substitute for a human clicking through the app.
 `Segoe MDL2 Assets`) ships with Windows - no NuGet package, no new binary
 asset, nothing to approve.
 
+## UI/UX Refinement Pass (2026-09-15)
+
+A targeted follow-up to the "UI/UX Redesign (2026-09-15)" pass above,
+scoped to specific issues found by manually reviewing the redesigned app -
+**not** a second redesign. No Domain/Application/Infrastructure/
+Contracts/Cloud.* code touched; `dotnet build CCMC.sln` and
+`dotnet test CCMC.sln` both re-run clean: **190/190 passing** (155 client
++ 35 cloud, cloud suite against a real disposable local PostgreSQL 16
+container), unchanged from baseline.
+
+**Root-cause fix, bigger than it looked: sidebar "black text on green".**
+`Theme.xaml`'s implicit `TargetType="TextBlock"` style had its own hard
+`Foreground` Setter (`TextPrimaryBrush`, near-black). A WPF Style Setter
+always outranks an *inherited* property value, so every plain,
+unstyled `TextBlock` placed inside a `Button`'s `Content` (the icon+label
+`StackPanel` pattern used throughout the prior redesign - sidebar nav,
+ACCEPT/HOLD/REJECT, Save, Read Devices, Test Connection, Refresh, Add
+Source/Vehicle, etc.) rendered in near-black regardless of the button's
+own intended `Foreground` - correct-looking by accident on light
+buttons, actively broken on the dark sidebar, and silently wrong on
+every coloured button's **hover** state too (`AcceptButtonStyle`'s
+`IsMouseOver` trigger sets `Foreground="{StaticResource TextInverseBrush}"`
+on the `Button` itself, intending white text on the now-solid-green
+background - the label never picked it up). Fixed at the root: the
+`Window` style now sets `TextElement.Foreground` (an inheritable attached
+property) to `TextPrimaryBrush`, and the implicit `TextBlock` style no
+longer sets `Foreground` at all - so a plain `TextBlock` now correctly
+inherits from whichever ancestor is closer (a `Button`'s own resolved
+Foreground, or the `Window`'s default for body text). Every named text
+style (`CaptionText`, `SectionLabelText`, `MetricValueText`, chip styles,
+etc.) already set its own `Foreground` explicitly and is unaffected.
+Fixes the reported sidebar contrast bug and, as a byproduct, the
+previously-silent hover-state contrast bug on ACCEPT/HOLD/REJECT and
+every other coloured icon+label button.
+
+**Reception weight field alignment.** The Weight card's `TextBox` reused
+the base `TextBox` style's `Padding="8,6"` (tuned for its 13px default
+`FontSize`) while itself set to `FontSize="18"` - the enlarged text sat
+off-centre in padding sized for a smaller font, and the field's fixed
+`Width="180"` floated alone in a card as wide as the whole window instead
+of following the same `Grid`-column rhythm every other field on the
+screen uses (Reception Details, FAT/SNF/CLR, Rate/Amount all use
+proportioned `Grid` columns). Fixed at the layout level, not with a
+margin offset: a new `MetricInputTextBox` style (`Styles/Theme.xaml`)
+scales padding/min-height together with its larger font, and the field
+now sits in a bounded `Grid` column matching the screen's existing
+rhythm.
+
+**Milk Reception opening off-screen.** New `CCMC.Desktop.Controls.WindowScreenFit`
+(Win32 `MonitorFromWindow`/`GetMonitorInfo` via `user32.dll` P/Invoke -
+already part of Windows, no NuGet package) resolves the actual monitor a
+window opens on and clamps its size/position to that monitor's work area,
+called once from `MainWindow.ShowOwned` (`SourceInitialized`, before first
+paint - no visible jump) for every secondary window, not just Reception.
+This is deliberately NOT `SystemParameters.WorkArea`, which only ever
+reports the *primary* monitor - wrong the moment the app runs on a
+secondary display. `ReceptionWindow`'s own static default `Height` was
+also reduced (860 → 780) as a more reasonable baseline; its existing
+`ScrollViewer` remains the fallback if content still exceeds the clamped
+height on a small screen.
+
+**Dashboard metrics are now actionable, not just numbers.** The four
+"Today" cards (Receptions/Accepted/Hold/Rejected) are real `Button`s
+(new `DashboardCardButtonStyle` - hover/pressed/keyboard-focus states,
+pointer cursor, `ToolTip` + `AutomationProperties.Name`, a "View
+accepted →" text hint so clickability isn't colour/shape-only) that call
+`MainWindow.OpenHistoryFiltered(statusFilter)`, which opens
+`ReceptionHistoryWindow` (the exact same window class/DI registration the
+sidebar's own "Reception History" item already opens - no second,
+parallel history screen) with its new `InitialStatusFilter` property set
+before `.Show()`. `ReceptionHistoryWindow.LoadAsync` applies it exactly
+once (a later manual "Refresh" never re-forces it over whatever the
+operator has since chosen) by setting `StatusFilterComboBox.SelectedItem`,
+which routes through the *existing* `ApplyFilter()` client-side filter -
+no new filtering backend, since History already loads its full
+(200-record) dataset and filters in memory. Counts on the cards remain
+exactly what `RefreshDashboardSummaryAsync` already computed from
+`GET /dashboard/summary` - untouched.
+
+**Sources and Vehicles no longer use a raw `DataGrid`.** Both replaced
+with the same card-row `DataTemplate`/`ItemsControl` pattern History
+already established, now shared via three new `Styles/Theme.xaml`
+resources (`ListHeaderBorder`, `ListContainerBorder`,
+`AlternatingRowBorder` - retrofitted into History too, so the row
+striping only exists once) instead of duplicating the same row-chrome
+XAML three times. Each row: identity (Source name+code / Vehicle
+number+tanker) as the primary line, secondary metadata (location/milk
+type; driver+mobile/capacity), and an Active/Inactive status chip
+(`StatusChip`-style, Success/Neutral). Search (already added in the
+prior pass) and the Add panels are unchanged. **No edit UI was added** -
+this app has never had one (only Add existed before this pass, confirmed
+by inspection; the cloud API supports `PATCH` but no client ever called
+it - a pre-existing, documented gap, see `progress.md` §7/§18). Building
+one was out of scope for a presentation-only refinement pass and would
+have been new functionality, not a redesign of existing functionality -
+flagged here rather than silently fabricated.
+
+**Accessibility additions:** `AutomationProperties.Name` added to all 8
+sidebar nav buttons and the History search/status controls (previously
+`ToolTip`-only); the History search/status filter fields gained visible
+field labels ("SEARCH"/"STATUS") so the active filter is never implied
+only by the ComboBox's own text.
+
+**Verification performed:** `dotnet build CCMC.sln` (0 warnings/errors),
+`dotnet test CCMC.sln` (190/190, cloud suite against a real disposable
+`postgres:16` container), and a real launch of the Debug build's `.exe` -
+log confirms the same clean startup signature as every prior session
+(`DeviceManager` reaching the Videocon adapter, "CCMC startup complete"),
+and incidentally shows a real prior manual-testing session in the same
+log file successfully calling `GET /dashboard/summary` against the local
+Docker cloud API (200 responses), evidence the previous redesign pass has
+already been exercised against a live backend, not just built. **Not
+verified:** literal mouse-click GUI interaction (clicking a Dashboard
+card, dragging Reception to a second monitor, tabbing through the
+sidebar) - no GUI automation tool was available for this native WPF app
+in this environment, the same limitation stated in every prior session.
+
 ## Important Commands
 
 ```

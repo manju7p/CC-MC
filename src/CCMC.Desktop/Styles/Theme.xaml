@@ -158,12 +158,28 @@
         <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="TextElement.FontSize" Value="13"/>
+        <!-- Sets the INHERITED default text colour for the whole window (TextElement.Foreground
+             is an inheritable attached property). Deliberately NOT duplicated as a hard Setter on
+             the implicit TextBlock style below - see that style's comment for why. -->
+        <Setter Property="TextElement.Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     </Style>
 
+    <!--
+        Root-cause fix (UI refinement pass): this implicit style must NOT set Foreground with
+        its own Setter. A Style Setter always outranks an inherited property value in WPF's
+        precedence chain - so a plain, unstyled TextBlock placed inside a coloured Button's
+        Content (e.g. the icon+label StackPanel pattern used for sidebar nav items, ACCEPT/
+        HOLD/REJECT, Save, Read Devices, etc.) would otherwise ALWAYS render in TextPrimaryBrush
+        (near-black) regardless of the button's own intended Foreground (white on the dark
+        sidebar, white on hover for solid-coloured buttons) - this was the exact cause of
+        "black text on green background" in the sidebar, and the same silent bug on several
+        other buttons' hover states. Leaving Foreground unset here lets it inherit from the
+        nearest ancestor that DOES set it - normally the Window's TextElement.Foreground above,
+        or a closer Button/Border's own Foreground when the TextBlock lives inside one.
+    -->
     <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="13"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
     </Style>
 
     <Style x:Key="RoundedTextBoxTemplate.Base" TargetType="Control">
@@ -649,6 +665,100 @@
     <!-- ================= Search box ================= -->
     <Style x:Key="SearchTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
         <Setter Property="Padding" Value="30,6,10,6"/>
+    </Style>
+
+    <!-- ================= Clickable dashboard metric card ================= -->
+    <!-- Same visual weight as CardBorder, but a real Button underneath - keyboard-focusable,
+         with hover/pressed/focus states, per this refinement pass's "make Dashboard metrics
+         actionable" requirement. Content (icon/label/value/"View..." row) is supplied by the
+         caller; this style only owns the clickable card chrome. -->
+    <Style x:Key="DashboardCardButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="6" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#1B2422" Direction="270" ShadowDepth="1" BlurRadius="6" Opacity="0.06"/>
+                        </Border.Effect>
+                        <ContentPresenter Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource FocusBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- "View accepted →" affordance row at the bottom of a DashboardCardButtonStyle card -
+         communicates "this is clickable" via text, not colour/shape alone. -->
+    <Style x:Key="CardActionHintText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="Margin" Value="0,10,0,0"/>
+    </Style>
+
+    <!-- ================= Large metric input (e.g. Reception's Weight field) ================= -->
+    <!-- The base TextBox style's Padding (8,6) is tuned for its 13px default FontSize - reusing
+         it verbatim for a visually-emphasised, larger metric input left the text sitting
+         off-centre relative to its own field label above it. This style scales padding/min-height
+         together with the larger font so the field's internal proportions stay correct instead of
+         being patched with one-off margins on the label. -->
+    <Style x:Key="MetricInputTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="MinHeight" Value="44"/>
+    </Style>
+
+    <!-- ================= Shared list/card-row chrome ================= -->
+    <!-- Used by Reception History, Sources, and Vehicles so all three "list of records" screens
+         share one visual language instead of each re-declaring the same header bar/row/container
+         XAML (this pass's "create reusable styles centrally" requirement). -->
+    <Style x:Key="ListHeaderBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+        <Setter Property="CornerRadius" Value="6,6,0,0"/>
+        <Setter Property="Padding" Value="14,10"/>
+    </Style>
+
+    <Style x:Key="ListContainerBorder" TargetType="Border">
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1,0,1,1"/>
+        <Setter Property="CornerRadius" Value="0,0,6,6"/>
+    </Style>
+
+    <!-- Alternating-background row - the DataContext of the row must expose a bool "IsEven". -->
+    <Style x:Key="AlternatingRowBorder" TargetType="Border">
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Margin" Value="0,0,0,1"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEven}" Value="True">
+                <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <Style TargetType="ScrollViewer">

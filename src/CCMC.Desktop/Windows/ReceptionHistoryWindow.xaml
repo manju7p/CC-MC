@@ -8,17 +8,7 @@
              see this redesign's "do not make History look like Excel" requirement. Column
              widths mirror ColumnHeaderRow below so labels and data always line up. -->
         <DataTemplate x:Key="HistoryRowTemplate">
-            <Border Padding="14,10" Margin="0,0,0,1">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsEven}" Value="True">
-                                <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
+            <Border Style="{StaticResource AlternatingRowBorder}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" MinWidth="150"/>
@@ -143,18 +133,27 @@
                             <ColumnDefinition Width="14"/>
                             <ColumnDefinition Width="220"/>
                         </Grid.ColumnDefinitions>
-                        <Grid Grid.Column="0">
-                            <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="Filter_Changed"
-                                     ToolTip="Search by source, vehicle, or transaction #"/>
-                            <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
-                                       Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
-                        </Grid>
-                        <ComboBox Grid.Column="2" Name="StatusFilterComboBox" SelectionChanged="Filter_Changed"/>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="SEARCH" Style="{StaticResource FieldLabelText}"/>
+                            <Grid>
+                                <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="Filter_Changed"
+                                         ToolTip="Search by source, vehicle, or transaction #"
+                                         AutomationProperties.Name="Search reception history"/>
+                                <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
+                                           Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="STATUS" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="StatusFilterComboBox" SelectionChanged="Filter_Changed"
+                                      AutomationProperties.Name="Filter reception history by status"
+                                      ToolTip="Filter by ACCEPT/HOLD/REJECT status"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
                 <!-- Column header labels - widths mirror HistoryRowTemplate above. -->
-                <Border Background="{StaticResource PrimarySoftBrush}" CornerRadius="6,6,0,0" Padding="14,10">
+                <Border Style="{StaticResource ListHeaderBorder}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" MinWidth="150"/>
@@ -175,7 +174,7 @@
                     </Grid>
                 </Border>
 
-                <Border BorderBrush="{StaticResource BorderBrush1}" BorderThickness="1,0,1,1" CornerRadius="0,0,6,6" Margin="0,0,0,14">
+                <Border Style="{StaticResource ListContainerBorder}" Margin="0,0,0,14">
                     <StackPanel>
                         <ItemsControl Name="RowsItemsControl" ItemTemplate="{StaticResource HistoryRowTemplate}"/>
 
