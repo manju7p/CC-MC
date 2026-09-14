@@ -17,8 +17,14 @@
 >
 > **Update (2026-09-15):** the "Production user bootstrap mechanism" item
 > below is now done — see "Neon Production Bootstrap (2026-09-15)" further
-> down for the full writeup. `NOT IMPLEMENTED`/`NEXT` in the checkpoint
-> below are updated accordingly; nothing else in this checkpoint changed.
+> down for the full writeup. A UI/UX redesign pass also landed the same
+> day (see "UI/UX Redesign (2026-09-15)" / "UI/UX Refinement Pass
+> (2026-09-15)" further down) — presentational only, no domain/
+> application/infrastructure change. **Render deployment is now explicitly
+> BLOCKED** (not just "not started"): the GitHub repository is owned by
+> the CEO and the current operator lacks the access to connect it to
+> Render — a real access/permissions blocker, not a technical one. The
+> checkpoint below is updated accordingly (new BLOCKED category added).
 
 ## Checkpoint (2026-09-13) — Current Scope
 
@@ -37,15 +43,25 @@ into the rest of this file / `context.md` / `progress.md` for detail.
   `[RequirePermission]` + `CentreAccessGuard`), JWT auth (HMAC-SHA256, 8h
   expiry), all master-data/reception/override/dashboard/audit endpoints,
   idempotent reception sync, EF Core/Npgsql with 3 migrations,
-  Development-only seeder.
+  Development-only seeder, production account bootstrap (see "Neon
+  Production Bootstrap (2026-09-15)").
 - Dockerization: `cc-mc` (API) + `cc-mc-postgres` containers, Compose
   profile-based skip of local Postgres in Neon mode, `.env.docker`/
   `.env.neon`/`.env.example` environment separation (all three
   secret-bearing files gitignored).
 - Neon linkage: project `fancy-cherry-25725711`, branch `production` —
-  connectivity, TLS, and automatic migrations all verified working.
+  connectivity, TLS, and automatic migrations all verified working; real
+  Admin/Manager/Operator accounts and one Chilling Centre now exist there
+  (see "Neon Production Bootstrap (2026-09-15)").
+- UI/UX redesign (2026-09-15): full visual pass across the WPF client
+  (design system, window sizing/ownership, status chips, dashboard
+  drill-down, history search/filter, screen-fit) plus a same-day
+  refinement pass fixing contrast/alignment/off-screen issues found by
+  manual review — presentational only, no domain/application/
+  infrastructure/rate/quality/sync logic touched (see "UI/UX Redesign
+  (2026-09-15)" / "UI/UX Refinement Pass (2026-09-15)" below).
 - Automated tests: 190/190 passing (155 client + 35 cloud), reverified
-  fresh in this checkpoint session.
+  fresh after both the bootstrap work and the UI/UX passes.
 
 ### PARTIALLY VERIFIED
 - Physical Ekomilk KAM98-2A hardware: payload **decode** verified against
@@ -67,7 +83,6 @@ into the rest of this file / `context.md` / `progress.md` for detail.
   credentials.
 
 ### NOT IMPLEMENTED
-- Render deployment (not performed — see "Next" below).
 - A password-change/reset endpoint — still genuinely absent (see "Neon
   Production Bootstrap (2026-09-15)" below); rotating any account's
   password today requires direct database access, not the app.
@@ -75,12 +90,35 @@ into the rest of this file / `context.md` / `progress.md` for detail.
   Source/Vehicle model, notification hooks, printed receipt/result output,
   reporting screens, WiX MSI installer packaging.
 
+### BLOCKED
+- **Render deployment.** Not a technical gap — the Docker image and Neon
+  backend are both already deployment-ready (§10 of `HOW_TO_RUN.md`).
+  Blocked because the GitHub repository is owned/controlled by the CEO and
+  the current operator does not have the access needed to connect the
+  private repo to Render. Waiting on repository access from the repo
+  owner/CEO before this can proceed.
+
 ### NEXT
-Render deployment → point WPF `CloudApi:BaseUrl` at the Render HTTPS URL →
-real-world end-to-end verification, including a real first login against
-Neon's now-real Admin/Manager/Operator accounts. See `HOW_TO_RUN.md` §9 and
-`progress.md` "Next Step". Production user bootstrap itself is done — see
-"Neon Production Bootstrap (2026-09-15)" below.
+1. Obtain GitHub repository access sufficient to connect it to Render.
+2. Connect the repository to Render and deploy the existing ASP.NET Core
+   Docker image (`Dockerfile`, repo root — already built and verified
+   against both local Docker Postgres and Neon).
+3. Configure Render's own environment variables
+   (`ConnectionStrings__CcmcDb`, `Jwt__Secret`, etc.) pointing at Neon, via
+   Render's dashboard/CLI — never committed to this repo.
+4. Verify Render → Neon connectivity (`/health`, `/health/db`) for real.
+5. Point the WPF client's `CloudApi:BaseUrl` at the Render HTTPS URL
+   (currently `http://localhost:8081/` — see "Current WPF API
+   Configuration" note in `HOW_TO_RUN.md` §14/`context.md`). Not done in
+   this pass, not to be done without an explicit instruction.
+6. Real-world end-to-end verification, including a real first login
+   against Neon's now-real Admin/Manager/Operator accounts (see "Neon
+   Production Bootstrap (2026-09-15)" below — this specific round-trip has
+   not been exercised yet, by explicit choice, not oversight).
+
+Production user bootstrap itself is done — see "Neon Production Bootstrap
+(2026-09-15)" below. See also `progress.md`'s own "Checkpoint (2026-09-15)"
+for the full narrative.
 
 ## Current Objective
 
@@ -872,8 +910,9 @@ could not be exercised through the live HTTP API against Neon in this
 pass. What *was* verified against Neon: connectivity, migrations, the
 auth pipeline's correctness up to credential lookup, and the seeding
 security boundary. See README.md §29.17 "Known Gaps" for the standing
-consideration this leaves for whoever sets up the first real production
-user.
+consideration this left for whoever sets up the first real production
+user — **resolved 2026-09-15, see "Neon Production Bootstrap
+(2026-09-15)" below.**
 
 **Local Docker re-verified working, unaffected**: after all Neon work,
 `cc-mc`/`cc-mc-postgres` (via Compose) still pass `/health`/`/health/db`

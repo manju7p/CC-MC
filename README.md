@@ -238,7 +238,10 @@ from, the old `pranav-dev` seed script:
 
 These are **development-only** values, seeded only when
 `ASPNETCORE_ENVIRONMENT=Development` (§29.7) - they must never be treated
-as, or reused as, production credentials. Nothing in `CCMC.Desktop`
+as, or reused as, production credentials, and never reused as any
+`Bootstrap__*Password` value (§29.15/HOW_TO_RUN.md §9) - a real bootstrap
+password must be a unique, strong value that does not appear anywhere in
+this repository. Nothing in `CCMC.Desktop`
 hardcodes, assumes, or falls back to any of these - the app has no
 knowledge of them at all until you sign in against a running cloud API
 that has actually run this seed.
@@ -929,16 +932,21 @@ dotnet test CCMC.sln
 ### 29.16 Deployment Direction
 
 **Current status: containerized and verified locally (Docker + Docker
-Compose + a real Neon PostgreSQL database); Render deployment is the next
-step, not done yet.** This supersedes the previous "not built in this
-pass" note - a `Dockerfile` now exists, and the full path from source to
-a running container against a real cloud PostgreSQL has been proven:
+Compose + a real Neon PostgreSQL database, now with real production
+accounts - see §29.15/§29.17); Render deployment is BLOCKED, not merely
+"the next step."** A `Dockerfile` now exists, and the full path from
+source to a running container against a real cloud PostgreSQL has been
+proven - **the only missing piece is repository access**: the GitHub
+repository is owned/controlled by the CEO, and the operator working on
+this repo does not currently have the access needed to connect the
+private repository to Render (2026-09-15). See HOW_TO_RUN.md §10 for the
+exact ordered steps once access is obtained.
 
 ```
 Windows WPF ──HTTPS──▶ CCMC.Cloud.Api (same image everywhere) ──Npgsql──▶ PostgreSQL
                               │
               Local Docker ───┼─── cc-mc-postgres (Docker Compose)
-              Production ─────┴─── Neon (target: Render, not deployed yet)
+              Production ─────┴─── Neon (target: Render, BLOCKED on repository access)
 ```
 
 The application binary/image is **identical** across every environment;
@@ -1040,15 +1048,24 @@ other tracked file, or a commit message.
 all three current migrations apply cleanly to a fresh Neon database,
 `/health` and `/health/db` both return healthy against it, and -
 correctly - `ASPNETCORE_ENVIRONMENT=Production` does **not** create the
-`DevelopmentSeeder`'s demo accounts there (confirmed: the Neon `users`
-table has zero rows). This means **Neon/production currently has no
-users and no administrative bootstrap mechanism** - a real deployment
-consideration to resolve before Render goes live (see §29.17).
+`DevelopmentSeeder`'s demo accounts there. **Update (2026-09-15):** Neon
+`production` is no longer empty - a dedicated `ProductionBootstrapSeeder`
+(env-var-gated via `Bootstrap:AdminEmail`, a no-op unless configured,
+idempotent, never overwrites an existing password) was used to create one
+Admin, one Manager, one Operator, and one Chilling Centre, verified
+directly against Neon (correct role/permission counts, correct centre
+scoping, real PBKDF2 password hashes). See HOW_TO_RUN.md §9 and
+STATUS.md "Neon Production Bootstrap (2026-09-15)" for the full detail
+and how to bootstrap a further account/centre later.
 
-**Next step (not done in this pass): deploy this same `cc-mc-api` image
-to Render**, pointing it at Neon via the same `ConnectionStrings__CcmcDb`
-environment variable, using Render's own environment-variable UI (not
-this repo's `.env.production` file, which stays local-only).
+**Next step: deploy this same `cc-mc-api` image to Render**, pointing it
+at Neon via the same `ConnectionStrings__CcmcDb` environment variable,
+using Render's own environment-variable UI (not this repo's
+`.env.production` file, which stays local-only). **Currently BLOCKED**
+(2026-09-15): the GitHub repository is owned/controlled by the CEO, and
+the operator working on this repo does not have the access needed to
+connect the private repository to Render - an access/permissions
+blocker, not a technical one. See HOW_TO_RUN.md §10.
 
 Migrations continue to run via the existing automatic
 `db.Database.Migrate()` at startup (see §29.11) - this was verified
@@ -1065,14 +1082,19 @@ directly against Neon, not just locally.
   contract change would need corresponding client-side work in
   `CCMC.Infrastructure.Sync`, and was not made without an explicit
   instruction to change the Windows client.
-- **No production administrative bootstrap mechanism.** `DevelopmentSeeder`
-  correctly never runs outside `ASPNETCORE_ENVIRONMENT=Development` (by
-  design - see §29.7/§29.15), which was directly verified against the real
-  Neon production database (zero rows in `users`). This is correct and
-  intentional, but it also means there is currently no way to create the
-  *first* real administrative user in a production deployment without
-  either a one-off manual `INSERT`/migration-seeded row or a dedicated
-  bootstrap endpoint/CLI - neither exists yet. Needs a decision before
-  Render goes live; not silently worked around (e.g. by loosening the
-  Development-only seeding boundary).
+- ~~No production administrative bootstrap mechanism~~ - **Resolved
+  2026-09-15.** `DevelopmentSeeder` still correctly never runs outside
+  `ASPNETCORE_ENVIRONMENT=Development`, but a separate, env-var-gated
+  `ProductionBootstrapSeeder` now exists and was used to create real
+  Admin/Manager/Operator accounts and one Chilling Centre in Neon
+  `production` - see HOW_TO_RUN.md §9 and STATUS.md "Neon Production
+  Bootstrap (2026-09-15)".
+- **No in-app password-change/reset endpoint anywhere.** Rotating any
+  account's password today (bootstrap-issued or otherwise) requires
+  direct database access using the same `IPasswordHasher` the app itself
+  uses at runtime - there is no script or endpoint for this yet.
 - **No installer/containerization** for the API itself yet - see §29.16.
+- **Render deployment is BLOCKED, not merely undone** - the GitHub
+  repository is owned/controlled by the CEO, and the operator working on
+  this repo does not currently have the access needed to connect the
+  private repository to Render. See §29.16 and HOW_TO_RUN.md §10.

@@ -401,7 +401,9 @@ tests/
 ```
 Confirmed building (`dotnet build CCMC.sln` → 0 warnings, 0 errors) and
 confirmed testing (`dotnet test CCMC.sln` → **110/110 passing** — 89
-Windows-client + 21 cloud-backend). The Windows app was also confirmed
+Windows-client + 21 cloud-backend) **at the time the cloud backend was
+first built — see "Current Development State" below for the current
+figure (190/190), which supersedes this.** The Windows app was also confirmed
 publishing + actually launching multiple times, including after the
 critical fix pass (`dotnet publish` then ran the real `.exe`, which
 created a real SQLite DB via `SchemaMigrator` AND logged
@@ -757,9 +759,15 @@ silently fall back to offline mode and therefore never sync master data,
 including rate-formula-settings). All six fixed - see STATUS.md
 "Application Bug Fixes" for the full root-cause writeup.
 
-**Render deployment is the next step, not done yet.** The prior blocker
-here - Neon/production having zero users and no administrative bootstrap
-mechanism - was resolved 2026-09-15: `ProductionBootstrapSeeder`
+**Render deployment is now explicitly BLOCKED (2026-09-15), not merely
+"not done yet."** The GitHub repository is owned/controlled by the CEO,
+and the operator working on this repo does not currently have the access
+needed to connect the private repository to Render - an access/
+permissions blocker, not a technical one (the Docker image and Neon
+backend are both already deployment-ready). See HOW_TO_RUN.md §10 for the
+exact ordered steps once access is obtained. Separately, the prior
+blocker here - Neon/production having zero users and no administrative
+bootstrap mechanism - was resolved the same day: `ProductionBootstrapSeeder`
 (env-var-gated, a no-op unless `Bootstrap:AdminEmail` is configured) now
 exists and was used to create one Admin, one Manager, one Operator, and
 one Chilling Centre in Neon `production`, verified directly against Neon

@@ -5,6 +5,8 @@
 > Where this document conflicts with `context.md` / `STATUS.md`, this document defers to the BRD for **scope** (per `CLAUDE.md`) but to **direct source-code inspection** for **implementation status** — several claims in `STATUS.md` were found to be stale (see §14 "Stale documentation found" below) and were not taken at face value.
 >
 > **Update (2026-09-13):** development is paused here as a deliberate checkpoint (documentation-only session, no code changes). See §19 "Checkpoint (2026-09-13)" at the end of this document for what changed since the analysis above, and `architecture.mmd` / `HOW_TO_RUN.md` / `STATUS.md`'s own "Checkpoint (2026-09-13)" section for the full current picture.
+>
+> **Update (2026-09-15):** Neon production account bootstrap was implemented and verified, and a UI/UX redesign pass landed — see §20 "Checkpoint (2026-09-15)" at the end of this document. Render deployment is now explicitly **BLOCKED** (GitHub repository access controlled by the CEO, not a technical gap) rather than merely "not started."
 
 ## 1. Current Architecture
 
@@ -303,7 +305,9 @@ Research conducted 2026-09-12, cross-checked against official pricing/docs pages
 
 ## 16. Recommended MVP Hosting
 
-**Update (2026-09-12):** the Neon half of this recommendation is now actually set up (project `fancy-cherry-25725711`, branch `production`) and verified — migrations apply cleanly, health checks pass. `CCMC.Cloud.Api` is containerized (`Dockerfile` + `compose.yaml`) and verified running locally against both a local Docker PostgreSQL and against Neon, controlled purely by environment variables (now `.env`/`.env.docker`/`.env.neon`, switched via `Copy-Item .env.docker .env -Force` / `Copy-Item .env.neon .env -Force` — see `.env.example`). **Render deployment itself has not happened yet** — that remains the next and final step to reach the architecture below. See STATUS.md "Docker Compose + Neon Setup" and "Application Bug Fixes" for the full verification detail, including two real, honestly-reported items: (1) Neon/production currently has zero users and no administrative bootstrap mechanism (by design — `DevelopmentSeeder` correctly never runs there), which blocks testing an authenticated endpoint against Neon until a real production user exists; (2) a real user manually tested the WPF client and found 6 bugs (5 sharing one root cause — a stale `CloudApi:BaseUrl` pointing at port 5000 instead of the actual Docker-mapped 8081), all fixed and verified via a real end-to-end harness — see STATUS.md for the full root-cause writeup.
+**Update (2026-09-12):** the Neon half of this recommendation is now actually set up (project `fancy-cherry-25725711`, branch `production`) and verified — migrations apply cleanly, health checks pass. `CCMC.Cloud.Api` is containerized (`Dockerfile` + `compose.yaml`) and verified running locally against both a local Docker PostgreSQL and against Neon, controlled purely by environment variables (now `.env`/`.env.docker`/`.env.neon`, switched via `Copy-Item .env.docker .env -Force` / `Copy-Item .env.neon .env -Force` — see `.env.example`). See STATUS.md "Docker Compose + Neon Setup" and "Application Bug Fixes" for the full verification detail, including one honestly-reported bug batch: a real user manually tested the WPF client and found 6 bugs (5 sharing one root cause — a stale `CloudApi:BaseUrl` pointing at port 5000 instead of the actual Docker-mapped 8081), all fixed and verified via a real end-to-end harness.
+
+**Update (2026-09-15):** the "Neon/production has zero users and no administrative bootstrap mechanism" limitation noted below (and in §17) is resolved — see §19 "Checkpoint (2026-09-15)" at the end of this document and STATUS.md "Neon Production Bootstrap (2026-09-15)" for the full writeup. **Render deployment itself still has not happened** — it is now explicitly BLOCKED (repository access, not a technical gap) rather than merely "not started"; see §19.
 
 **Backend: Render (Web Service, Docker deploy). Database: Neon (PostgreSQL, free plan).**
 
@@ -338,7 +342,7 @@ Tradeoff vs. the primary pick: both require a credit card at signup (GCP for acc
 - **No HSTS configured** (`UseHttpsRedirection` is present, so this is defense-in-depth only, not a functional gap). Still open.
 - **`[RequirePermission]`-omission fallback is "authenticated user allowed," not "denied"** — currently harmless because every current endpoint is correctly annotated, but there is no structural safety net if a future endpoint is added without the attribute. Still open.
 - **New (found via Docker testing, since fixed): `JwtOptions.Issuer`/`Audience` had no default**, causing every authenticated request to fail with 401 whenever only `Jwt__Secret` was supplied (a very plausible real deployment shape). Fixed by giving `JwtOptions` real defaults and unifying token issuance/validation onto a single `IOptions<JwtOptions>` instance — see STATUS.md for the full writeup. Locked down with 2 new regression tests.
-- **New: Neon/production has no administrative bootstrap mechanism** — `DevelopmentSeeder` correctly never runs there, but this also means there is currently no way to create the first real production user without a manual one-off action. Needs a decision before Render goes live.
+- ~~New: Neon/production has no administrative bootstrap mechanism~~ — **Resolved 2026-09-15.** `ProductionBootstrapSeeder` now exists (env-var-gated, idempotent) and was used to create real Admin/Manager/Operator accounts and one Chilling Centre in Neon `production`. See §19 "Checkpoint (2026-09-15)".
 
 ### Optional
 - No rate-limiting on `/auth/login` (brute-force concern, acceptable for a college-project pilot, worth hardening before any real production use).
@@ -438,3 +442,91 @@ hardware serial link not yet verified.
 **Next step:** production admin bootstrap, then Render deployment (see
 `HOW_TO_RUN.md` §9) — explicitly not started in this checkpoint.
 8. **Defer**: Reports module (§16), WiX installer, override-endpoint idempotency key, client-side RBAC UI gating — all real gaps, none blocking a first online MVP test deployment.
+
+## 20. Checkpoint (2026-09-15) — Neon Production Bootstrap / Deployment Pause
+
+Chronological summary of what happened since §19 above, so this document
+remains a complete record without needing to be re-derived from git log.
+Full technical detail for both items below lives in STATUS.md — this
+section is the narrative summary `progress.md` is for.
+
+**Neon production bootstrap (code + real database work):**
+- Repository/database state was inspected first, not assumed: Neon
+  (`fancy-cherry-25725711`, branch `production`) already had all 3 EF Core
+  migrations applied (confirmed via `__EFMigrationsHistory`) but zero rows
+  in every table. Local Docker Postgres was separately inspected and found
+  to hold only `DevelopmentSeeder` output plus manual QA-testing rows
+  (duplicate transactions from button-mash testing) — judged not real
+  business data and deliberately **not** migrated to Neon.
+- A new `ProductionBootstrapSeeder` + `ProductionBootstrapOptions`
+  (`src/CCMC.Cloud.Infrastructure/Seed/`) was added, wired into
+  `Program.cs` right after migrations. It runs in any environment but is a
+  complete no-op unless `Bootstrap:AdminEmail` configuration is present;
+  every identity/credential comes from `Bootstrap__*` environment
+  variables (documented as placeholders in `.env.example`), nothing
+  invented. It is idempotent (existing users detected by email, password
+  hash never overwritten) and fails fast on invalid input (a real
+  11-character admin password was caught and rejected before any DB write
+  during this session's own run). `DevelopmentSeeder`'s role/permission
+  grants and upsert helpers were extracted into a shared `SeedHelpers` so
+  the two seeders cannot drift apart on RBAC — `DevelopmentSeeder` itself
+  is otherwise unchanged. 190/190 tests reverified passing after the
+  refactor.
+- Bootstrapped into Neon `production`, by explicit human decision on
+  identities: one Chilling Centre (`BLR-CC-01` / "Chilling Centre -
+  Bangalore" — a placeholder identity, same as the dev seed, to be renamed
+  once the real centre is known), one Admin (`admin@ccmc.local`, all
+  centres), one Manager and one Operator (`manager1@ccmc.local` /
+  `operator1@ccmc.local`, both scoped to `BLR-CC-01`), plus the same BRD
+  §10 global quality rules `DevelopmentSeeder` already used. Verified
+  directly against Neon afterward — correct role/permission counts (Admin
+  15, Manager 15, Operator 7), correct centre scoping, real ASP.NET Core
+  Identity PBKDF2 password hashes (not plaintext). `RateFormulaSettings`
+  deliberately left unseeded, same as `DevelopmentSeeder` (no fabricated
+  defaults).
+- A real secret-exposure incident occurred during this session: a
+  diagnostic shell command intended only to check line numbers printed
+  `.env.neon`'s full contents — including the real Neon DB password, JWT
+  signing secret, and all three (weak, dev-seed-pattern) bootstrap
+  passwords — into the session transcript. Disclosed immediately; the
+  human chose to rotate these credentials themselves rather than in-session.
+  **Until confirmed rotated, treat those specific credentials as
+  compromised**, not merely "worth rotating eventually."
+- A UI/UX redesign pass (full visual pass, then a same-day refinement
+  pass fixing contrast/alignment/off-screen issues) also landed this same
+  day — presentational only, no domain/application/infrastructure/rate/
+  quality/sync logic touched, 190/190 tests unaffected. See STATUS.md
+  "UI/UX Redesign (2026-09-15)" / "UI/UX Refinement Pass (2026-09-15)" for
+  the full detail (design system extensions, window sizing/ownership
+  fixes, dashboard drill-down, history search/filter, screen-fit
+  handling).
+
+**Render deployment paused (documentation-only session, no code change):**
+- The GitHub repository is owned/controlled by the CEO; the current
+  session's operator does not have the access required to connect the
+  private repository to Render. This is an access/permissions blocker,
+  not a technical one — the Docker image and Neon backend are both
+  already deployment-ready.
+- This session (documentation-only, per its own explicit instruction) did
+  not touch application/source/test/configuration code, did not deploy
+  anything, and did not change the WPF client's `CloudApi:BaseUrl` — it
+  updated `CLAUDE.md`, `STATUS.md`, `progress.md`, `HOW_TO_RUN.md`,
+  `context.md`, and `README.md` to remove stale claims (mainly: the old
+  "Neon has zero users"/"no bootstrap mechanism" statements) and to
+  record the Render blocker accurately as BLOCKED rather than "not
+  started."
+- A documentation-focused secret scan was performed across every tracked
+  file touched in this pass — no real secret values were found or added;
+  only variable names and placeholders. Git state was checked before and
+  after: branch stayed `windows-application`, HEAD unchanged by this
+  pass's own edits (verified via `git rev-parse HEAD` before/after),
+  nothing committed or pushed, `pranav-dev` untouched.
+
+**Current next step (unchanged in substance, updated in framing):**
+obtain Render-connect access from the repository owner/CEO → connect the
+repo to Render → deploy the existing Docker image → verify Render→Neon
+connectivity → point the WPF client's `CloudApi:BaseUrl` at the Render
+HTTPS URL → real-world end-to-end verification, including a real first
+login against Neon's new accounts (not yet exercised — see STATUS.md).
+None of this has been started; see STATUS.md "Checkpoint" → NEXT for the
+ordered list.

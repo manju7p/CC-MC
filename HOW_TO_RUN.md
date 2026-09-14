@@ -131,8 +131,13 @@ it's absent from `docker compose -p cc-mc ps` entirely). Only the `cc-mc`
 API container starts, and it connects straight to Neon over TLS.
 
 `ASPNETCORE_ENVIRONMENT=Production` means `DevelopmentSeeder` does **not**
-run — Neon's `production` branch currently has **zero users** by design (see
-§8). Migrations still apply automatically on startup, same as Docker mode.
+run — by design, `DevelopmentSeeder`'s own demo accounts (§8) never reach
+Neon `production`. **Update (2026-09-15):** Neon `production` is no
+longer empty — it has real Admin/Manager/Operator accounts created via
+the separate, env-var-gated `ProductionBootstrapSeeder` (§9), which is
+independent of `DevelopmentSeeder` and equally inert unless explicitly
+configured. Migrations still apply automatically on startup, same as
+Docker mode.
 
 The WPF client's configuration is unchanged — `CloudApi:BaseUrl` still points
 at `http://localhost:8081/`, because the `cc-mc` container's host port
@@ -187,6 +192,14 @@ only — created by `DevelopmentSeeder`, never in Production/Neon):
 | `operator1@ccmc.local` | `Operator@12345` | Operator | Bangalore (`BLR-CC-01`) |
 | `operator2@ccmc.local` | `Operator@12345` | Operator | Mysore (`MYS-CC-01`) |
 
+> **Warning — never reuse these exact strings for any real/production
+> `Bootstrap__*Password` value.** These are local-dev-only placeholders,
+> deliberately documented here in plaintext because `DevelopmentSeeder`
+> never runs outside Docker/`Development`. A real production bootstrap
+> password (`Bootstrap__AdminPassword`/`Bootstrap__ManagerPassword`/
+> `Bootstrap__OperatorPassword` — see §9) must be a unique, strong value
+> that does not appear in this table or anywhere else in this repository.
+
 These are placeholder development credentials only, already documented here
 and in `STATUS.md`/`README.md` — never used in production, and Neon's
 `production` branch has none of these (or any) users.
@@ -235,19 +248,66 @@ real production credential the moment it's set — same handling as
 only, never printed, never committed). A bootstrap password should be
 strong and unique, not a reused dev-seed-style password.
 
-## 10. Production (Render) — NOT yet complete
+## 10. Production (Render) — BLOCKED (repository access), not yet complete
 
-Render deployment has **not** been performed. What exists today: the same
-`Dockerfile`/image builds and runs correctly locally against Neon
-(§6, verified) — that is the artifact a future Render deployment would
-publish, and Neon `production` now has real accounts (§9). What's still
-missing before Render can go live:
+**Render deployment: BLOCKED / NOT STARTED, pending GitHub repository
+access from the repository owner/CEO.** The GitHub repository is owned/
+controlled by the CEO, and the current operator does not have the access
+needed to connect the private repository to Render. This is an
+access/permissions blocker, not a technical one — the Docker image and
+Neon backend are both already deployment-ready:
 
-- Actual Render service creation/deployment and its own environment variable
-  configuration (`ConnectionStrings__CcmcDb`, `Jwt__Secret`, etc., set via
-  Render's dashboard/CLI, not committed anywhere).
-- Pointing the WPF client's `CloudApi:BaseUrl` at the Render HTTPS URL
-  instead of `http://localhost:8081/` for a real deployed client.
+- `Dockerfile`/image builds and runs correctly locally against Neon (§6,
+  verified) — that is the exact artifact a future Render deployment would
+  publish.
+- Neon `production` now has real accounts and one Chilling Centre (§9,
+  done 2026-09-15).
 
-Do not invent instructions for any of the above until they are actually
-implemented — see `STATUS.md` "Remaining Gaps" / `progress.md` "Next Step".
+What's still missing before Render can go live, once repository access is
+obtained:
+
+1. Connect the GitHub repository to Render.
+2. Deploy the existing `Dockerfile`/image as a Render Web Service.
+3. Configure Render's own environment variables
+   (`ConnectionStrings__CcmcDb`, `Jwt__Secret`, etc.) pointing at Neon, via
+   Render's dashboard/CLI — never committed to this repo.
+4. Verify Render → Neon connectivity for real (`/health`, `/health/db`
+   against the Render URL).
+5. Point the WPF client's `CloudApi:BaseUrl` at the Render HTTPS URL
+   instead of `http://localhost:8081/` for a real deployed client. **Not
+   done in this pass, and not to be done without an explicit
+   instruction** — see §11 for what the WPF client currently points at.
+6. Real-world end-to-end verification, including a real first login
+   against Neon's bootstrapped accounts.
+
+Do not invent instructions beyond the above until they are actually
+implemented, and do not attempt to work around the access blocker (e.g.
+by seeking elevated access, forking, or making the repo public) without
+being explicitly asked — see `STATUS.md` "Checkpoint" → BLOCKED/NEXT and
+`progress.md` §20 "Checkpoint (2026-09-15)" for the full detail.
+
+## 11. Current WPF API configuration — API host vs. database host
+
+Two different things change independently, and this repo's docs are
+careful to keep them distinct:
+
+- **API host** — where the WPF client's HTTP requests go
+  (`src/CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`). Currently
+  `http://localhost:8081/`, **unchanged by this documentation pass**. This
+  is the same value in both Docker-local mode and Neon-backed mode (§5/§6)
+  — the client always talks to the locally running `cc-mc` container on
+  `localhost:8081`; only what's *behind* that container changes. It will
+  change to the Render HTTPS URL only once Render is actually deployed
+  (§10) — not before, and not as part of this pass.
+- **Database host** — where `cc-mc` itself connects
+  (`ConnectionStrings__CcmcDb` inside `.env`/`.env.docker`/`.env.neon`).
+  This is what actually differs between Docker mode (`cc-mc-postgres`) and
+  Neon mode (Neon's hostname) — the WPF client has no visibility into this
+  at all and never connects to a database host directly (see `CLAUDE.md`
+  "Constraints").
+
+Verified directly in this session: `appsettings.json`'s `CloudApi:BaseUrl`
+is `http://localhost:8081/`; the currently-running stack is in Docker mode
+(`ASPNETCORE_ENVIRONMENT=Development`, `cc-mc` talking to
+`cc-mc-postgres`) — Neon mode was used only transiently, for the §9
+bootstrap, then switched back to Docker mode for local development.

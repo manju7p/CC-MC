@@ -1,5 +1,16 @@
 # Working guidelines for CCMC
 
+**What is CC-MC?** A native Windows desktop application (WPF, C#/.NET 8,
+code-behind — no MVVM) for the operational workflow at a dairy Chilling
+Centre: weigh and quality-test incoming milk from a vehicle/source, apply
+a manual Accept/Hold/Reject decision (with an advisory automatic
+suggestion), compute Rate/Amount from a configured formula, save locally
+first (SQLite, fully offline-capable), and sync idempotently to a cloud
+API (ASP.NET Core 8 / EF Core / PostgreSQL) for cross-centre reporting,
+RBAC, and audit. See `context.md` "Product" for the full scope statement
+and `Doc/CCMC_BRD_and_Technical_Design_v2.docx` for the authoritative
+requirements.
+
 Engineering guidelines for building this software — how to test it, how
 to keep its docs honest, the code-style and git defaults, and the
 security/infra baseline. This file should stay true regardless of which
@@ -27,10 +38,14 @@ from "what's true right now" from "what happened and why," on purpose:
 - **`HOW_TO_RUN.md`** — the practical runbook: build, test, Docker mode,
   Neon mode, switching between them, logs, migrations, dev credentials.
 
-## Current operational state (checkpoint 2026-09-13)
+## Current operational state (checkpoint 2026-09-15)
 
 Read this section first in any new session — it's the fastest way to avoid
-re-deriving context that already exists.
+re-deriving context that already exists. Originally written 2026-09-13,
+kept current via dated `Update (...)` notes below rather than rewritten
+each time — see `STATUS.md`'s own "Checkpoint" section and
+`progress.md`'s dated checkpoints for the full chronological detail this
+section only summarizes.
 
 - **Branch:** `windows-application`. **`pranav-dev`** is a separate,
   historically unrelated legacy NestJS implementation on its own branch —
@@ -98,23 +113,40 @@ re-deriving context that already exists.
   permissions already existed), and Enter key not submitting login
   (`IsDefault="True"`). Full writeup: `STATUS.md` "Application Bug Fixes
   (2026-09-12)".
-- **Remaining gaps:** Render deployment not yet performed; no in-app
-  password-change/reset endpoint exists anywhere (rotating any account's
-  password today requires direct database access with the same
-  `IPasswordHasher` the app uses at runtime); a real `POST /auth/login`
-  round-trip against Neon's now-real accounts has not actually been
-  exercised (verified at the data layer only, by the human's own choice —
-  see `STATUS.md`); literal WPF GUI mouse/keyboard interaction not
-  verifiable in any environment used so far (verification instead uses
-  real production service classes against a real running API); physical
-  Ekomilk KAM98-2A serial hardware link not yet verified (payload *decode*
-  is verified against real sample frames).
-- **Next intended step:** Render deployment — not started. Do not perform
+- **Render deployment: BLOCKED, not merely "not started" (as of
+  2026-09-15).** The GitHub repository is owned/controlled by the CEO, and
+  the current session's operator does not have the access needed to
+  connect the private repo to Render. This is an access/permissions
+  blocker, not a technical one — the Docker image and Neon backend are
+  both already deployment-ready (see the Neon bullet above and
+  `HOW_TO_RUN.md` §10). Do not attempt to work around this (e.g. by
+  requesting elevated access, forking, or making the repo public) without
+  being explicitly asked; do not perform a Render deployment without being
+  explicitly asked, either.
+- **Other remaining gaps:** no in-app password-change/reset endpoint
+  exists anywhere (rotating any account's password today requires direct
+  database access with the same `IPasswordHasher` the app uses at
+  runtime); a real `POST /auth/login` round-trip against Neon's now-real
+  accounts has not actually been exercised (verified at the data layer
+  only, by the human's own choice — see `STATUS.md`); literal WPF GUI
+  mouse/keyboard interaction not verifiable in any environment used so far
+  (verification instead uses real production service classes against a
+  real running API, plus a real `.exe` launch confirming clean startup —
+  see `STATUS.md` "UI/UX Redesign (2026-09-15)"); physical Ekomilk
+  KAM98-2A serial hardware link not yet verified (payload *decode* is
+  verified against real sample frames).
+- **Next intended step:** obtain Render-connect access from the repo
+  owner, then deploy — see `HOW_TO_RUN.md` §10 and `STATUS.md`
+  "Checkpoint" → NEXT for the ordered list once unblocked. Do not perform
   Render deployment without being explicitly asked. Production user
   bootstrap itself is done (see the Neon bullet above); if a new
   centre/account needs bootstrapping later, reuse
   `ProductionBootstrapSeeder` via `Bootstrap__*` env vars (see
-  `HOW_TO_RUN.md` §9) rather than inventing a new mechanism.
+  `HOW_TO_RUN.md` §9) rather than inventing a new mechanism. A UI/UX
+  redesign pass (2026-09-15) also landed — see `STATUS.md` "UI/UX Redesign
+  (2026-09-15)" / "UI/UX Refinement Pass (2026-09-15)" — purely
+  presentational, no domain/application/infrastructure/rate/quality/sync
+  logic touched, 190/190 tests unaffected.
 
 ## Testing philosophy
 
