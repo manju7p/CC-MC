@@ -1,8 +1,10 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using CCMC.Application.Abstractions;
 using CCMC.Application.Auth;
 using CCMC.Application.Sync;
+using CCMC.Desktop.Controls;
 using CCMC.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +19,7 @@ public partial class MainWindow : Window
     private readonly SyncEngineService _syncEngineService;
     private readonly AuthenticationService _authenticationService;
     private readonly ICloudApiClient _cloudApiClient;
+    private readonly IReceptionRepository _receptionRepository;
 
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -28,7 +31,8 @@ public partial class MainWindow : Window
         IDeviceManager deviceManager,
         SyncEngineService syncEngineService,
         AuthenticationService authenticationService,
-        ICloudApiClient cloudApiClient)
+        ICloudApiClient cloudApiClient,
+        IReceptionRepository receptionRepository)
     {
         InitializeComponent();
         _serviceProvider = serviceProvider;
@@ -38,6 +42,7 @@ public partial class MainWindow : Window
         _syncEngineService = syncEngineService;
         _authenticationService = authenticationService;
         _cloudApiClient = cloudApiClient;
+        _receptionRepository = receptionRepository;
 
         Loaded += MainWindow_Loaded;
         Closed += (_, _) =>
@@ -59,12 +64,13 @@ public partial class MainWindow : Window
         // (SyncEngineService treats IsOffline the same as "no session") until the
         // operator explicitly signs in online again via ReconnectButton.
         var isOffline = session?.IsOffline ?? false;
-        OfflineModeTextBlock.Visibility = isOffline ? Visibility.Visible : Visibility.Collapsed;
+        OfflineModeBorder.Visibility = isOffline ? Visibility.Visible : Visibility.Collapsed;
         OfflineModeTextBlock.Text = "OFFLINE MODE (sync paused)";
         ReconnectButton.Visibility = isOffline ? Visibility.Visible : Visibility.Collapsed;
 
         await RefreshStatusAsync();
         await RefreshDashboardSummaryAsync();
+        await RefreshRecentReceptionsAsync();
 
         _statusTimer.Tick += async (_, _) => await RefreshStatusAsync();
         _statusTimer.Start();
@@ -92,6 +98,7 @@ public partial class MainWindow : Window
         {
             await RefreshStatusAsync();
             await RefreshDashboardSummaryAsync(); // a reception may have just synced - reflect it in the cards
+            await RefreshRecentReceptionsAsync();
         }
     }
 
@@ -141,36 +148,127 @@ public partial class MainWindow : Window
     private async Task RefreshStatusAsync()
     {
         var pending = await _outboxRepository.CountPendingAsync(CancellationToken.None);
-        SyncStatusTextBlock.Text = pending == 0 ? "Sync: up to date" : $"Sync: {pending} pending";
+        SyncStatusPanel.Children.Clear();
+        SyncStatusPanel.Children.Add(StatusChip.Create(
+            pending == 0 ? "Up to date" : $"{pending} pending",
+            pending == 0 ? ChipKind.Success : ChipKind.Info));
 
-        var scaleState = _deviceManager.WeighingScale?.State ?? DeviceConnectionState.Disconnected;
-        var analyserState = _deviceManager.MilkAnalyser?.State ?? DeviceConnectionState.Disconnected;
-        ConnectivityStatusTextBlock.Text = $"Scale: {scaleState}   |   Analyser: {analyserState}";
+        DeviceStatusPanel.Children.Clear();
+        DeviceStatusPanel.Children.Add(BuildDeviceStatusRow("Weighing scale", _deviceManager.WeighingScale?.State ?? DeviceConnectionState.Disconnected));
+        DeviceStatusPanel.Children.Add(BuildDeviceStatusRow("Milk analyser", _deviceManager.MilkAnalyser?.State ?? DeviceConnectionState.Disconnected, isLast: true));
     }
 
-    private void ReceptionButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<ReceptionWindow>().Show();
+    private static UIElement BuildDeviceStatusRow(string label, DeviceConnectionState state, bool isLast = false)
+    {
+        var row = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, isLast ? 0 : 8) };
+        row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
 
-    private void HistoryButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<ReceptionHistoryWindow>().Show();
+        var kind = state switch
+        {
+            DeviceConnectionState.Connected => ChipKind.Success,
+            DeviceConnectionState.Connecting => ChipKind.Info,
+            DeviceConnectionState.Error => ChipKind.Danger,
+            _ => ChipKind.Neutral,
+        };
+        var chip = StatusChip.Create(state.ToString(), kind);
+        DockPanel.SetDock(chip, Dock.Right);
+        row.Children.Add(chip);
+        return row;
+    }
 
-    private void SourcesButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<SourcesWindow>().Show();
+    /// <summary>
+    /// Shows the most recent locally captured receptions (any sync state) - purely a
+    /// read of the existing IReceptionRepository.ListRecentAsync (the same method
+    /// ReceptionHistoryWindow already uses), never fabricated/estimated data. Works
+    /// offline (SQLite is local) unlike the cloud-backed summary cards above.
+    /// </summary>
+    private async Task RefreshRecentReceptionsAsync()
+    {
+        var recent = await _receptionRepository.ListRecentAsync(5, CancellationToken.None);
+        RecentReceptionsPanel.Children.Clear();
 
-    private void VehiclesButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<VehiclesWindow>().Show();
+        if (recent.Count == 0)
+        {
+            var empty = new Border { Style = (Style)FindResource("EmptyStateBorder"), BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent };
+            var stack = new StackPanel();
+            stack.Children.Add(new TextBlock { Text = "", Style = (Style)FindResource("EmptyStateIconText") });
+            stack.Children.Add(new TextBlock { Text = "No receptions captured yet", Style = (Style)FindResource("EmptyStateTitleText") });
+            stack.Children.Add(new TextBlock { Text = "Receptions you capture on the Milk Reception screen will appear here.", Style = (Style)FindResource("EmptyStateBodyText") });
+            empty.Child = stack;
+            RecentReceptionsPanel.Children.Add(empty);
+            return;
+        }
 
-    private void DeviceStatusButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<DeviceStatusWindow>().Show();
+        foreach (var transaction in recent)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-    private void DeviceConfigButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<DeviceConfigurationWindow>().Show();
+            var idText = new TextBlock
+            {
+                Text = transaction.TransactionNumber ?? $"Local #{transaction.LocalId}",
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            Grid.SetColumn(idText, 0);
 
-    private void SyncStatusButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<SyncStatusWindow>().Show();
+            var qtyText = new TextBlock
+            {
+                Text = $"{transaction.QuantityKg:F1} kg   {transaction.CapturedAt.LocalDateTime:g}",
+                Style = (Style)FindResource("CaptionText"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 14, 0),
+            };
+            Grid.SetColumn(qtyText, 1);
 
-    private void SettingsButton_Click(object sender, RoutedEventArgs e) =>
-        _serviceProvider.GetRequiredService<SettingsWindow>().Show();
+            var kind = transaction.Status switch
+            {
+                TransactionStatus.Accepted => ChipKind.Success,
+                TransactionStatus.Hold => ChipKind.Warning,
+                TransactionStatus.Rejected => ChipKind.Danger,
+                _ => ChipKind.Neutral,
+            };
+            var chip = StatusChip.Create(transaction.Status.ToString().ToUpperInvariant(), kind);
+            Grid.SetColumn(chip, 2);
+
+            row.Children.Add(idText);
+            row.Children.Add(qtyText);
+            row.Children.Add(chip);
+            RecentReceptionsPanel.Children.Add(row);
+        }
+    }
+
+    private void ReceptionButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<ReceptionWindow>());
+
+    private void HistoryButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<ReceptionHistoryWindow>());
+
+    private void SourcesButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SourcesWindow>());
+
+    private void VehiclesButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<VehiclesWindow>());
+
+    private void DeviceStatusButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<DeviceStatusWindow>());
+
+    private void DeviceConfigButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<DeviceConfigurationWindow>());
+
+    private void SyncStatusButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SyncStatusWindow>());
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SettingsWindow>());
+
+    /// <summary>
+    /// Every secondary window is owned by this shell (Owner + WindowStartupLocation=
+    /// CenterOwner, set in each window's own XAML) so it opens centred over the
+    /// dashboard, minimizes/restores with it, and never appears as a detached,
+    /// unrelated window - see this redesign's window-hierarchy requirement. Still
+    /// non-modal (.Show(), not .ShowDialog()) - unchanged from before, so an operator
+    /// can still have Reception and History open side by side if they choose.
+    /// </summary>
+    private void ShowOwned(Window window)
+    {
+        window.Owner = this;
+        window.Show();
+    }
 
     private async void LogoutButton_Click(object sender, RoutedEventArgs e)
     {

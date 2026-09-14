@@ -1181,6 +1181,131 @@ for the per-test breakdown.
 installer for the API itself; closing the override idempotency-key gap
 above.
 
+## UI/UX Redesign (2026-09-15)
+
+A full visual redesign of the Windows client, explicitly scoped as
+**"better UI over the existing working system," not a rewrite** - no
+MVVM, no domain/application/infrastructure changes, no rate/quality/sync
+logic changes. Every `CCMC.Desktop` project other than `Controls/StatusChip.cs`
+(new) was a modification of an existing file; nothing was deleted or
+descoped. `dotnet build CCMC.sln` and `dotnet test CCMC.sln` both re-run
+clean after this pass: **190/190 passing** (155 client + 35 cloud, cloud
+suite run against a real disposable local PostgreSQL 16 container),
+unchanged from the pre-redesign baseline - expected, since no
+Domain/Application/Infrastructure/Contracts/Cloud.* code was touched.
+
+**Research basis:** Fluent 2's documented 4px spacing scale (design
+tokens: XXS/XS/S/M/L/XL/XXL/XXXL = 2/4/8/12/16/20/24/32px -
+fluent2.microsoft.design/design-tokens) informed every new margin/padding
+value added; Microsoft's Windows-apps keyboard-accessibility guidance
+(learn.microsoft.com/windows/apps/design/accessibility/keyboard-accessibility)
+informed the new explicit `IsKeyboardFocused` focus-ring triggers added to
+the Button/sidebar-button templates in `Theme.xaml` (the prior templates
+relied solely on WPF's default dashed-rectangle adorner, which the
+existing `CornerRadius`-clipped templates could partially obscure).
+
+**Design system (`Styles/Theme.xaml`, extended not replaced):** every
+existing resource key from before this pass still resolves to the same
+role, so no other file needed to change just because the theme changed.
+Added: an icon font resource (`IconFontFamily` = "Segoe Fluent Icons,
+Segoe MDL2 Assets" - both ship with Windows, zero new package/asset),
+`PageTitleText`/`PageSubtitleText` typography, a full chip system
+(`SuccessChipBorder`/`WarningChipBorder`/`DangerChipBorder`/`InfoChipBorder`/
+`NeutralChipBorder` + matching icon/text styles) built by the new
+`CCMC.Desktop.Controls.StatusChip.Create(text, kind)` helper so every
+status shown anywhere (transaction status, device connection state, sync
+pending count, online/offline) renders as icon+colour+text consistently -
+never colour alone. Also added: `WindowHeaderBorder`/`WindowHeaderIconText`
+(the icon+title+subtitle strip now atop every secondary window),
+`EmptyStateBorder`/`EmptyStateIconText`/`EmptyStateTitleText`/
+`EmptyStateBodyText` (used by History/Sources/Vehicles/Dashboard's Recent
+Receptions instead of a blank grid), `SearchTextBox`, and an
+`IsKeyboardFocused` trigger on the Button and sidebar-nav templates.
+
+**Window hierarchy fixed** (the task's named "parent windows can be
+smaller than child windows" defect): `MainWindow` is now the dominant
+shell (1320x820 default, 1040x680 minimum, up from 960x620/720x480).
+Every secondary window (`ReceptionWindow`, `ReceptionHistoryWindow`,
+`SourcesWindow`, `VehiclesWindow`, `DeviceConfigurationWindow`,
+`DeviceStatusWindow`, `SyncStatusWindow`, `SettingsWindow`) is now opened
+via `MainWindow.ShowOwned()`, which sets `Owner = this` before `.Show()`;
+each window's own XAML changed `WindowStartupLocation` from `CenterScreen`
+to `CenterOwner` and gained real `MinWidth`/`MinHeight` values (three -
+`DeviceStatusWindow`, `SyncStatusWindow`, `SettingsWindow` - had **no**
+minimum size at all before this pass, so they could be resized down until
+content clipped). Still non-modal (`.Show()`, not `.ShowDialog()`) -
+an operator can still have Reception and History open side by side.
+**Noted, deliberate side effect:** because WPF automatically closes owned
+windows when their owner closes, logging out (which closes `MainWindow`)
+now also closes any still-open secondary windows instead of leaving them
+orphaned against a session that no longer exists - judged a correctness
+improvement, not a functionality removal, and flagged here rather than
+silently introduced. `LoginWindow` intentionally keeps `ResizeMode="NoResize"`
+(a single-purpose auth dialog, not a data-entry screen) - a deliberate,
+narrow exception per the task's own "don't disable resizing everywhere"
+instruction, not the default.
+
+**Reception History no longer looks like a spreadsheet** (the task's
+explicit, named requirement): the old 16-column flat `DataGrid` is
+replaced with KPI summary cards (count/quantity/amount/status breakdown,
+computed client-side from the already-loaded set - never invented), a
+search box (source/vehicle/transaction #) + status filter, and a
+card-styled row list built from a `DataTemplate` bound to a small
+display-only `HistoryRow` class (formatting/lookup only - no
+business/quality logic recomputed, per `CLAUDE.md` "business logic stays
+out of the UI"). Source and vehicle **names** (previously not shown at
+all - the old grid had no Source/Vehicle columns) are resolved via the
+same `ISourceRepository`/`IVehicleRepository` calls `SourcesWindow`/
+`VehiclesWindow` already used, across every centre the operator can see -
+existing data only. Two distinct empty states (`EmptyStatePanel`: "no
+receptions yet" vs. `NoMatchesPanel`: "no receptions match this filter").
+
+**Dashboard** gained a `Recent Receptions` card - the five most recent
+locally captured transactions (any sync state), from
+`IReceptionRepository.ListRecentAsync(5, ...)`, the exact same method
+`ReceptionHistoryWindow` already called; no new data source, no invented
+metric. `MainWindow`'s device/sync status areas now render
+`CCMC.Desktop.Controls.StatusChip`s instead of one concatenated status
+string per card.
+
+**Reception, Device Configuration, Device Status, Synchronization,
+Settings, Sources, Vehicles** all gained the shared `WindowHeaderBorder`
+header, icon-labelled buttons, and (Sources/Vehicles) a client-side search
+box over the already-loaded grid plus a proper empty state - the
+add/edit forms, DataGrid columns, validation, and every `Click`/
+`SelectionChanged`/`TextChanged` handler are unchanged. Device
+Status/Synchronization now show connection/pending state as chips instead
+of a single plain-text line.
+
+**Rate/quality/sync/auth logic: byte-for-byte unchanged.** No formula,
+threshold, permission check, idempotency key, offline-fallback rule, or
+outbox state machine was touched - every functional change in this pass
+is additive UI wiring (new constructor dependencies that were already
+DI-registered singletons: `IReceptionRepository` into `MainWindow`;
+`ISessionStore`/`IChillingCentreRepository`/`ISourceRepository`/
+`IVehicleRepository` into `ReceptionHistoryWindow`) or pure presentation
+(new Border/StackPanel wrappers, `Style=` attributes, icon glyphs).
+
+**Verification performed:** `dotnet build CCMC.sln` (0 warnings/errors),
+`dotnet test CCMC.sln` (190/190, cloud suite against a real disposable
+`postgres:16` container per HOW_TO_RUN.md §4), and a real launch of the
+Debug build's `.exe` - process stayed up, and its own structured log
+(`%LocalAppData%\CCMC\logs\ccmc-yyyyMMdd.log`) shows the same clean
+startup signature as prior sessions (`DeviceManager` reaching the
+Videocon adapter, "CCMC startup complete") - confirming the composition
+root and every window's constructor still resolve correctly through DI.
+**Not verified:** literal mouse-click/keyboard GUI interaction (login
+flow, Reception's Read Devices/Accept/Hold/Reject buttons, History's
+search/filter, resizing behaviour at different DPI) - no GUI automation
+tool was available for a native WPF app in this environment, consistent
+with every prior session's own stated limitation on this exact point (see
+"Tests Completed" above). This is a source-level and composition-root-level
+verification, not a substitute for a human clicking through the app.
+
+**No new dependency added.** The icon font (`Segoe Fluent Icons` /
+`Segoe MDL2 Assets`) ships with Windows - no NuGet package, no new binary
+asset, nothing to approve.
+
 ## Important Commands
 
 ```

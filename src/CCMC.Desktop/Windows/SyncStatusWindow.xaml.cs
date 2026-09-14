@@ -1,6 +1,7 @@
 using System.Windows;
 using CCMC.Application.Abstractions;
 using CCMC.Application.Sync;
+using CCMC.Desktop.Controls;
 
 namespace CCMC.Desktop.Windows;
 
@@ -29,7 +30,16 @@ public partial class SyncStatusWindow : Window
     {
         var pending = await _outboxRepository.CountPendingAsync(CancellationToken.None);
         var overridesPending = await _overrideOutboxRepository.CountPendingAsync(CancellationToken.None);
-        PendingTextBlock.Text = $"Pending receptions: {pending}    |    Pending overrides: {overridesPending}";
+
+        PendingHost.Children.Clear();
+        PendingHost.Children.Add(StatusChip.Create(
+            pending == 0 ? "Receptions up to date" : $"{pending} reception(s) pending",
+            pending == 0 ? ChipKind.Success : ChipKind.Info));
+        var overrideChip = StatusChip.Create(
+            overridesPending == 0 ? "Overrides up to date" : $"{overridesPending} override(s) pending",
+            overridesPending == 0 ? ChipKind.Success : ChipKind.Info);
+        overrideChip.Margin = new Thickness(8, 0, 0, 0);
+        PendingHost.Children.Add(overrideChip);
 
         var session = _sessionStore.Current;
         NoSessionHintTextBlock.Text = session switch

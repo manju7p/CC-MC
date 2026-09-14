@@ -15,6 +15,8 @@ public partial class SourcesWindow : Window
     private readonly ICloudApiClient _cloudApiClient;
     private readonly MasterDataSyncService _masterDataSyncService;
 
+    private List<Source> _allSources = [];
+
     public SourcesWindow(
         ISessionStore sessionStore,
         IChillingCentreRepository centreRepository,
@@ -46,7 +48,8 @@ public partial class SourcesWindow : Window
         {
             all.AddRange(await _sourceRepository.ListByCentreAsync(centre.Id, CancellationToken.None));
         }
-        SourcesGrid.ItemsSource = all;
+        _allSources = all;
+        ApplySearchFilter();
 
         // Client-side visibility only, matching this repo's existing UX-only
         // permission-check convention (CLAUDE.md "Security baseline") - the
@@ -62,6 +65,30 @@ public partial class SourcesWindow : Window
             AddSourceCentreComboBox.ItemsSource = accessible;
             if (accessible.Count > 0) AddSourceCentreComboBox.SelectedIndex = 0;
         }
+    }
+
+    private void SearchTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) => ApplySearchFilter();
+
+    private void ApplySearchFilter()
+    {
+        if (!IsLoaded) return;
+
+        var search = SearchTextBox.Text?.Trim() ?? string.Empty;
+        var filtered = string.IsNullOrEmpty(search)
+            ? _allSources
+            : _allSources.Where(s =>
+                s.Code.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (s.Location?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+
+        SourcesGrid.ItemsSource = filtered;
+
+        var showEmpty = filtered.Count == 0;
+        EmptyStatePanel.Visibility = showEmpty ? Visibility.Visible : Visibility.Collapsed;
+        GridBorder.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
+        EmptyStateBodyTextBlock.Text = _allSources.Count == 0
+            ? "No sources are cached for your accessible centre(s) yet. Sign in online to sync the latest master data."
+            : "No sources match this search.";
     }
 
     private async void AddSourceButton_Click(object sender, RoutedEventArgs e)

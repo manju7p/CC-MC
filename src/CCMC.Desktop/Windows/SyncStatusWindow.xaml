@@ -1,18 +1,38 @@
 <Window x:Class="CCMC.Desktop.Windows.SyncStatusWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Synchronization Status" Height="340" Width="460"
-        WindowStartupLocation="CenterScreen">
-    <StackPanel Margin="24">
-        <TextBlock Text="Synchronization Status" Style="{StaticResource TitleText}" Margin="0,0,0,16"/>
+        Title="CCMC - Synchronization Status" Height="420" Width="520" MinHeight="360" MinWidth="440"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <Border Style="{StaticResource CardBorder}">
-            <StackPanel>
-                <TextBlock Name="PendingTextBlock" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                <TextBlock Name="LastTickTextBlock" TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,0,0,16"/>
-                <Button Name="SyncNowButton" Content="Sync Now" Height="36" Style="{StaticResource PrimaryButton}" Click="SyncNowButton_Click"/>
-                <TextBlock Name="NoSessionHintTextBlock" Foreground="{StaticResource WarningBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,14,0,0"/>
+        <Border Grid.Row="0" Style="{StaticResource WindowHeaderBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE895;" Style="{StaticResource WindowHeaderIconText}"/>
+                <TextBlock Text="Synchronization Status" Style="{StaticResource TitleText}" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
-    </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="24">
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="PENDING" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                    <StackPanel Name="PendingHost" Orientation="Horizontal" Margin="0,0,0,16"/>
+
+                    <Button Name="SyncNowButton" Height="38" Style="{StaticResource PrimaryButton}" Click="SyncNowButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE895;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                            <TextBlock Text="Sync Now"/>
+                        </StackPanel>
+                    </Button>
+
+                    <TextBlock Name="LastTickTextBlock" TextWrapping="Wrap" Style="{StaticResource CaptionText}" Margin="0,14,0,0"/>
+                    <TextBlock Name="NoSessionHintTextBlock" Foreground="{StaticResource WarningBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
 </Window>

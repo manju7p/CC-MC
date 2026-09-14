@@ -1,94 +1,133 @@
 <Window x:Class="CCMC.Desktop.Windows.SourcesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Sources" Height="640" Width="760" MinHeight="480" MinWidth="560"
-        WindowStartupLocation="CenterScreen">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="300"/>
-            </Grid.RowDefinitions>
+        Title="CCMC - Sources" Height="720" Width="860" MinHeight="520" MinWidth="640"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-            <StackPanel Grid.Row="0" Margin="0,0,0,14">
-                <TextBlock Text="Sources" Style="{StaticResource TitleText}"/>
-                <TextBlock Style="{StaticResource CaptionText}" Margin="0,4,0,0"
-                           Text="Sources are managed in the cloud and cached locally for offline reception."/>
-            </StackPanel>
-
-            <!-- Add Source - visible only to users whose role grants SOURCE_CREATE (Manager/Admin).
-                 This is a client-side UX convenience only; the server independently enforces the
-                 same permission and remains the real authorization boundary. -->
-            <Border Grid.Row="1" Name="AddSourcePanel" Style="{StaticResource CardBorder}" Margin="0,0,0,14" Visibility="Collapsed">
+        <Border Grid.Row="0" Style="{StaticResource WindowHeaderBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE707;" Style="{StaticResource WindowHeaderIconText}"/>
                 <StackPanel>
-                    <TextBlock Text="ADD SOURCE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Chilling Centre" Style="{StaticResource FieldLabelText}"/>
-                            <ComboBox Name="AddSourceCentreComboBox" DisplayMemberPath="Name"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Code" Style="{StaticResource FieldLabelText}"/>
-                            <TextBox Name="AddSourceCodeTextBox"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Name" Style="{StaticResource FieldLabelText}"/>
-                            <TextBox Name="AddSourceNameTextBox"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Milk Type" Style="{StaticResource FieldLabelText}"/>
-                            <TextBox Name="AddSourceMilkTypeTextBox"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="Location" Style="{StaticResource FieldLabelText}"/>
-                            <TextBox Name="AddSourceLocationTextBox"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Contact" Style="{StaticResource FieldLabelText}"/>
-                            <TextBox Name="AddSourceContactTextBox"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Button Name="AddSourceButton" Content="Add Source" Height="34" Width="140" HorizontalAlignment="Left"
-                            Style="{StaticResource PrimaryButton}" Click="AddSourceButton_Click"/>
-                    <TextBlock Name="AddSourceResultTextBlock" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+                    <TextBlock Text="Sources" Style="{StaticResource TitleText}"/>
+                    <TextBlock Style="{StaticResource CaptionText}"
+                               Text="Sources are managed in the cloud and cached locally for offline reception."/>
                 </StackPanel>
-            </Border>
+            </StackPanel>
+        </Border>
 
-            <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="0">
-                <DataGrid Name="SourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Code" Binding="{Binding Code}"/>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                        <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="*"/>
-                        <DataGridTextColumn Header="Milk Type" Binding="{Binding MilkType}"/>
-                        <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Border>
-        </Grid>
-    </ScrollViewer>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="300"/>
+                </Grid.RowDefinitions>
+
+                <!-- Add Source - visible only to users whose role grants SOURCE_CREATE (Manager/Admin).
+                     This is a client-side UX convenience only; the server independently enforces the
+                     same permission and remains the real authorization boundary. -->
+                <Border Grid.Row="0" Name="AddSourcePanel" Style="{StaticResource CardBorder}" Margin="0,0,0,14" Visibility="Collapsed">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,6,0"/>
+                            <TextBlock Text="ADD SOURCE" Style="{StaticResource SectionLabelText}"/>
+                        </StackPanel>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Chilling Centre" Style="{StaticResource FieldLabelText}"/>
+                                <ComboBox Name="AddSourceCentreComboBox" DisplayMemberPath="Name"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Code" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="AddSourceCodeTextBox"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Name" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="AddSourceNameTextBox"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Milk Type" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="AddSourceMilkTypeTextBox"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Location" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="AddSourceLocationTextBox"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Contact" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="AddSourceContactTextBox"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Name="AddSourceButton" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Click="AddSourceButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                <TextBlock Text="Add Source"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Name="AddSourceResultTextBlock" TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Search -->
+                <Border Grid.Row="1" Style="{StaticResource CardBorder}">
+                    <Grid>
+                        <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="SearchTextBox_TextChanged"
+                                 ToolTip="Search by code, name, or location"/>
+                        <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
+                                   Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2" Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="&#xE707;" Style="{StaticResource EmptyStateIconText}"/>
+                        <TextBlock Text="No sources found" Style="{StaticResource EmptyStateTitleText}"/>
+                        <TextBlock Name="EmptyStateBodyTextBlock" Style="{StaticResource EmptyStateBodyText}"
+                                   Text="No sources are cached for your accessible centre(s) yet. Sign in online to sync the latest master data."/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Style="{StaticResource CardBorder}" Padding="0" Name="GridBorder">
+                    <DataGrid Name="SourcesGrid" AutoGenerateColumns="False" IsReadOnly="True" BorderThickness="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Code" Binding="{Binding Code}"/>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="*"/>
+                            <DataGridTextColumn Header="Milk Type" Binding="{Binding MilkType}"/>
+                            <DataGridTextColumn Header="Status" Binding="{Binding Status}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </Window>

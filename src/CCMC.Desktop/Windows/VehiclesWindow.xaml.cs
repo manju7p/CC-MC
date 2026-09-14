@@ -16,6 +16,8 @@ public partial class VehiclesWindow : Window
     private readonly ICloudApiClient _cloudApiClient;
     private readonly MasterDataSyncService _masterDataSyncService;
 
+    private List<Vehicle> _allVehicles = [];
+
     public VehiclesWindow(
         ISessionStore sessionStore,
         IChillingCentreRepository centreRepository,
@@ -47,7 +49,8 @@ public partial class VehiclesWindow : Window
         {
             all.AddRange(await _vehicleRepository.ListByCentreAsync(centre.Id, CancellationToken.None));
         }
-        VehiclesGrid.ItemsSource = all;
+        _allVehicles = all;
+        ApplySearchFilter();
 
         // Client-side visibility only (see SourcesWindow's identical comment) -
         // the server independently enforces VEHICLE_CREATE regardless.
@@ -58,6 +61,30 @@ public partial class VehiclesWindow : Window
             AddVehicleCentreComboBox.ItemsSource = accessible;
             if (accessible.Count > 0) AddVehicleCentreComboBox.SelectedIndex = 0;
         }
+    }
+
+    private void SearchTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) => ApplySearchFilter();
+
+    private void ApplySearchFilter()
+    {
+        if (!IsLoaded) return;
+
+        var search = SearchTextBox.Text?.Trim() ?? string.Empty;
+        var filtered = string.IsNullOrEmpty(search)
+            ? _allVehicles
+            : _allVehicles.Where(v =>
+                v.VehicleNumber.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (v.TankerNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (v.DriverName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+
+        VehiclesGrid.ItemsSource = filtered;
+
+        var showEmpty = filtered.Count == 0;
+        EmptyStatePanel.Visibility = showEmpty ? Visibility.Visible : Visibility.Collapsed;
+        GridBorder.Visibility = showEmpty ? Visibility.Collapsed : Visibility.Visible;
+        EmptyStateBodyTextBlock.Text = _allVehicles.Count == 0
+            ? "No vehicles are cached for your accessible centre(s) yet. Sign in online to sync the latest master data."
+            : "No vehicles match this search.";
     }
 
     private async void AddVehicleButton_Click(object sender, RoutedEventArgs e)

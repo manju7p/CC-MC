@@ -1,7 +1,7 @@
 <Window x:Class="CCMC.Desktop.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Dashboard" Height="620" Width="960" MinHeight="480" MinWidth="720"
+        Title="CCMC - Dashboard" Height="840" Width="1320" MinHeight="680" MinWidth="1040"
         WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.RowDefinitions>
@@ -10,81 +10,157 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush1}" BorderThickness="0,0,0,1">
-            <Grid Margin="20,12">
+        <Border Grid.Row="0" Style="{StaticResource WindowHeaderBorder}">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="CCMC" FontSize="18" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
-                    <TextBlock Text="Chilling Centre Milk Collection" Style="{StaticResource CaptionText}" Margin="10,4,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="&#xE80F;" Style="{StaticResource WindowHeaderIconText}"/>
+                    <StackPanel>
+                        <TextBlock Text="CCMC" FontSize="18" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="Chilling Centre Milk Collection" Style="{StaticResource CaptionText}"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <TextBlock Name="OfflineModeTextBlock" Foreground="{StaticResource WarningBrush}" FontWeight="Bold"
-                               VerticalAlignment="Center" Margin="0,0,16,0"/>
-                    <Button Name="ReconnectButton" Content="Sign in online" Style="{StaticResource SecondaryButton}"
-                            Width="120" Margin="0,0,16,0" Visibility="Collapsed" Click="ReconnectButton_Click"/>
+                    <Border Name="OfflineModeBorder" Style="{StaticResource WarningChipBorder}" Margin="0,0,14,0" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7BA;" Style="{StaticResource WarningChipIcon}"/>
+                            <TextBlock Name="OfflineModeTextBlock" Style="{StaticResource WarningChipText}"/>
+                        </StackPanel>
+                    </Border>
+                    <Button Name="ReconnectButton" Style="{StaticResource SecondaryButton}"
+                            Margin="0,0,16,0" Visibility="Collapsed" Click="ReconnectButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE895;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                            <TextBlock Text="Sign in online"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Border Width="1" Background="{StaticResource BorderBrush1}" Margin="0,2,16,2"/>
+
+                    <TextBlock Text="&#xE77B;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBlock Name="WelcomeTextBlock" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="SemiBold"/>
-                    <Button Name="LogoutButton" Content="Logout" Style="{StaticResource SecondaryButton}" Width="90" Click="LogoutButton_Click"/>
+                    <Button Name="LogoutButton" Content="Logout" Style="{StaticResource SecondaryButton}" Click="LogoutButton_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="220"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar navigation -->
             <Border Grid.Column="0" Background="{StaticResource PrimaryDarkBrush}">
                 <DockPanel LastChildFill="False" Margin="0,16,0,16">
-                    <TextBlock DockPanel.Dock="Top" Text="NAVIGATION" FontSize="11" FontWeight="Bold"
-                               Foreground="{StaticResource PrimarySoftBrush}" Margin="20,0,0,10"/>
+                    <Border DockPanel.Dock="Top" Style="{StaticResource SidebarActiveItemBorder}" Margin="8,0,8,16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE80F;" Style="{StaticResource SidebarIconText}"/>
+                            <TextBlock Text="Dashboard" Foreground="{StaticResource TextInverseBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock DockPanel.Dock="Top" Text="NAVIGATION" Style="{StaticResource SidebarSectionLabelText}"/>
 
                     <StackPanel DockPanel.Dock="Top">
-                        <Button Content="Milk Reception" Style="{StaticResource SidebarButtonStyle}" Click="ReceptionButton_Click"/>
-                        <Button Content="Reception History" Style="{StaticResource SidebarButtonStyle}" Click="HistoryButton_Click"/>
-                        <Button Content="Sources" Style="{StaticResource SidebarButtonStyle}" Click="SourcesButton_Click"/>
-                        <Button Content="Vehicles" Style="{StaticResource SidebarButtonStyle}" Click="VehiclesButton_Click"/>
-                        <Button Content="Device Status" Style="{StaticResource SidebarButtonStyle}" Click="DeviceStatusButton_Click"/>
-                        <Button Content="Device Configuration" Style="{StaticResource SidebarButtonStyle}" Click="DeviceConfigButton_Click"/>
-                        <Button Content="Synchronization" Style="{StaticResource SidebarButtonStyle}" Click="SyncStatusButton_Click"/>
-                        <Button Content="Settings" Style="{StaticResource SidebarButtonStyle}" Click="SettingsButton_Click"/>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="ReceptionButton_Click" ToolTip="Start a new milk reception">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Milk Reception" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryButton_Click" ToolTip="Browse past receptions">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE917;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Reception History" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SourcesButton_Click" ToolTip="Manage milk sources">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE707;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Sources" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="VehiclesButton_Click" ToolTip="Manage collection vehicles">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE804;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Vehicles" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceStatusButton_Click" ToolTip="View scale/analyser connection state">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE975;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Device Status" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="DeviceConfigButton_Click" ToolTip="Configure serial devices">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Device Configuration" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SyncStatusButton_Click" ToolTip="View/trigger cloud synchronization">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE895;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Synchronization" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsButton_Click" ToolTip="View application configuration">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE946;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Settings" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </DockPanel>
             </Border>
 
             <!-- Content: dashboard -->
             <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel Margin="24">
-                    <TextBlock Text="Today" Style="{StaticResource HeaderText}" Margin="0,0,0,14"/>
+                <StackPanel Margin="28,24,28,28">
+                    <TextBlock Text="Today" Style="{StaticResource PageTitleText}" Margin="0,0,0,4"/>
+                    <TextBlock Text="Operational overview for your accessible centre(s)." Style="{StaticResource CaptionText}" Margin="0,0,0,18"/>
 
                     <UniformGrid Name="SummaryCardsPanel" Columns="4" Margin="0,0,0,20">
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
                             <StackPanel>
-                                <TextBlock Text="RECEPTIONS" Style="{StaticResource SectionLabelText}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="RECEPTIONS" Style="{StaticResource SectionLabelText}"/>
+                                </StackPanel>
                                 <TextBlock Name="TodayTotalTextBlock" Text="—" Style="{StaticResource MetricValueText}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
                             <StackPanel>
-                                <TextBlock Text="ACCEPTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource SuccessBrush}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE73E;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource SuccessBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="ACCEPTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource SuccessBrush}"/>
+                                </StackPanel>
                                 <TextBlock Name="TodayAcceptedTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource SuccessBrush}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
                             <StackPanel>
-                                <TextBlock Text="HOLD" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource WarningBrush}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE7BA;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource WarningBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="HOLD" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource WarningBrush}"/>
+                                </StackPanel>
                                 <TextBlock Name="TodayHoldTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource WarningBrush}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
-                                <TextBlock Text="REJECTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource DangerBrush}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE711;" Style="{StaticResource InlineIconText}" FontSize="14" Foreground="{StaticResource DangerBrush}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="REJECTED" Style="{StaticResource SectionLabelText}" Foreground="{StaticResource DangerBrush}"/>
+                                </StackPanel>
                                 <TextBlock Name="TodayRejectedTextBlock" Text="—" Style="{StaticResource MetricValueText}" Foreground="{StaticResource DangerBrush}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
@@ -93,20 +169,25 @@
                     <TextBlock Name="DashboardUnavailableTextBlock" Style="{StaticResource CaptionText}" Margin="0,0,0,20" Visibility="Collapsed"/>
 
                     <TextBlock Text="System Status" Style="{StaticResource HeaderText}" Margin="0,0,0,14"/>
-                    <UniformGrid Columns="2">
+                    <UniformGrid Columns="2" Margin="0,0,0,20">
                         <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
                             <StackPanel>
-                                <TextBlock Text="DEVICES" Style="{StaticResource SectionLabelText}"/>
-                                <TextBlock Name="ConnectivityStatusTextBlock" Margin="0,8,0,0" FontSize="13"/>
+                                <TextBlock Text="DEVICES" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                                <StackPanel Name="DeviceStatusPanel"/>
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource CardBorder}">
                             <StackPanel>
-                                <TextBlock Text="SYNCHRONIZATION" Style="{StaticResource SectionLabelText}"/>
-                                <TextBlock Name="SyncStatusTextBlock" Margin="0,8,0,0" FontSize="13"/>
+                                <TextBlock Text="SYNCHRONIZATION" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                                <StackPanel Name="SyncStatusPanel"/>
                             </StackPanel>
                         </Border>
                     </UniformGrid>
+
+                    <TextBlock Text="Recent Receptions" Style="{StaticResource HeaderText}" Margin="0,0,0,14"/>
+                    <Border Style="{StaticResource CardBorder}" Margin="0">
+                        <StackPanel Name="RecentReceptionsPanel"/>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

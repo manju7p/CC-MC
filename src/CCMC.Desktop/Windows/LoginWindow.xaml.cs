@@ -28,8 +28,9 @@ public partial class LoginWindow : Window
 
     private async void LoginButton_Click(object sender, RoutedEventArgs e)
     {
-        StatusTextBlock.Text = string.Empty;
+        SetError(null);
         LoginButton.IsEnabled = false;
+        LoginButton.Content = "Signing in…";
 
         try
         {
@@ -38,14 +39,14 @@ public partial class LoginWindow : Window
 
             if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
             {
-                StatusTextBlock.Text = "Enter both email and password.";
+                SetError("Enter both email and password.");
                 return;
             }
 
             var result = await _authenticationService.LoginAsync(email, password, CancellationToken.None);
             if (!result.Success)
             {
-                StatusTextBlock.Text = result.ErrorMessage ?? "Login failed.";
+                SetError(result.ErrorMessage ?? "Login failed.");
                 return;
             }
 
@@ -78,6 +79,13 @@ public partial class LoginWindow : Window
         finally
         {
             LoginButton.IsEnabled = true;
+            LoginButton.Content = "Sign In";
         }
+    }
+
+    private void SetError(string? message)
+    {
+        StatusTextBlock.Text = message ?? string.Empty;
+        ErrorBanner.Visibility = string.IsNullOrEmpty(message) ? Visibility.Collapsed : Visibility.Visible;
     }
 }

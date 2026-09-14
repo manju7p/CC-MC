@@ -65,8 +65,48 @@
     <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
     <SolidColorBrush x:Key="InfoSoftBrush" Color="{StaticResource InfoSoftColor}"/>
 
+    <!-- Elevated surface (e.g. header bars, popovers) - one step lighter than SurfaceBrush's
+         neighbouring background, used sparingly per Fluent 2's elevation guidance. -->
+    <Color x:Key="ElevatedSurfaceColor">#FBFCFC</Color>
+    <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="{StaticResource ElevatedSurfaceColor}"/>
+
+    <!-- Keyboard-focus ring colour - distinct, high-contrast, never relies on the same
+         hue as hover/pressed so focus remains visible in every control state. -->
+    <SolidColorBrush x:Key="FocusBrush" Color="#2E6BB5"/>
+
+    <!-- ================= Icon font ================= -->
+    <!-- Built-in Windows icon fonts - no NuGet package/asset required. Segoe Fluent Icons
+         ships with Windows 11; Segoe MDL2 Assets is the Windows 10 predecessor with the
+         same glyph codepoints for the set used in this app - the fallback list means every
+         glyph below renders correctly on either OS. -->
+    <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+    <!-- ================= Spacing scale ================= -->
+    <!-- Fluent 2's 4px-based spacing scale (https://fluent2.microsoft.design/design-tokens) -
+         referenced by convention in this file's own margins/padding rather than as bound
+         resources (WPF Thickness resources add indirection with no real benefit here), but
+         kept as documented values so every new margin in this app picks one of these instead
+         of an arbitrary pixel count: 4 (XS) / 8 (S) / 12 (M) / 16 (L) / 20 (XL) / 24 (XXL) / 32 (XXXL). -->
+
     <!-- ================= Typography ================= -->
     <FontFamily x:Key="AppFontFamily">Segoe UI</FontFamily>
+
+    <!-- Page-level title, larger than TitleText, used once per window at the very top. -->
+    <Style x:Key="PageTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Secondary line directly under a PageTitleText, e.g. "Managed in the cloud...". -->
+    <Style x:Key="PageSubtitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+    </Style>
 
     <Style x:Key="TitleText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
@@ -250,6 +290,10 @@
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
                         </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource FocusBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
                             <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
@@ -326,7 +370,9 @@
         </Style.Triggers>
     </Style>
 
-    <!-- Flat sidebar navigation item (MainWindow shell). -->
+    <!-- Flat sidebar navigation item (MainWindow shell). Content is expected to be a
+         StackPanel(icon glyph + label) - see MainWindow.xaml - so the style itself stays
+         icon-agnostic. -->
     <Style x:Key="SidebarButtonStyle" TargetType="Button">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="13"/>
@@ -347,15 +393,54 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#1A8C7561"/>
+                            <Setter TargetName="Bd" Property="Background" Value="#1AFFFFFF"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#338C7561"/>
+                            <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- The single permanently-active "Dashboard" sidebar entry - not a Button, since
+         MainWindow's own content IS the dashboard (every other item opens a separate
+         window - see "Do not rewrite architecture"/"no MVVM" - so there is no in-shell
+         page swap to track). This is the shell's "you are here" indicator. -->
+    <Style x:Key="SidebarActiveItemBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Margin" Value="8,2"/>
+    </Style>
+
+    <!-- Sidebar section label, e.g. "NAVIGATION". -->
+    <Style x:Key="SidebarSectionLabelText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimarySoftBrush}"/>
+        <Setter Property="Margin" Value="20,0,0,8"/>
+    </Style>
+
+    <!-- Icon glyph inside a sidebar item, sized to sit next to a 13px label. -->
+    <Style x:Key="SidebarIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Generic icon glyph used inline with body/caption text elsewhere in the app. -->
+    <Style x:Key="InlineIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
     <!-- ================= Cards / sections ================= -->
@@ -416,7 +501,7 @@
         </Style.Triggers>
     </Style>
 
-    <!-- ================= Status badge ================= -->
+    <!-- ================= Status badge / chip ================= -->
     <!-- A small coloured pill for connection/sync/quality state text. Colour role is chosen in code-behind
          (Style key selection or Background/Foreground assignment) based on the actual status - see each
          window's code-behind, unchanged logic, just a nicer container than a bare TextBlock. -->
@@ -431,6 +516,139 @@
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- Full status "chip" - icon + text, never colour alone (WCAG "don't rely on colour
+         alone" / this task's own section 13/20 requirement). Built by
+         CCMC.Desktop.Controls.StatusChip so every window that shows a status (history rows,
+         source/vehicle status, device/sync state, offline banner) renders it identically
+         instead of five slightly different one-off Borders. One style per semantic role;
+         the icon glyph itself is supplied by the caller (StatusChip.Kind), not the style. -->
+    <Style x:Key="ChipBorderBase" TargetType="Border">
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style x:Key="ChipTextBase" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style x:Key="ChipIconBase" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,0,5,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SuccessChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource WarningSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource DangerSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource InfoSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+    </Style>
+
+    <Style x:Key="SuccessChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+    <Style x:Key="SuccessChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- ================= Secondary-window header ================= -->
+    <!-- Consistent icon + title + optional subtitle strip at the top of every non-shell
+         window (Reception, History, Sources, Vehicles, Device Configuration/Status, Sync
+         Status, Settings) - gives every window a shared identity instead of each one
+         inventing its own header layout. -->
+    <Style x:Key="WindowHeaderBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource ElevatedSurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Padding" Value="24,18"/>
+    </Style>
+
+    <Style x:Key="WindowHeaderIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Margin" Value="0,0,14,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ================= Empty / loading state ================= -->
+    <Style x:Key="EmptyStateBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="32"/>
+    </Style>
+
+    <Style x:Key="EmptyStateIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,0,10"/>
+    </Style>
+
+    <Style x:Key="EmptyStateTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="EmptyStateBodyText" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="MaxWidth" Value="420"/>
+    </Style>
+
+    <!-- ================= Search box ================= -->
+    <Style x:Key="SearchTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="Padding" Value="30,6,10,6"/>
     </Style>
 
     <Style TargetType="ScrollViewer">

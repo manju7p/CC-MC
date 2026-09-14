@@ -1,5 +1,6 @@
 using System.Windows;
 using CCMC.Application.Abstractions;
+using CCMC.Desktop.Controls;
 using CCMC.Domain.Enums;
 
 namespace CCMC.Desktop.Windows;
@@ -17,15 +18,34 @@ public partial class DeviceStatusWindow : Window
 
     private void Refresh()
     {
-        ScaleStateTextBlock.Text = $"State: {_deviceManager.WeighingScale?.State.ToString() ?? "Not configured"}";
+        SetState(ScaleStateHost, _deviceManager.WeighingScale?.State);
         ScaleDetailTextBlock.Text = "Videocon Precision Systems weighing scale. Protocol decoder verified against " +
             "the physical device - a successful connection test opens the COM port and reads the actual weight.";
 
-        AnalyserStateTextBlock.Text = $"State: {_deviceManager.MilkAnalyser?.State.ToString() ?? "Not configured"}";
+        SetState(AnalyserStateHost, _deviceManager.MilkAnalyser?.State);
         AnalyserDetailTextBlock.Text = _deviceManager.MilkAnalyser is null
             ? "No milk analyser configuration has been entered yet - see Device Configuration."
             : "Ekomilk Milkana KAM98-2A. Payload decode is verified against real device output; the physical " +
               "serial connection itself has not yet been tested against the hardware - see STATUS.md.";
+    }
+
+    private static void SetState(System.Windows.Controls.StackPanel host, DeviceConnectionState? state)
+    {
+        host.Children.Clear();
+        if (state is null)
+        {
+            host.Children.Add(StatusChip.Create("NOT CONFIGURED", ChipKind.Neutral));
+            return;
+        }
+
+        var kind = state switch
+        {
+            DeviceConnectionState.Connected => ChipKind.Success,
+            DeviceConnectionState.Connecting => ChipKind.Info,
+            DeviceConnectionState.Error => ChipKind.Danger,
+            _ => ChipKind.Neutral,
+        };
+        host.Children.Add(StatusChip.Create(state.ToString()!.ToUpperInvariant(), kind));
     }
 
     private async void TestScaleButton_Click(object sender, RoutedEventArgs e)
@@ -34,7 +54,7 @@ public partial class DeviceStatusWindow : Window
         try
         {
             var state = await _deviceManager.TestConnectionAsync(DeviceKind.WeighingScale, CancellationToken.None);
-            ScaleStateTextBlock.Text = $"State: {state}";
+            SetState(ScaleStateHost, state);
         }
         finally
         {
@@ -48,7 +68,7 @@ public partial class DeviceStatusWindow : Window
         try
         {
             var state = await _deviceManager.TestConnectionAsync(DeviceKind.MilkAnalyser, CancellationToken.None);
-            AnalyserStateTextBlock.Text = $"State: {state}";
+            SetState(AnalyserStateHost, state);
         }
         finally
         {
