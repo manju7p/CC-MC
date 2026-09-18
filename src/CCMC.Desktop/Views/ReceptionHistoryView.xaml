@@ -135,13 +135,9 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="SEARCH" Style="{StaticResource FieldLabelText}"/>
-                            <Grid>
-                                <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="Filter_Changed"
-                                         ToolTip="Search by source, vehicle, transaction #, quantity, fat, SNF, rate, amount, status, and more"
-                                         AutomationProperties.Name="Search reception history"/>
-                                <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
-                                           Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
-                            </Grid>
+                            <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" Tag="&#xE721;" TextChanged="Filter_Changed"
+                                     ToolTip="Search by source, vehicle, transaction #, quantity, fat, SNF, rate, amount, status, and more"
+                                     AutomationProperties.Name="Search reception history"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="PERIOD" Style="{StaticResource FieldLabelText}"/>

@@ -91,3 +91,27 @@ public sealed class RateFormulaSettingsDto
 
     [JsonPropertyName("centreId")] public int? CentreId { get; init; }
 }
+
+/// <summary>
+/// Mirrors the cloud's RateFormulaSettingsController.UpsertRateFormulaSettingsRequest exactly
+/// - PUT /rate-formula-settings, gated by RATE_FORMULA_CONFIGURE (Manager/Admin - see
+/// PermissionCodes/SeedHelpers) and, as of the 2026-09-18 centre-scoping correction, by
+/// CentreAccessGuard for a specific CentreId (or CentreAccess.AllCentres for a null/global
+/// CentreId) - see RateFormulaSettingsService.UpsertAsync. CentreId is always a specific,
+/// caller-accessible centre when sent from the Windows client's Rate Configuration screen
+/// (never null) - see Views/RateConfigurationView.xaml.cs.
+/// </summary>
+public sealed class UpsertRateFormulaSettingsRequestDto
+{
+    [JsonPropertyName("centreId")] public int? CentreId { get; init; }
+    [JsonPropertyName("rateType")] public required RateFormulaType RateType { get; init; }
+
+    [JsonPropertyName("value1"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value1 { get; init; }
+
+    [JsonPropertyName("value2"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value2 { get; init; }
+
+    [JsonPropertyName("tsRate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? TsRate { get; init; }
+}

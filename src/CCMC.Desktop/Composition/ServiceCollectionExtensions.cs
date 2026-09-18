@@ -95,6 +95,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<VehiclesView>();
         services.AddTransient<SyncStatusView>();
         services.AddTransient<SettingsView>();
+        services.AddTransient<RateConfigurationView>();
 
         return services;
     }

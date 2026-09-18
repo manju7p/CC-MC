@@ -216,32 +216,40 @@ public sealed class HttpCloudApiClient(HttpClient httpClient, ILogger<HttpCloudA
     }
 
     public Task<CloudCreateSourceResult> CreateSourceAsync(string accessToken, CreateSourceRequestDto request, CancellationToken cancellationToken) =>
-        PostMasterDataAsync<CreateSourceRequestDto, SourceDto, CloudCreateSourceResult>(
-            "sources", accessToken, request,
+        SendMasterDataAsync<CreateSourceRequestDto, SourceDto, CloudCreateSourceResult>(
+            HttpMethod.Post, "sources", accessToken, request,
             (outcome, dto, message) => new CloudCreateSourceResult(outcome, dto, message),
             cancellationToken);
 
     public Task<CloudCreateVehicleResult> CreateVehicleAsync(string accessToken, CreateVehicleRequestDto request, CancellationToken cancellationToken) =>
-        PostMasterDataAsync<CreateVehicleRequestDto, VehicleDto, CloudCreateVehicleResult>(
-            "vehicles", accessToken, request,
+        SendMasterDataAsync<CreateVehicleRequestDto, VehicleDto, CloudCreateVehicleResult>(
+            HttpMethod.Post, "vehicles", accessToken, request,
             (outcome, dto, message) => new CloudCreateVehicleResult(outcome, dto, message),
             cancellationToken);
 
+    /// <summary>PUT /rate-formula-settings - same classify-the-response shape as CreateSourceAsync/CreateVehicleAsync, just PUT instead of POST (an upsert, not a create).</summary>
+    public Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(string accessToken, UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken) =>
+        SendMasterDataAsync<UpsertRateFormulaSettingsRequestDto, RateFormulaSettingsDto, CloudUpdateRateFormulaSettingsResult>(
+            HttpMethod.Put, "rate-formula-settings", accessToken, request,
+            (outcome, dto, message) => new CloudUpdateRateFormulaSettingsResult(outcome, dto, message),
+            cancellationToken);
+
     /// <summary>
-    /// Shared POST-and-classify logic for the simple (no idempotency-key,
-    /// no created/duplicate distinction) master-data create endpoints -
+    /// Shared send-and-classify logic for the simple (no idempotency-key,
+    /// no created/duplicate distinction) master-data create/upsert endpoints -
     /// mirrors OverrideReceptionAsync's own status-code classification
     /// exactly (401 -> AuthRetryable, 429/5xx -> Retryable, everything else
-    /// including 403 permission-denied -> Terminal).
+    /// including 403 permission-denied -> Terminal). Method-agnostic (POST for
+    /// create, PUT for upsert) since the classification logic is identical either way.
     /// </summary>
-    private async Task<TResult> PostMasterDataAsync<TRequest, TResponse, TResult>(
-        string route, string accessToken, TRequest request,
+    private async Task<TResult> SendMasterDataAsync<TRequest, TResponse, TResult>(
+        HttpMethod method, string route, string accessToken, TRequest request,
         Func<CloudMutationOutcome, TResponse?, string?, TResult> makeResult,
         CancellationToken cancellationToken)
     {
         try
         {
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, route)
+            using var httpRequest = new HttpRequestMessage(method, route)
             {
                 Content = JsonContent.Create(request, options: JsonOptions),
             };

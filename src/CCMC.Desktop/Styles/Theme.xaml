@@ -621,6 +621,31 @@
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
     </Style>
 
+    <!-- ROOT-CAUSE FIX (2026-09-18 correction pass) - Reception History's Accepted/Hold/
+         Rejected status chips only, NOT every other StatusChip user (Device/Sync state,
+         Source/Vehicle Active/Inactive) which were never reported as broken and must not
+         change. The previous pass added MinHeight/centering to the shared ChipBorderBase
+         (still correct, kept), but never gave the chip a fixed MinWidth - so "HOLD" (4
+         characters) was always narrower than "ACCEPTED"/"REJECTED" (8 characters each),
+         which is exactly the reported "not the same size" bug: width was left to be
+         whatever the text needed, never pinned to one shared value. These four styles add
+         one shared MinWidth (comfortably wider than "ACCEPTED"/"REJECTED"'s own natural
+         content width, so all three clamp to the same floor and none is ever wider than
+         another for these three specific status words) on top of the existing colour-
+         specific chip Border styles - HistoryRowTemplate's binding is the only caller. -->
+    <Style x:Key="HistorySuccessChipBorder" TargetType="Border" BasedOn="{StaticResource SuccessChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryWarningChipBorder" TargetType="Border" BasedOn="{StaticResource WarningChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryDangerChipBorder" TargetType="Border" BasedOn="{StaticResource DangerChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryNeutralChipBorder" TargetType="Border" BasedOn="{StaticResource NeutralChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+
     <!-- ================= Secondary-window header ================= -->
     <!-- Consistent icon + title + optional subtitle strip at the top of every non-shell
          window (Reception, History, Sources, Vehicles, Device Configuration/Status, Sync
@@ -675,16 +700,83 @@
     </Style>
 
     <!-- ================= Icon-prefixed inputs (search box / login fields) ================= -->
-    <!-- Shared left padding for any TextBox/PasswordBox that overlays a small icon glyph at its
-         left edge (Reception History/Sources/Vehicles search, Login email/password - see each
-         XAML's Grid+TextBlock overlay pattern) - one definition instead of each window repeating
-         its own inline Padding, so a future adjustment only happens here (this redesign's
-         "shared style, not per-control margins" fix for the icon/text spacing). -->
+    <!-- ROOT-CAUSE FIX (2026-09-18 correction pass): the previous approach (a plain TextBox
+         given a large left Padding, with a *separate* icon TextBlock manually overlaid on top
+         of it in the CALLING XAML's own Grid, the two positioned by two independently-tuned
+         magic numbers - the icon's own Margin and the TextBox's own Padding) is why this kept
+         looking wrong: those two numbers live in different elements with no relationship
+         enforced between them, so "enough padding to clear the icon" was a guess repeated in
+         every caller, not something the input itself guarantees. It also meant PART_ContentHost's
+         (the ScrollViewer WPF actually renders text into) left inset was set purely to "leave
+         room for a thing drawn on top of it", not to what a normal input's own left padding
+         should be - hence text visibly starting far later than every OTHER TextBox in the app.
+         Fixed by giving the icon its own Grid.Column INSIDE one shared ControlTemplate, so the
+         icon and the text box are two cells of the same Grid, inside the exact same bordered
+         "Bd" box (focus/disabled/read-only triggers below are the same ones the base TextBox/
+         PasswordBox templates already use) - the text column's own Padding is the same modest
+         "10,6,10,6" every other input effectively uses, not a value inflated to dodge an overlay.
+         The icon glyph itself is supplied per instance via Tag (e.g. Tag="&#xE721;" for search) -
+         one template, one visual box, no overlay, no drift-prone padding arithmetic. -->
     <Style x:Key="SearchTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-        <Setter Property="Padding" Value="30,6,10,6"/>
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{TemplateBinding Tag}" Style="{StaticResource InlineIconText}"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="10,0,6,0" IsHitTestVisible="False"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Grid.Column="1" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsReadOnly" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
     <Style x:Key="IconPasswordBox" TargetType="PasswordBox" BasedOn="{StaticResource {x:Type PasswordBox}}">
-        <Setter Property="Padding" Value="30,6,10,6"/>
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{TemplateBinding Tag}" Style="{StaticResource InlineIconText}"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="10,0,6,0" IsHitTestVisible="False"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Grid.Column="1" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- ================= Clickable dashboard metric card ================= -->

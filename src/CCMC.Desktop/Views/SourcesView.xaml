@@ -127,12 +127,8 @@
 
                 <!-- Search -->
                 <Border Style="{StaticResource CardBorder}">
-                    <Grid>
-                        <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="SearchTextBox_TextChanged"
-                                 ToolTip="Search by code, name, or location" AutomationProperties.Name="Search sources"/>
-                        <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
-                                   Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
-                    </Grid>
+                    <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" Tag="&#xE721;" TextChanged="SearchTextBox_TextChanged"
+                             ToolTip="Search by code, name, or location" AutomationProperties.Name="Search sources"/>
                 </Border>
 
                 <Border Style="{StaticResource EmptyStateBorder}" Name="EmptyStatePanel" Visibility="Collapsed" Margin="0,0,0,14">

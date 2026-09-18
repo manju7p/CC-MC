@@ -1,3 +1,5 @@
+using CCMC.Cloud.Application.Auth;
+using CCMC.Cloud.Application.Common;
 using CCMC.Cloud.Domain.Entities;
 using CCMC.Cloud.Domain.Enums;
 using CCMC.Cloud.Infrastructure.Persistence;
@@ -22,8 +24,33 @@ public sealed class RateFormulaSettingsService(CcmcDbContext db)
     public Task<List<RateFormulaSettings>> ListAsync(CancellationToken cancellationToken) =>
         db.RateFormulaSettings.AsNoTracking().ToListAsync(cancellationToken);
 
-    public async Task<RateFormulaSettings> UpsertAsync(UpsertRateFormulaSettingsCommand cmd, CancellationToken cancellationToken)
+    /// <summary>
+    /// Centre-scoped, same enforcement pattern as SourceService/VehicleService's own
+    /// CentreAccessGuard.AssertCanAccess calls (2026-09-18 correction pass - this endpoint
+    /// previously had no centre check at all, meaning any Manager/Admin with
+    /// RATE_FORMULA_CONFIGURE could silently overwrite ANY centre's configuration, or the
+    /// shared global default, regardless of their own centre assignment - the exact "one
+    /// centre's configuration overwriting another's" outcome this session's Centre Scoping
+    /// requirement explicitly forbids). A null <paramref name="cmd"/>.CentreId (the global
+    /// default row, applied to every centre that has no centre-specific override - see
+    /// RateFormulaSettings' own doc comment) may only be written by a caller whose
+    /// CentreAccess.AllCentres is true, since that row is not scoped to any single centre a
+    /// non-AllCentres Manager could be said to "own".
+    /// </summary>
+    public async Task<RateFormulaSettings> UpsertAsync(RequestUser user, UpsertRateFormulaSettingsCommand cmd, CancellationToken cancellationToken)
     {
+        if (cmd.CentreId is { } centreId)
+        {
+            CentreAccessGuard.AssertCanAccess(user.CentreAccess, centreId);
+
+            var centreExists = await db.ChillingCentres.AnyAsync(c => c.Id == centreId, cancellationToken);
+            if (!centreExists) throw new ValidationException("Centre not found.");
+        }
+        else if (!user.CentreAccess.AllCentres)
+        {
+            throw new CentreAccessDeniedException(centreId: null);
+        }
+
         var existing = await db.RateFormulaSettings.SingleOrDefaultAsync(s => s.CentreId == cmd.CentreId, cancellationToken);
 
         if (existing is null)

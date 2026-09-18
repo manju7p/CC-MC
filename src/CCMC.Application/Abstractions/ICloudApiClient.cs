@@ -68,6 +68,9 @@ public sealed record CloudCreateSourceResult(CloudMutationOutcome Outcome, Sourc
 
 public sealed record CloudCreateVehicleResult(CloudMutationOutcome Outcome, VehicleDto? Vehicle, string? ErrorMessage);
 
+/// <summary>PUT /rate-formula-settings - gated server-side by RATE_FORMULA_CONFIGURE (Manager/Admin) and centre scoping (see RateFormulaSettingsService.UpsertAsync). A 403 (permission denied or out-of-scope centre) is Terminal, same classification as CloudCreateSourceResult/CloudCreateVehicleResult.</summary>
+public sealed record CloudUpdateRateFormulaSettingsResult(CloudMutationOutcome Outcome, RateFormulaSettingsDto? Settings, string? ErrorMessage);
+
 /// <summary>
 /// The Windows app's only path to the cloud. Implemented by
 /// CCMC.Infrastructure's HttpCloudApiClient against the existing NestJS API
@@ -95,6 +98,9 @@ public interface ICloudApiClient
 
     /// <summary>POST /vehicles - gated server-side by VEHICLE_CREATE (Manager/Admin only, per DevelopmentSeeder's role grants).</summary>
     Task<CloudCreateVehicleResult> CreateVehicleAsync(string accessToken, CreateVehicleRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>PUT /rate-formula-settings - gated server-side by RATE_FORMULA_CONFIGURE (Manager/Admin only) and centre scoping.</summary>
+    Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(string accessToken, UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken);
 
     Task<DashboardSummaryDto> GetDashboardSummaryAsync(string accessToken, int? centreId, CancellationToken cancellationToken);
 }

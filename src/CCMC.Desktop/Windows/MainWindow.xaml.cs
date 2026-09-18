@@ -52,6 +52,20 @@ public partial class MainWindow : Window
     /// </summary>
     private bool _canManageSourcesAndVehicles;
 
+    /// <summary>
+    /// Rate Configuration nav visibility - Manager/Admin only, hidden for Operator (this
+    /// correction pass's explicit requirement). Computed the same way as
+    /// <see cref="_canManageSourcesAndVehicles"/> for the same reason (role-based nav
+    /// visibility, not permission-based) - kept as a separate flag rather than reusing that
+    /// one because the two capabilities are conceptually distinct even though today's role
+    /// grants happen to produce the same Manager/Admin result. The SAVE action inside
+    /// RateConfigurationView itself additionally checks the real RATE_FORMULA_CONFIGURE
+    /// permission (defensive, UX-only - see that view's own doc comment); the server's
+    /// [RequirePermission] + CentreAccessGuard on PUT /rate-formula-settings remains the
+    /// actual authorization boundary regardless of what this flag hides or shows.
+    /// </summary>
+    private bool _canManageRateConfiguration;
+
     public MainWindow(
         IServiceProvider serviceProvider,
         ISessionStore sessionStore,
@@ -72,7 +86,7 @@ public partial class MainWindow : Window
         _cloudApiClient = cloudApiClient;
         _receptionRepository = receptionRepository;
 
-        _navButtons.AddRange([NavDashboardButton, NavReceptionButton, NavHistoryButton, NavSourcesButton, NavVehiclesButton, NavSyncButton, NavSettingsButton]);
+        _navButtons.AddRange([NavDashboardButton, NavReceptionButton, NavHistoryButton, NavSourcesButton, NavVehiclesButton, NavRateConfigButton, NavSyncButton, NavSettingsButton]);
 
         Loaded += MainWindow_Loaded;
         Closed += (_, _) =>
@@ -133,6 +147,9 @@ public partial class MainWindow : Window
 
         NavSourcesButton.Visibility = _canManageSourcesAndVehicles ? Visibility.Visible : Visibility.Collapsed;
         NavVehiclesButton.Visibility = _canManageSourcesAndVehicles ? Visibility.Visible : Visibility.Collapsed;
+
+        _canManageRateConfiguration = _canManageSourcesAndVehicles; // same Manager/Admin role set today - see _canManageRateConfiguration's doc comment
+        NavRateConfigButton.Visibility = _canManageRateConfiguration ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task RunSyncTickAsync()
@@ -348,6 +365,13 @@ public partial class MainWindow : Window
         MainContent.Content = _serviceProvider.GetRequiredService<SyncStatusView>();
     }
 
+    private void ShowRateConfiguration()
+    {
+        if (!_canManageRateConfiguration) return;
+        SetActiveNav(NavRateConfigButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<RateConfigurationView>();
+    }
+
     private void ShowSettings()
     {
         SetActiveNav(NavSettingsButton);
@@ -363,6 +387,8 @@ public partial class MainWindow : Window
     private void SourcesButton_Click(object sender, RoutedEventArgs e) => ShowSources();
 
     private void VehiclesButton_Click(object sender, RoutedEventArgs e) => ShowVehicles();
+
+    private void RateConfigButton_Click(object sender, RoutedEventArgs e) => ShowRateConfiguration();
 
     private void SyncStatusButton_Click(object sender, RoutedEventArgs e) => ShowSync();
 

@@ -389,10 +389,12 @@ src/
                           left sidebar nav + a right ContentControl that swaps
                           in whichever page is selected - see "Single-Window
                           Shell" below), Views/ (Reception, ReceptionHistory,
-                          Sources, Vehicles, SyncStatus, Settings - the last
-                          combining General/Device Configuration/Device Status
-                          as three toggled sections on one screen; every one
-                          of these is a UserControl hosted in Main's content
+                          Sources, Vehicles, SyncStatus, Settings, RateConfiguration -
+                          Settings combines General/Device Configuration/Device Status
+                          as three toggled sections on one screen; RateConfiguration is
+                          Manager/Admin-only (BRD §25, hidden for Operator - see
+                          "Single-Window Shell" below); every one of these is a
+                          UserControl hosted in Main's content
                           area, not a separate top-level Window) —
                           refs all four projects above
 tests/

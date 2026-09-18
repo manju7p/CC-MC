@@ -150,6 +150,9 @@ public class AuthenticationServiceTests
         public Task<CloudCreateVehicleResult> CreateVehicleAsync(
             string accessToken, CCMC.Contracts.Dtos.CreateVehicleRequestDto request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(
+            string accessToken, CCMC.Contracts.Dtos.UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task<CCMC.Contracts.Dtos.DashboardSummaryDto> GetDashboardSummaryAsync(
             string accessToken, int? centreId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();

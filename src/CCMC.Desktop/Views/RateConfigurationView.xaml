@@ -1,0 +1,152 @@
+<UserControl x:Class="CCMC.Desktop.Views.RateConfigurationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource WindowHeaderBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE8EF;" Style="{StaticResource WindowHeaderIconText}"/>
+                <StackPanel>
+                    <TextBlock Text="Rate Configuration" Style="{StaticResource TitleText}"/>
+                    <TextBlock Text="BRD section 25: Milk Rate Calculation - configure the formula used to price every reception at a centre." Style="{StaticResource CaptionText}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24">
+
+                <!-- Centre selection - rate configuration is centre-scoped (mirrors Sources/
+                     Vehicles' own centre-scoped Add panels); only centres this Manager/Admin is
+                     actually authorized for are offered, and the server independently
+                     re-enforces this (CentreAccessGuard) regardless of what this combo shows. -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="CHILLING CENTRE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                        <ComboBox Name="CentreComboBox" DisplayMemberPath="Name" SelectionChanged="CentreComboBox_SelectionChanged"
+                                  AutomationProperties.Name="Rate configuration centre"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Mode + formula explanation - human-readable, not just numeric textboxes. -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="CALCULATION MODE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                        <ComboBox Name="ModeComboBox" DisplayMemberPath="Label" SelectionChanged="ModeComboBox_SelectionChanged"
+                                  AutomationProperties.Name="Rate calculation mode" Margin="0,0,0,14"/>
+
+                        <TextBlock Text="FORMULA" Style="{StaticResource SectionLabelText}" Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource BackgroundBrush}" CornerRadius="5" Padding="14,10">
+                            <TextBlock Name="FormulaTextBlock" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Fat-vs-SNF parameters. -->
+                <Border Name="FatVsSnfPanel" Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <TextBlock Text="FAT-VS-SNF PARAMETERS" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="14"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Value 1" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="Value1TextBox" ToolTip="PREFS_RATE_VALUE1 - a configured base-rate component"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Value 2" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="Value2TextBox" ToolTip="PREFS_RATE_VALUE2 - a configured base-rate component"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="FIXED FORMULA CONSTANTS (not editable - BRD section 25.2)" Style="{StaticResource FieldLabelText}"/>
+                        <Border Background="{StaticResource BackgroundBrush}" CornerRadius="5" Padding="10,8">
+                            <StackPanel>
+                                <TextBlock Text="0.22 - fat weighting factor applied to (Value 1 + Value 2)" Style="{StaticResource CaptionText}"/>
+                                <TextBlock Text="0.36 - SNF weighting factor applied to (Value 1 + Value 2)" Style="{StaticResource CaptionText}" Margin="0,4,0,0"/>
+                                <TextBlock Text="0.32 - fixed per-litre adjustment added to every calculation" Style="{StaticResource CaptionText}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- TS-based parameters. -->
+                <Border Name="TsBasedPanel" Style="{StaticResource CardBorder}" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="TS-BASED PARAMETERS" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
+                        <TextBlock Text="TS Rate" Style="{StaticResource FieldLabelText}"/>
+                        <TextBox Name="TsRateTextBox" Width="220" ToolTip="PREFS_RATE_TS - flat rate per Total Solids point"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Save. -->
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <Button Name="SaveButton" Height="38" HorizontalAlignment="Left" Style="{StaticResource PrimaryButton}" Click="SaveButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE73E;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                <TextBlock Text="Save Configuration"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Name="StatusTextBlock" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Calculation preview - proves the configured formula against sample readings,
+                     using the exact same RateCalculationService the real Reception screen uses
+                     (CalculationPreviewService below is not a second calculation implementation -
+                     see its own doc comment). -->
+                <Border Style="{StaticResource CardBorder}" Margin="0">
+                    <StackPanel>
+                        <TextBlock Text="CALCULATION PREVIEW" Style="{StaticResource SectionLabelText}" Margin="0,0,0,4"/>
+                        <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,12"
+                                   Text="Enter sample FAT/SNF/Weight to see the Rate/Amount this configuration would produce - computed by the same calculation Reception uses, not a separate copy."/>
+                        <Grid Margin="0,0,0,14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Sample FAT (%)" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="PreviewFatTextBox" TextChanged="PreviewInput_Changed"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Sample SNF (%)" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="PreviewSnfTextBox" TextChanged="PreviewInput_Changed"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="Sample Weight (kg)" Style="{StaticResource FieldLabelText}"/>
+                                <TextBox Name="PreviewWeightTextBox" TextChanged="PreviewInput_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="Preview Rate" Style="{StaticResource FieldLabelText}"/>
+                                <TextBlock Name="PreviewRateTextBlock" Text="0.00" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource PrimaryDarkBrush}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="Preview Amount" Style="{StaticResource FieldLabelText}"/>
+                                <TextBlock Name="PreviewAmountTextBlock" Text="0.00" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource PrimaryDarkBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

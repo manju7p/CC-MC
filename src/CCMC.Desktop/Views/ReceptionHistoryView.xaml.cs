@@ -246,12 +246,17 @@ public partial class ReceptionHistoryView : UserControl
             IReadOnlyDictionary<int, string> vehicleNumbers,
             int index)
         {
+            // Uses the History-specific chip border styles (fixed shared MinWidth, so
+            // Accepted/Hold/Rejected are always the same size regardless of text length -
+            // see Theme.xaml's "HistorySuccessChipBorder" etc. doc comment) - the icon/text
+            // child styles are the same shared ones every other StatusChip uses, since only
+            // the width/sizing was ever reported wrong, not the colours/icons themselves.
             var (statusGlyph, statusBorderKey, statusIconKey, statusTextKey) = t.Status switch
             {
-                TransactionStatus.Accepted => ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText"),
-                TransactionStatus.Hold => ("", "WarningChipBorder", "WarningChipIcon", "WarningChipText"),
-                TransactionStatus.Rejected => ("", "DangerChipBorder", "DangerChipIcon", "DangerChipText"),
-                _ => ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText"),
+                TransactionStatus.Accepted => ("", "HistorySuccessChipBorder", "SuccessChipIcon", "SuccessChipText"),
+                TransactionStatus.Hold => ("", "HistoryWarningChipBorder", "WarningChipIcon", "WarningChipText"),
+                TransactionStatus.Rejected => ("", "HistoryDangerChipBorder", "DangerChipIcon", "DangerChipText"),
+                _ => ("", "HistoryNeutralChipBorder", "NeutralChipIcon", "NeutralChipText"),
             };
 
             var isDevice = t.ReadingSource == ReadingSource.Device;

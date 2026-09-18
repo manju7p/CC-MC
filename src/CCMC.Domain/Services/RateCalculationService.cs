@@ -16,10 +16,17 @@ public sealed record RateCalculationResult(decimal Rate, decimal Amount)
 /// <summary>
 /// Pure domain calculation, ported exactly from BRD v5.0 section 25 (itself
 /// ported from the legacy Android reference implementation's
-/// MilkCollectionFragment.getAmount()/RateFormulaFragment) - deliberately
-/// mirroring the cloud API's independent copy of the same rules (see
-/// CCMC.Cloud.Domain.Services.RateCalculationService's doc comment for why
-/// duplicated, not shared, exactly as QualityValidationService already is).
+/// MilkCollectionFragment.getAmount()/RateFormulaFragment). Unlike
+/// QualityValidationService, there is deliberately no separate
+/// CCMC.Cloud.Domain.Services copy of this class (a previous doc comment
+/// here incorrectly claimed one existed - corrected 2026-09-18, no such type
+/// is defined anywhere in the solution): the BRD's own wording ("Rate is
+/// recalculated live... on the milk collection screen") makes this a
+/// client-side, capture-time calculation, and the cloud's ReceptionService
+/// only ever persists the Rate/Amount the client already computed and sent
+/// (CreateReceptionCommand.Rate/Amount) - it never recomputes them. This is
+/// the single authoritative implementation of BRD section 25 in the whole
+/// solution.
 ///
 /// Rounding: the BRD gives the Rate formula, then "Amount = Rate x Weight",
 /// then separately (section 25.4, "Output Formatting") states both Rate and

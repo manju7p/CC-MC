@@ -1725,6 +1725,158 @@ static/code-level (build, the unaffected client test suite, and a real
 `.exe` launch confirming clean startup) plus manual review of the
 merged XAML/code-behind against each original window's own source.
 
+## Visual Correction Pass + Rate Calculation Root-Cause Fix (2026-09-18)
+
+Follow-up to "Single-Window Shell & Navigation Redesign (2026-09-18)" above,
+triggered by manual verification finding the textbox-padding and status-
+chip-sizing fixes from that pass had not actually taken visual effect, and
+that Rate Calculation was not working at all in the running application.
+BRD source consulted directly for this pass: `Doc/CCMC_BRD_and_Technical_
+Design_v2.docx` §25 "Milk Rate Calculation — Business Logic" (extracted via
+its own `word/document.xml`, not taken from any prior summary) - its
+25.1–25.4 wording matches this repo's own `RateCalculationService`/
+`RateCalculationServiceTests` doc comments verbatim, confirming those were
+already an accurate port; nothing in the formula itself needed to change.
+
+**Textbox padding - real root cause found.** The previous pass's fix
+(`HorizontalContentAlignment="Left"`) was cosmetic only and said so in its
+own doc comment - `TextBox`/`PasswordBox`'s custom `ControlTemplate` never
+reads that property (WPF's `PART_ContentHost` renders text directly into a
+`ScrollViewer`, not through a `ContentPresenter`), so it changed nothing.
+The actual structural problem: `SearchTextBox`/`IconPasswordBox` were a
+plain input given a large left `Padding` (30px) purely to leave room for a
+*separate* icon `TextBlock` manually overlaid on top of it in each caller's
+own `Grid` - two independently-tuned numbers (the icon's `Margin`, the
+input's `Padding`) with no relationship enforced between them, in two
+different elements. Fixed by moving the icon **into** the same
+`ControlTemplate` as its own `Grid.Column`, sharing the one `Bd` Border
+with `PART_ContentHost` - text now starts after a normal, modest
+`Padding="10,6,10,6"` (matching every other input in the app) immediately
+following the icon column, not after an inflated guess. The icon glyph is
+now supplied per instance via `Tag` (e.g. `Tag="&#xE721;"`). Every caller
+(`LoginWindow`'s email/password, and History/Sources/Vehicles' search
+boxes) had its old `Grid`+overlay `TextBlock` removed and now just sets
+`Tag` on a single `TextBox`/`PasswordBox`.
+
+**Accepted/Hold/Rejected sizing - real root cause found.** The previous
+pass added `MinHeight`/centering to the *shared* `ChipBorderBase` (correct,
+kept) but never gave the chip a `MinWidth` - so "HOLD" (4 characters) was
+always narrower than "ACCEPTED"/"REJECTED" (8 characters each) wherever
+they appeared down a column of History rows, because width was left
+entirely to the text. Fixed with four new History-specific styles
+(`HistorySuccessChipBorder`/`HistoryWarningChipBorder`/
+`HistoryDangerChipBorder`/`HistoryNeutralChipBorder`, each `BasedOn` the
+existing colour-specific chip style plus `MinWidth="112"`) used **only** by
+`ReceptionHistoryView`'s status column - deliberately not applied to the
+shared `SuccessChipBorder`/etc. keys `StatusChip.Create` uses everywhere
+else (Device/Sync state, Source/Vehicle Active/Inactive), which were never
+reported broken and must not change size.
+
+**Rate Calculation - actual root cause: configuration never existed, not
+a calculation bug.** `RateCalculationService.Calculate` (domain layer),
+`ReceptionWorkflowService.CalculateRateAsync`/`ValidateAndSaveAsync`
+(resolves settings, computes, persists), `SyncEngineService`'s outbox
+mapping, the cloud's `ReceptionService.CreateAsync` (persists verbatim),
+and `ReceptionHistoryView`'s Rate/Amount columns were all *already*
+correctly wired and already covered by tests (`RateCalculationServiceTests`
+- exact BRD §25.2/25.3 formulas including the "full-precision Rate feeds
+Amount, not the rounded one" discriminating case; `ReceptionWorkflowService
+Tests` - local persistence/reload; `ReceptionTests.Create_WithRateAndAmount
+_PersistsAndReturnsThemVerbatim` - cloud persistence/round-trip). The cloud
+already had a working `PUT /rate-formula-settings` (`RateFormulaSettings
+Controller`/`Service`, gated by `RATE_FORMULA_CONFIGURE`) and its own
+passing RBAC tests. What never existed anywhere: (1) any seed data for the
+`rate_formula_settings` table (confirmed by reading `SeedHelpers`/
+`DevelopmentSeeder`/`ProductionBootstrapSeeder` - none inserts a row), (2)
+any WPF screen to configure it, and (3) any method on `ICloudApiClient` to
+call the PUT at all (only `GetRateFormulaSettingsAsync` existed). Consequence:
+`IRateFormulaSettingsRepository.ResolveForCentreAsync` always resolved
+`null`, so `RateCalculationService.Calculate`'s `config is null -> Zero`
+branch always ran - every reception's Rate/Amount was always 0, for every
+centre, always. Also fixed in passing: `RateCalculationService`'s own doc
+comment falsely claimed a `CCMC.Cloud.Domain.Services.RateCalculationService`
+mirror existed "exactly as QualityValidationService already is" - no such
+type is defined anywhere in the solution (confirmed by search); corrected,
+since BRD §25's own wording ("Rate is recalculated live... on the milk
+collection screen") makes this correctly a client-side-only calculation -
+the cloud only ever persists the Rate/Amount the client already computed
+and sent, it never recomputes them.
+
+**Rate Configuration screen (new, Manager/Admin-only).**
+`Views/RateConfigurationView` - centre selector (only the caller's own
+accessible centres, mirroring Sources/Vehicles' Add panels), a mode
+`ComboBox` (Fat vs SNF / TS Based), the exact BRD §25.2/25.3 formula text
+rendered read-only, editable Value1/Value2 (Fat-vs-SNF) or TS Rate (TS-
+based) fields with the 0.22/0.36/0.32 constants shown as explicitly
+non-editable (BRD does not make these configurable), a calculation preview
+(sample FAT/SNF/Weight -&gt; Rate/Amount, computed by calling
+`RateCalculationService.Calculate` directly - the same one authoritative
+implementation, not a second copy), and Save. Save validates Value1+Value2
+(Fat-vs-SNF) or TsRate (TS-based) are present per BRD 25.2/25.3's own
+"otherwise Rate/Amount = 0" wording, then calls the new
+`ICloudApiClient.UpdateRateFormulaSettingsAsync` (PUT, new
+`UpsertRateFormulaSettingsRequestDto` in `CCMC.Contracts`) and refreshes
+the local cache via the existing `MasterDataSyncService.PullAsync` - same
+pattern as `SourcesView`/`VehiclesView`'s own Add buttons, not a second
+persistence mechanism. Nav visibility (`MainWindow.NavRateConfigButton`) is
+Manager/Admin-only, hidden for Operator, computed by role exactly like
+Sources/Vehicles (`_canManageRateConfiguration`) - not by the
+`RATE_FORMULA_VIEW` permission, which Operator also holds (BRD §14's
+least-privilege grant, so Reception's own read-only use of rate settings
+keeps working for an Operator); the Save button additionally checks the
+real `RATE_FORMULA_CONFIGURE` permission defensively. The server's own
+`[RequirePermission]` + (new, see below) `CentreAccessGuard` remain the
+actual authorization boundary regardless of what this screen shows.
+
+**Centre-scoping gap found and fixed server-side.**
+`RateFormulaSettingsService.UpsertAsync` had **no centre check at all** -
+any Manager/Admin with `RATE_FORMULA_CONFIGURE` could silently overwrite
+*any* centre's rate configuration, or the shared global (`CentreId: null`)
+default that applies to every centre without its own override, regardless
+of their own centre assignment. This is exactly the "one centre's
+configuration overwriting another's" failure mode this task's Centre
+Scoping requirement forbids, and it had a passing test
+(`Upsert_ByManager_CreatesNewGlobalSettings`) actively asserting the
+unsafe behaviour as correct. Fixed by adding the same
+`CentreAccessGuard.AssertCanAccess` check `SourceService`/`VehicleService`
+already use for a specific `CentreId`, plus a new rule (extending
+`CentreAccessDeniedException` to accept `int?`) that only a caller with
+`CentreAccess.AllCentres` may write the global (`null`) row. The old test
+was replaced with `Upsert_ByCentreScopedManager_ForGlobalDefault_Returns403`
+(manager1 is BLR-CC-01-scoped, not AllCentres) plus three new tests:
+`Upsert_ByAdmin_ForGlobalDefault_Succeeds` (Admin is seeded AllCentres),
+`Upsert_ByManager_ForOwnCentre_Succeeds`, and
+`Upsert_ByManager_ForOtherCentre_Returns403`.
+
+**Verification performed (real, not just "it builds"):** `dotnet build
+CCMC.sln` - 0 warnings/0 errors. `dotnet test CCMC.sln` -
+**197/197 passing** (159 client, up from 155: +4 new
+`HttpCloudApiClientTests` cases for `UpdateRateFormulaSettingsAsync`; 38
+cloud, up from 35: the centre-scoping test changes above), the cloud suite
+run against a real disposable `postgres:16` Docker container on host port
+5432 (started for this session specifically because the local
+`postgresql-x64-16` Windows service was stopped and this sandbox lacks the
+privilege to start Windows services) - a genuine real-Postgres integration
+run, not skipped. A real Debug `.exe` launch was performed both before and
+after all changes; its log shows the same clean startup signature as every
+prior session both times. Repo-wide search confirms exactly one
+`RateCalculationService` in the whole solution (`CCMC.Domain.Services`) -
+no duplicate/conflicting implementation.
+
+**Not verified this session (documented, not silently skipped):** literal
+mouse-click GUI interaction (typing into the fixed textboxes and visually
+confirming the caret position, visually confirming the three status chips
+are now equal width, clicking through the new Rate Configuration screen as
+a real Manager/Operator account, watching a real reception's Rate/Amount
+populate live) - no GUI automation tool was available for this native WPF
+app in this environment, the same limitation stated in every prior UI
+session. The full calculation-to-persistence-to-sync-to-cloud path was
+instead proven at the automated-test layer end to end (domain formula ->
+local SQLite persistence/reload -> cloud POST /reception persistence -
+three separate, already-existing or newly-added test suites, not a single
+"it builds" claim), and the configuration path (PUT -> centre scoping ->
+local cache refresh) was proven the same way.
+
 ## Important Commands
 
 ```

@@ -100,6 +100,15 @@
                                 <TextBlock Text="Vehicles" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+                        <!-- Rate Configuration: same Manager/Admin-only visibility as Sources/
+                             Vehicles above - see ApplyRoleBasedNavigation. Never available to
+                             Operator, per this correction pass's explicit requirement. -->
+                        <Button Name="NavRateConfigButton" Style="{StaticResource SidebarButtonStyle}" Click="RateConfigButton_Click" ToolTip="Configure the milk rate calculation formula" AutomationProperties.Name="Rate Configuration">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8EF;" Style="{StaticResource SidebarIconText}"/>
+                                <TextBlock Text="Rate Configuration" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                         <Button Name="NavSyncButton" Style="{StaticResource SidebarButtonStyle}" Click="SyncStatusButton_Click" ToolTip="View/trigger cloud synchronization" AutomationProperties.Name="Synchronization">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE895;" Style="{StaticResource SidebarIconText}"/>
