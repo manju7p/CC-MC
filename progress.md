@@ -7,6 +7,8 @@
 > **Update (2026-09-13):** development is paused here as a deliberate checkpoint (documentation-only session, no code changes). See §19 "Checkpoint (2026-09-13)" at the end of this document for what changed since the analysis above, and `architecture.mmd` / `HOW_TO_RUN.md` / `STATUS.md`'s own "Checkpoint (2026-09-13)" section for the full current picture.
 >
 > **Update (2026-09-15):** Neon production account bootstrap was implemented and verified, and a UI/UX redesign pass landed — see §20 "Checkpoint (2026-09-15)" at the end of this document. Render deployment is now explicitly **BLOCKED** (GitHub repository access controlled by the CEO, not a technical gap) rather than merely "not started."
+>
+> **Update (2026-09-18):** the WPF client was restructured into a single-window shell (one `MainWindow`, a left sidebar, a swappable right content area), and a Manager/Admin-only **Rate Configuration** screen was added — closing a gap that §4 below did not make obvious: no WPF screen or client method ever existed to configure rates *through the running application* until this date, so every reception's Rate/Amount was actually `0` for the entire period covered by §4's original "🟢 Implemented" claim. See §21 "Checkpoint (2026-09-18)" at the end of this document, and the new root-level `rateconfig.md` for the manager-facing explanation of the feature.
 
 ## 1. Current Architecture
 
@@ -52,6 +54,8 @@ No single invented percentage is justified — the BRD's eight MVP areas (§17) 
 | Notifications (outbound-notification hook/abstraction) | 🔴 Not implemented |
 
 **Update (2026-09-12):** Rate Calculation is now fully implemented end-to-end (domain formula, centre-scoped configuration synced from the cloud, live UI recalculation, local persistence, outbox, cloud sync, PostgreSQL storage) and verified with 187/187 tests passing (154 client + 33 cloud, the cloud suite run against a real local PostgreSQL instance) plus a real end-to-end harness against the actual running API. See §4 for full detail. Source Hierarchy and the Notification hook remain unimplemented — they were out of scope for that follow-up task.
+
+**Update (2026-09-18) — important correction to the claim above:** everything this 2026-09-12 update describes as "implemented" (the formula, the configuration entity, the cloud `PUT`/`GET` endpoints, the sync-down of config) really was correct and really was verified — but strictly at the domain/API layer, via a throwaway test harness outside this repository (the update above says so explicitly in its own caveat). **No WPF screen, and no method on `ICloudApiClient`, existed to let an actual Manager call that `PUT` endpoint through the running application** — this was only discovered and closed on 2026-09-18 (see §21). Read literally, "🟢 Implemented" in the table below was accurate about the underlying mechanism and misleading about what an end user could actually do with it. Rate Configuration is now reachable from the app itself; see §4's own "Update (2026-09-18)" note and `rateconfig.md`.
 
 ## 3. BRD Requirement Matrix
 
@@ -126,6 +130,8 @@ This gap identified in the original audit (below, preserved for the historical r
 **Formula implementation location**: `src/CCMC.Domain/Services/RateCalculationService.cs` (client, authoritative for calculation), `src/CCMC.Domain/Entities/RateFormulaSettings.cs` (client config), `src/CCMC.Cloud.Domain/Entities/MasterData.cs` (cloud config entity), `src/CCMC.Cloud.Application/MasterData/RateFormulaSettingsService.cs` (cloud config CRUD), `src/CCMC.Application/Reception/ReceptionWorkflowService.cs` (integration point), `src/CCMC.Desktop/Windows/ReceptionWindow.xaml(.cs)` (live UI display).
 
 **One documented design decision** (BRD-ambiguous, resolved by literal reading rather than invented): the BRD states the Rate formula, then "Amount = Rate × Weight", then separately (§25.4) that both are rounded to 2 decimals before display/use. This was implemented as: compute full-precision Rate, compute full-precision Amount = Rate × Weight, then round *both* independently to 2 decimals — not "round Rate first, then multiply the rounded Rate by Weight." This is the literal order the BRD's own sections present, not a fabricated business rule, and is called out explicitly in `RateCalculationService`'s doc comment for a human to revisit if the intended behavior was actually the other order.
+
+**Update (2026-09-18):** the calculation/persistence/sync detail above remains accurate and unchanged. What was missing — and has now been added — is the actual Manager-facing configuration path: a **Rate Configuration** screen in the WPF app (`Views/RateConfigurationView`, reached from the main window's left sidebar, Manager/Admin only) and a corresponding `ICloudApiClient.UpdateRateFormulaSettingsAsync` client method that calls the `PUT /rate-formula-settings` endpoint this section already described. Before this addition, that endpoint's only caller was the throwaway harness mentioned above — there was no in-app way to set `Value1`/`Value2`/`TsRate`/`RateType` at all, so every centre's Rate/Amount was `0` in practice. A previously-undiscovered centre-scoping gap in that same endpoint (any Manager/Admin could overwrite *any* centre's configuration, not just their own) was also found and fixed in this pass. Full detail: `STATUS.md` "Visual Correction Pass + Rate Calculation Root-Cause Fix (2026-09-18)"; manager-facing explanation including the exact BRD-sourced meaning of Value 1/Value 2: `rateconfig.md`.
 
 ## 5. Weighing Scale (Videocon)
 
@@ -249,7 +255,7 @@ The automatic Fat/Snf/Temperature range check (the original "auto-accept" logic)
 
 ### Complete
 - Reception workflow (minus receipt/printout)
-- **Rate Calculation (BRD §25)** — implemented, tested (187/187 total including a live-PostgreSQL cloud run), verified end-to-end (updated 2026-09-12; see §4)
+- **Rate Calculation (BRD §25)** — implemented, tested (187/187 total including a live-PostgreSQL cloud run), verified end-to-end (updated 2026-09-12; see §4) — **but see §4/§21's 2026-09-18 correction: no in-app way to configure it existed until 2026-09-18, so this was not actually usable by a Manager through the running application until then**
 - Quality validation + manual ACCEPT/HOLD/REJECT (auto-accept correctly dormant)
 - Offline-first SQLite + idempotent cloud sync
 - Cloud auth/RBAC/audit
@@ -530,3 +536,119 @@ HTTPS URL → real-world end-to-end verification, including a real first
 login against Neon's new accounts (not yet exercised — see STATUS.md).
 None of this has been started; see STATUS.md "Checkpoint" → NEXT for the
 ordered list.
+
+## 21. Checkpoint (2026-09-18) — Single-Window Shell, RBAC Navigation, Rate Configuration
+
+Chronological summary since §20 above. Full technical detail lives in
+`STATUS.md`'s "Single-Window Shell & Navigation Redesign (2026-09-18)",
+"Visual Correction Pass + Rate Calculation Root-Cause Fix (2026-09-18)",
+and "Documentation Consistency Pass (2026-09-18, later the same day)"
+entries — this section is the narrative summary, same convention as §20.
+
+**Single-window navigation (code + real UI restructuring):**
+- `MainWindow` is now the only post-login top-level window (besides
+  `LoginWindow`) — `ReceptionWindow`, `ReceptionHistoryWindow`,
+  `SourcesWindow`, `VehiclesWindow`, `SyncStatusWindow`,
+  `SettingsWindow`, `DeviceConfigurationWindow`, and `DeviceStatusWindow`
+  (eight separate top-level windows previously) were converted to
+  `UserControl`s under a new `CCMC.Desktop.Views` namespace, hosted in a
+  single `ContentControl` that the left sidebar swaps between. No
+  reception/device/rate/sync business logic was rewritten in this
+  conversion — confirmed by inspection, every constructor/handler/service
+  call carried over unchanged.
+- **Settings** now hosts **Device Configuration** and **Device Status**
+  as two additional toggled sections alongside the existing General
+  section, on one screen reached via one "Settings" sidebar item — there
+  are no longer separate "Device Status"/"Device Configuration" sidebar
+  entries.
+- **Sources/Vehicles are hidden from Operator navigation**, visible for
+  Manager/Admin — deliberately checked by **role name**, not by the
+  `SOURCE_VIEW`/`VEHICLE_VIEW` permission (Operator is actually granted
+  both of those server-side, so Reception's own source/vehicle pickers
+  keep working for an Operator; gating the *nav item* on that permission
+  would not have hidden it for an Operator).
+- **Reception History** gained a date-period filter (Today / Past Week /
+  Past Month / Past Year / Total, defaulting to Today) that combines with
+  the existing status filter and a widened search (now covering quantity,
+  fat, SNF, CLR, water, protein, temperature, rate, amount, reading
+  source, status, sync state, and captured date/time — previously only
+  source/vehicle/transaction number).
+
+**Rate Calculation made actually usable for the first time (root-cause
+finding — see "Update (2026-09-18)" note in §2/§4 below for why this
+matters):**
+- The calculation formula, local/cloud persistence, sync, and history
+  display were all already correct and already covered by passing tests
+  (confirmed by re-reading the actual BRD `.docx` directly, not a prior
+  summary — its §25 wording matches this repo's own doc comments
+  verbatim). What never existed anywhere until this pass: any WPF screen,
+  and any `ICloudApiClient` method, to actually call the cloud's already-
+  working `PUT /rate-formula-settings`. Consequence: every reception's
+  Rate/Amount was genuinely `0` in the running application, for every
+  centre, for the entire time between the 2026-09-12 Rate Calculation
+  work (§4 below) and this pass — the domain formula and API endpoint
+  being correct was necessary but not sufficient for an actual Manager to
+  ever use the feature.
+- A new **Rate Configuration** screen (`Views/RateConfigurationView`) was
+  added: centre selector (only the signed-in user's own accessible
+  centres), a calculation-mode selector ("Fat vs SNF" / "TS Based"), the
+  exact BRD formula shown read-only, editable Value 1/Value 2 or TS Rate
+  fields depending on mode, the 0.22/0.36/0.32 constants shown explicitly
+  as non-editable, a calculation preview using the same domain service
+  Reception itself uses, and Save. Visible only to Manager/Admin in the
+  sidebar (same role-based convention as Sources/Vehicles above).
+- **Backend gap found and fixed in the same pass:**
+  `RateFormulaSettingsService.UpsertAsync` had no centre-scoping check at
+  all — any Manager/Admin with the configure permission could silently
+  overwrite *any* centre's configuration, or the shared global default,
+  regardless of their own centre assignment. A passing test
+  (`Upsert_ByManager_CreatesNewGlobalSettings`) was actively asserting
+  this as correct. Fixed with the same `CentreAccessGuard` pattern
+  Sources/Vehicles already use, plus a new rule that only an
+  all-centres-scoped caller may write the global default; the affected
+  test was replaced and three new ones added.
+- See `rateconfig.md` (new, root-level) for the manager-facing explanation
+  of the feature, including the exact BRD-defined meaning of Value 1/
+  Value 2 (the BRD calls them, together, "two configured base-rate
+  components, used only in Fat-vs-SNF mode" — neither the BRD nor the code
+  defines any more specific business meaning, and that document
+  deliberately does not invent one).
+
+**Visual fixes attempted, one still open per the developer's own
+manual testing:**
+- The Accepted/Hold/Rejected History status-chip sizing issue was fixed
+  by giving those three chips (only) a shared minimum width, in addition
+  to the height/centering fix from the 2026-09-15 pass.
+- The textbox left-padding issue (Login, and the History/Sources/Vehicles
+  search boxes) was restructured at the root cause — the icon was moved
+  into the same `ControlTemplate` as the text input instead of being a
+  separately-overlaid element with a compensating oversized `Padding`.
+  **However, the developer's own commit message for this exact change
+  (`dfa9ad9 "Rate config added -- text box bug still an issue"`) records
+  that, per manual testing after committing, the issue is still visually
+  present.** This is not glossed over: it is recorded as an open item
+  here, in `STATUS.md`, and in `rateconfig.md` §13, not claimed fixed.
+
+**Testing/build status:** `dotnet build CCMC.sln` — 0 warnings/0 errors.
+`dotnet test CCMC.sln` — **197/197 passing** (159 client, up from 155;
+38 cloud, up from 35), the cloud suite run against a real disposable
+`postgres:16` Docker container (the local Postgres Windows service is
+currently stopped and this sandbox cannot start Windows services without
+elevation). A real Debug `.exe` launch was performed and its log shows
+the same clean-startup signature as every prior session.
+
+**Not verified in any of the sessions covered by this checkpoint:**
+literal mouse-click GUI interaction — clicking through the new nav items,
+visually confirming chip width/centering, visually confirming textbox
+caret position, walking through the Rate Configuration screen as a real
+Manager account end to end. No GUI automation tool has been available for
+this native WPF app in any session to date. All claims about on-screen
+behavior in this checkpoint and in `rateconfig.md` are sourced from
+reading the actual XAML/code-behind, and from the automated test suites
+covering the calculation/persistence/sync/RBAC layers beneath the UI —
+not from an observed screenshot or click-through.
+
+**Render deployment status: unchanged, still BLOCKED** (repository access
+from the CEO, not a technical gap) — nothing in this checkpoint touches
+that blocker either way; see §20 above and `STATUS.md`/`HOW_TO_RUN.md`
+§10 for the current detail, which remains accurate.

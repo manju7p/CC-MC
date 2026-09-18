@@ -10,6 +10,11 @@
 > **Update (2026-09-15):** §9 now documents the production account bootstrap
 > mechanism (done — Neon `production` has real Admin/Manager/Operator
 > accounts). Render deployment itself does **not** exist yet — see §10.
+> **Update (2026-09-18):** the client is now a single-window shell with a
+> Manager/Admin-only Rate Configuration screen — see new §12. Test count is
+> now **197/197** (159 client + 38 cloud), re-verified fresh this session
+> (superseding the 190/190 figure above); see `STATUS.md`'s dated entries
+> for what changed.
 
 ---
 
@@ -62,9 +67,9 @@ dotnet test CCMC.sln
 ```
 
 This runs both test projects and prints one combined result. Current state
-(verified fresh this session): **190/190 passing** — `CCMC.Tests` (client,
-155 tests, no external dependency — uses a real temp-file SQLite database)
-and `CCMC.Cloud.Api.Tests` (cloud, 35 tests, needs a reachable PostgreSQL at
+(verified fresh 2026-09-18): **197/197 passing** — `CCMC.Tests` (client,
+159 tests, no external dependency — uses a real temp-file SQLite database)
+and `CCMC.Cloud.Api.Tests` (cloud, 38 tests, needs a reachable PostgreSQL at
 `Host=localhost;Port=5432;Database=ccmc_cloud_test;Username=postgres;Password=postgres`
 — a throwaway Postgres container on port 5432 is enough; it does not need to
 be the same `cc-mc-postgres` container, and nothing in this project ever
@@ -311,3 +316,72 @@ is `http://localhost:8081/`; the currently-running stack is in Docker mode
 (`ASPNETCORE_ENVIRONMENT=Development`, `cc-mc` talking to
 `cc-mc-postgres`) — Neon mode was used only transiently, for the §9
 bootstrap, then switched back to Docker mode for local development.
+
+## 12. Using the Windows application — navigation and Rate Configuration
+
+(Added 2026-09-18, describing the current single-window shell. See
+`STATUS.md`'s "Single-Window Shell & Navigation Redesign (2026-09-18)" for
+why/how this replaced the previous per-window design, and `rateconfig.md`
+for the full Rate Configuration explanation aimed at a Manager.)
+
+After building/running the client (§3/§4) with the cloud API reachable
+(§5 or §6), launching `CCMC.Desktop.exe` opens `LoginWindow`. Signing in
+successfully opens **one** main application window — there is no longer a
+separate window per feature:
+
+```
+LoginWindow (email + password)
+    ↓ successful sign-in
+MainWindow — single window, left sidebar + right content area
+    ├── Dashboard          (default content on open)
+    ├── Milk Reception
+    ├── Reception History  (Today/Past Week/Past Month/Past Year/Total
+    │                        filter + status filter + search, combined)
+    ├── Sources             ← Manager/Admin only, hidden for Operator
+    ├── Vehicles            ← Manager/Admin only, hidden for Operator
+    ├── Rate Configuration  ← Manager/Admin only, hidden for Operator
+    ├── Synchronization
+    └── Settings            (General / Device Configuration / Device
+                              Status as three sections on one screen —
+                              no separate Device Configuration/Status
+                              sidebar entries exist anymore)
+```
+
+Clicking a sidebar item replaces the content on the right; it never opens
+a new window. The signed-in user's role determines which items are
+visible (checked by role name, not by the underlying view permission —
+see `CLAUDE.md`'s "Rate calculation" bullet for why) — an Operator account
+never sees Sources, Vehicles, or Rate Configuration in this sidebar at
+all, regardless of what the cloud API itself would permit them to *view*.
+
+**Reaching Rate Configuration as a Manager**, using the already-documented
+development credentials from §8 above (Docker mode only — never use these
+for a real deployment):
+
+```
+Sign in as manager1@ccmc.local / Manager@12345 (Manager, BLR-CC-01)
+    ↓
+Left sidebar → "Rate Configuration"
+    ↓
+Select the chilling centre (only centres this account has access to
+are listed), select a calculation mode, fill in that mode's parameters
+    ↓
+Click "Save Configuration"
+    ↓
+Perform (or re-perform) a Milk Reception at that centre — the "RATE &
+AMOUNT" card now reflects the saved configuration
+```
+
+Full step-by-step detail, the exact meaning of each field, the exact
+formulas, and troubleshooting are in `rateconfig.md` — this section only
+covers how to reach the screen, not what each field means.
+
+**Known open issue (documented, not hidden):** a textbox left-padding
+problem on the Login screen and on the History/Sources/Vehicles search
+boxes was structurally reworked on 2026-09-18, but the developer's own
+commit message for that exact change records it as still visually present
+after manual testing (`dfa9ad9 "Rate config added -- text box bug still an
+issue"`). This does not affect Rate Configuration's own input fields
+(Value 1/Value 2/TS Rate use a different, unaffected textbox style — see
+`rateconfig.md` §13) and does not affect any calculation, persistence, or
+sync behavior — it is a cosmetic issue on specific screens only.

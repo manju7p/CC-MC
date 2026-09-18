@@ -1758,6 +1758,16 @@ now supplied per instance via `Tag` (e.g. `Tag="&#xE721;"`). Every caller
 boxes) had its old `Grid`+overlay `TextBlock` removed and now just sets
 `Tag` on a single `TextBox`/`PasswordBox`.
 
+**Update (2026-09-18, same day, later commit):** the developer's own
+commit message for this exact change (`dfa9ad9 "Rate config added --
+text box bug still an issue"`) records that, per manual testing after
+committing, the textbox left-padding issue is **still visually present**
+despite this structural fix being in place. This is not silently claimed
+resolved - see the "Documentation Consistency Pass" entry near the end of
+this file and `rateconfig.md` §13 for how this is now tracked as an open
+item. No further code change was made to re-diagnose it in the
+documentation-only pass that added that note.
+
 **Accepted/Hold/Rejected sizing - real root cause found.** The previous
 pass added `MinHeight`/centering to the *shared* `ChipBorderBase` (correct,
 kept) but never gave the chip a `MinWidth` - so "HOLD" (4 characters) was
@@ -1876,6 +1886,87 @@ local SQLite persistence/reload -> cloud POST /reception persistence -
 three separate, already-existing or newly-added test suites, not a single
 "it builds" claim), and the configuration path (PUT -> centre scoping ->
 local cache refresh) was proven the same way.
+
+## Documentation Consistency Pass (2026-09-18, later the same day)
+
+**Documentation-only session — no source code, XAML, project, test, or
+migration file was touched.** Triggered by a follow-up request to bring
+`CLAUDE.md`/`progress.md`/`STATUS.md`/`HOW_TO_RUN.md` up to date with the
+single-window shell + Rate Calculation/Configuration work above, and to
+add a new `rateconfig.md` explaining the feature to a Manager. Everything
+below was re-verified directly against the current repository state
+before writing it down — not carried forward from memory of the earlier
+sessions.
+
+**Re-verified, fresh, this session (read-only — build/test only, no files
+changed):** `dotnet build CCMC.sln` → 0 warnings/0 errors.
+`dotnet test tests/CCMC.Tests/CCMC.Tests.csproj` → **159/159 passing**.
+`dotnet test tests/CCMC.Cloud.Api.Tests/CCMC.Cloud.Api.Tests.csproj` →
+**38/38 passing**, run against a freshly started, then removed, disposable
+`postgres:16` Docker container on host port 5432 (same throwaway-container
+pattern as the prior pass — the local `postgresql-x64-16` Windows service
+is still stopped and this sandbox still lacks the privilege to start it).
+**197/197 total**, matching the count already recorded above for the same
+code — confirms nothing regressed between that pass and this one.
+
+**Stale documentation found and corrected, with historical text
+preserved (not deleted):**
+
+- `progress.md` §4 "Milk Rate Calculation" and §2 "Overall Status" (both
+  dated 2026-09-12, from a session *before* this repository's own
+  single-window shell / Rate Configuration work) described Rate
+  Calculation as "fully implemented end-to-end" and verified via "a
+  throwaway console program outside the repository" - accurate about the
+  *domain formula and API mechanism* existing and being correct even
+  then, but it left a reader with the impression a Manager could actually
+  configure rates through the running application. They could not: as
+  documented in this file's own "Visual Correction Pass + Rate
+  Calculation Root-Cause Fix (2026-09-18)" entry above, **no WPF screen
+  and no `ICloudApiClient` method to call `PUT /rate-formula-settings`
+  existed until later on 2026-09-18** - every reception's Rate/Amount was
+  actually `0` in the running application for the entire period between
+  the 2026-09-12 entry and that fix, regardless of what the API/harness
+  could already do. An "Update (2026-09-18)" note was appended to both
+  sections making this explicit, rather than editing the original 2026-09-12
+  text out of the record.
+- `RateCalculationService`'s own doc comment (`src/CCMC.Domain/Services/
+  RateCalculationService.cs`) previously claimed a
+  `CCMC.Cloud.Domain.Services.RateCalculationService` mirror existed -
+  already corrected in the prior pass (see that section above), re-verified
+  here by a fresh repo-wide search: no such type exists anywhere in the
+  solution.
+- `CLAUDE.md`'s "Current operational state" checkpoint (dated 2026-09-15,
+  i.e. before both the single-window shell and Rate Configuration work)
+  described the Windows client as a per-window `MainWindow`/
+  `ReceptionWindow`/etc. shell and said rate configuration "reaches the
+  client via `MasterDataSyncService`" without mentioning any way to
+  *write* it. Updated in place (not rewritten wholesale - the rest of the
+  checkpoint, e.g. Neon/Docker/offline-login detail, was already accurate
+  and is left as-is) to describe the current single-window shell and the
+  new Manager/Admin-only Rate Configuration screen, with an explicit note
+  that literal GUI click-through verification has still not been
+  performed in any session to date.
+- `HOW_TO_RUN.md` had no section at all describing how to actually
+  navigate the running application (login → sidebar → a specific screen) -
+  not stale, just missing. A new §12 was added covering navigation in
+  general and reaching Rate Configuration specifically, reusing the
+  already-documented (§8) development credentials verbatim rather than
+  inventing new ones.
+
+**Not verified this session (unchanged limitation, stated plainly):** no
+GUI automation tool is available for this native WPF app in this
+environment. Every claim in the updated documents about what a Manager
+"sees" or "can do" on screen is sourced from reading the actual XAML/code-
+behind (control names, `Style`/`Tag` values, click handlers, RBAC checks),
+not from an observed screenshot or click-through - this is stated
+explicitly in `rateconfig.md`'s own header note and is the same caveat
+every prior UI-focused session in this file has carried. In particular,
+this session did **not** attempt to re-diagnose or re-fix the textbox
+left-padding issue the developer's own commit (`dfa9ad9 "Rate config
+added -- text box bug still an issue"`) reports as still present after
+the structural fix in the prior pass - that is out of scope for a
+documentation-only task and is instead recorded honestly as an open item
+in `STATUS.md`, `progress.md`, and `rateconfig.md`.
 
 ## Important Commands
 

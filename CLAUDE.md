@@ -38,14 +38,33 @@ from "what's true right now" from "what happened and why," on purpose:
 - **`HOW_TO_RUN.md`** — the practical runbook: build, test, Docker mode,
   Neon mode, switching between them, logs, migrations, dev credentials.
 
-## Current operational state (checkpoint 2026-09-15)
+## Current operational state (checkpoint 2026-09-18)
 
 Read this section first in any new session — it's the fastest way to avoid
 re-deriving context that already exists. Originally written 2026-09-13,
 kept current via dated `Update (...)` notes below rather than rewritten
 each time — see `STATUS.md`'s own "Checkpoint" section and
 `progress.md`'s dated checkpoints for the full chronological detail this
-section only summarizes.
+section only summarizes. Header bumped to 2026-09-18 for the single-window
+shell + Rate Configuration work below (same convention as the 2026-09-13 →
+2026-09-15 bump for the Neon bootstrap/UI redesign work).
+
+- **WPF shell (2026-09-18):** the client is now a genuine single-window
+  application — `MainWindow` (plus `LoginWindow` before sign-in) is the
+  only top-level `Window`; Dashboard, Milk Reception, Reception History,
+  Sources, Vehicles, Synchronization, Settings, and the new Rate
+  Configuration (see below) are all `UserControl`s under
+  `CCMC.Desktop.Views`, swapped into `MainWindow`'s single right-hand
+  `ContentControl` by its left sidebar. **Settings** now contains Device
+  Configuration and Device Status as two additional sections on the same
+  screen — there are no separate sidebar entries for either anymore.
+  **Sources/Vehicles/Rate Configuration are hidden from Operator
+  navigation** (role-name check — Manager/Admin only — not the
+  `*_VIEW` permission an Operator also holds, since that permission still
+  needs to work for Reception's own read-only use of that data). Reception
+  History gained a date-period filter (Today/Past Week/Past Month/Past
+  Year/Total, default Today) and a widened search covering every field a
+  row displays, not just source/vehicle/transaction number.
 
 - **Branch:** `windows-application`. **`pranav-dev`** is a separate,
   historically unrelated legacy NestJS implementation on its own branch —
@@ -89,7 +108,22 @@ section only summarizes.
   `Rate` used to compute `Amount` (not a rounded intermediate). Config is
   cached locally per centre and reaches the client via
   `MasterDataSyncService`. No fabricated defaults — an unconfigured formula
-  computes Rate=0/Amount=0, never a guessed value.
+  computes Rate=0/Amount=0, never a guessed value. **Update (2026-09-18):**
+  a Manager/Admin-only **Rate Configuration** screen
+  (`Views/RateConfigurationView`, reached from the main window's sidebar)
+  and a corresponding `ICloudApiClient.UpdateRateFormulaSettingsAsync`
+  method now exist to actually call the cloud's `PUT /rate-formula-settings`
+  — **before this date, no such screen or client method existed at all**,
+  so every centre's Rate/Amount was genuinely `0` in the running
+  application regardless of the calculation itself being correct (see
+  `STATUS.md`'s "Visual Correction Pass + Rate Calculation Root-Cause Fix
+  (2026-09-18)" and `rateconfig.md`). A previously-missing centre-scoping
+  check on that same endpoint (any Manager/Admin could overwrite any
+  centre's config, not just their own) was also found and fixed. The BRD
+  gives Value1/Value2 no more specific meaning than "two configured
+  base-rate components, used only in Fat-vs-SNF mode" — `rateconfig.md`
+  documents this deliberately without inventing a dairy-industry
+  interpretation the BRD does not support.
 - **Offline-first:** `Session.IsOffline` gates both `SyncEngineService` and
   master-data sync. Offline login uses Argon2id + DPAPI
   (`OfflineCredentialStore`, `CurrentUser` scope) — the raw password is
@@ -134,7 +168,14 @@ section only summarizes.
   real running API, plus a real `.exe` launch confirming clean startup —
   see `STATUS.md` "UI/UX Redesign (2026-09-15)"); physical Ekomilk
   KAM98-2A serial hardware link not yet verified (payload *decode* is
-  verified against real sample frames).
+  verified against real sample frames). **Open as of 2026-09-18:** a
+  textbox left-padding issue (Login email/password, History/Sources/
+  Vehicles search boxes) was structurally re-fixed but the developer's own
+  commit message for that change (`dfa9ad9 "Rate config added -- text box
+  bug still an issue"`) records it as still visually present after manual
+  testing — do not claim this is resolved without new evidence; see
+  `rateconfig.md` §13 and `STATUS.md`'s "Documentation Consistency Pass
+  (2026-09-18, later the same day)" entry.
 - **Next intended step:** obtain Render-connect access from the repo
   owner, then deploy — see `HOW_TO_RUN.md` §10 and `STATUS.md`
   "Checkpoint" → NEXT for the ordered list once unblocked. Do not perform
