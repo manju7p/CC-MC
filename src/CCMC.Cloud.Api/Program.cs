@@ -11,6 +11,7 @@ using CCMC.Cloud.Infrastructure.Persistence;
 using CCMC.Cloud.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -33,6 +34,25 @@ if (!string.IsNullOrWhiteSpace(renderPort))
 {
     builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
 }
+
+// Render (like Heroku/Azure App Service) terminates TLS at its own edge and
+// forwards plain HTTP to the container - Kestrel only ever sees http here,
+// so app.UseHttpsRedirection() below would otherwise redirect every request
+// (including Render's own health-check probes, which don't follow redirects)
+// in an infinite loop, since the container never listens on https at all.
+// X-Forwarded-Proto lets ASP.NET Core recognize the original request was
+// already https and skip the redirect. KnownNetworks/KnownProxies are
+// cleared because Render's edge address isn't a fixed IP/network known at
+// deploy time (unlike an on-prem reverse proxy) - this is the documented
+// ASP.NET Core pattern for exactly this class of PaaS deployment, safe here
+// because the container is reachable only through Render's own routing,
+// never directly from the internet.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // --- Configuration ---------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("CcmcDb")
@@ -166,6 +186,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

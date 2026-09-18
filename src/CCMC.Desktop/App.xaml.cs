@@ -34,6 +34,13 @@ public partial class App : System.Windows.Application
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+            // Optional, gitignored (.gitignore already reserves this exact
+            // filename), never committed - lets an operator point CloudApi:BaseUrl
+            // at the production Render URL on a specific machine without
+            // touching the tracked appsettings.json default (localhost:8081,
+            // the local Docker/dotnet-run API - see context.md "API Integration").
+            // Absent (the default on every dev machine), this is a no-op.
+            .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false)
             .Build();
 
         var services = new ServiceCollection();

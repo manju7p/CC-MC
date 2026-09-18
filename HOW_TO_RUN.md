@@ -297,13 +297,25 @@ Two different things change independently, and this repo's docs are
 careful to keep them distinct:
 
 - **API host** — where the WPF client's HTTP requests go
-  (`src/CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`). Currently
-  `http://localhost:8081/`, **unchanged by this documentation pass**. This
-  is the same value in both Docker-local mode and Neon-backed mode (§5/§6)
-  — the client always talks to the locally running `cc-mc` container on
-  `localhost:8081`; only what's *behind* that container changes. It will
-  change to the Render HTTPS URL only once Render is actually deployed
-  (§10) — not before, and not as part of this pass.
+  (`src/CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`). The tracked
+  default remains `http://localhost:8081/` — **unchanged**, so every
+  existing dev workflow (Docker-local mode and Neon-backed-via-Docker mode,
+  §5/§6) keeps working exactly as before with zero setup.
+- **Update (2026-09-18, Render deployed):** now that Render is deployed and
+  verified (§10), `App.xaml.cs` also layers an optional, gitignored
+  `src/CCMC.Desktop/appsettings.Local.json` on top of the committed
+  `appsettings.json` (present only if a developer/operator creates it —
+  absent on every machine by default, a total no-op). To point a build at
+  the production Render API instead of local Docker, create that file next
+  to the committed `appsettings.json` with:
+  ```json
+  { "CloudApi": { "BaseUrl": "https://cc-mc.onrender.com/" } }
+  ```
+  (trailing slash required — `HttpClient.BaseAddress` drops the last path
+  segment without it, see `CloudApiOptions.BaseUrl`'s doc comment). Never
+  commit this file — it's already covered by `.gitignore`'s
+  `appsettings.Local.json` entry, the same pattern this repo already uses
+  for `appsettings.*.local.json` on the cloud side.
 - **Database host** — where `cc-mc` itself connects
   (`ConnectionStrings__CcmcDb` inside `.env`/`.env.docker`/`.env.neon`).
   This is what actually differs between Docker mode (`cc-mc-postgres`) and
