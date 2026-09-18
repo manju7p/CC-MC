@@ -8,9 +8,15 @@ using CCMC.Domain.Entities;
 using CCMC.Domain.Enums;
 using CCMC.Infrastructure.Devices;
 
-namespace CCMC.Desktop.Windows;
+namespace CCMC.Desktop.Views;
 
-public partial class ReceptionWindow : Window
+/// <summary>
+/// Milk Reception - moved from Windows/ReceptionWindow (a top-level Window) to a UserControl
+/// hosted in MainWindow's single content area (2026-09-18 single-window shell redesign). All
+/// reception/device/rate logic below is unchanged from ReceptionWindow - only the base class
+/// and the lack of an Owner/Show() call are different (see CLAUDE.md "single-window shell").
+/// </summary>
+public partial class ReceptionView : UserControl
 {
     private const string ManualAnalyserDeviceId = "milk-analyser-manual-test";
 
@@ -32,7 +38,7 @@ public partial class ReceptionWindow : Window
     /// </summary>
     private bool _suppressProvenanceTracking;
 
-    public ReceptionWindow(
+    public ReceptionView(
         ISessionStore sessionStore,
         IChillingCentreRepository centreRepository,
         ISourceRepository sourceRepository,
@@ -46,7 +52,7 @@ public partial class ReceptionWindow : Window
         _vehicleRepository = vehicleRepository;
         _receptionWorkflowService = receptionWorkflowService;
 
-        Loaded += ReceptionWindow_Loaded;
+        Loaded += ReceptionView_Loaded;
 
         QuantityTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkWeightEditedManually(); };
         FatTextBox.TextChanged += (_, _) => { if (!_suppressProvenanceTracking) _provenance.MarkQualityEditedManually(); };
@@ -92,7 +98,7 @@ public partial class ReceptionWindow : Window
         AmountValueTextBlock.Text = result.Amount.ToString("F2", CultureInfo.InvariantCulture);
     }
 
-    private async void ReceptionWindow_Loaded(object sender, RoutedEventArgs e)
+    private async void ReceptionView_Loaded(object sender, RoutedEventArgs e)
     {
         var session = _sessionStore.Current;
         if (session is null)

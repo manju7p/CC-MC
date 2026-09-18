@@ -1,0 +1,217 @@
+<UserControl x:Class="CCMC.Desktop.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource WindowHeaderBorder}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE946;" Style="{StaticResource WindowHeaderIconText}"/>
+                <StackPanel>
+                    <TextBlock Text="Settings" Style="{StaticResource TitleText}"/>
+                    <TextBlock Text="Application configuration, device configuration, and device status." Style="{StaticResource CaptionText}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="24">
+
+                <!-- Settings sub-navigation (2026-09-18 redesign): Device Configuration and Device
+                     Status no longer have their own primary sidebar entries - they are reached
+                     through Settings via these three section buttons, which just toggle which of
+                     the three panels below is visible. Same idea as MainWindow's own sidebar nav,
+                     scaled down to this one screen, rather than introducing a new TabControl
+                     template into the theme. -->
+                <UniformGrid Columns="3" Margin="0,0,0,18">
+                    <Button Name="GeneralSectionButton" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
+                            Click="GeneralSectionButton_Click" AutomationProperties.Name="Application Settings section">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE946;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                            <TextBlock Text="General"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Name="DeviceConfigSectionButton" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="DeviceConfigSectionButton_Click" AutomationProperties.Name="Device Configuration section">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE713;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                            <TextBlock Text="Device Configuration"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Name="DeviceStatusSectionButton" Style="{StaticResource SecondaryButton}"
+                            Click="DeviceStatusSectionButton_Click" AutomationProperties.Name="Device Status section">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE975;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                            <TextBlock Text="Device Status"/>
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
+
+                <!-- ===== General / Application Settings (from the former SettingsWindow) ===== -->
+                <StackPanel Name="GeneralPanel">
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="Cloud API base URL" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Name="CloudApiUrlTextBlock" FontFamily="Consolas" FontSize="12" Margin="0,0,0,14"/>
+
+                            <TextBlock Text="Local database" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Name="DatabasePathTextBlock" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,14"/>
+
+                            <TextBlock Text="Raw device captures" Style="{StaticResource FieldLabelText}"/>
+                            <TextBlock Name="CapturesPathTextBlock" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource BackgroundBrush}" CornerRadius="5" Padding="10,8" Margin="4,4,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE946;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Top" Margin="0,1,8,0"/>
+                            <TextBlock Style="{StaticResource CaptionText}"
+                                       Text="These values are configured via appsettings.json and are shown here read-only for this MVP."/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ===== Device Configuration (from the former DeviceConfigurationWindow) ===== -->
+                <StackPanel Name="DeviceConfigPanel" Visibility="Collapsed">
+                    <TextBlock Style="{StaticResource CaptionText}" MaxWidth="600" Margin="0,0,0,14"
+                               Text="Configurable serial settings per centre/device - COM4/2400/8-N-1 is only the verified default for the weighing scale, not a fixed requirement."/>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="DEVICE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
+                            <TextBlock Text="Device" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="DeviceKindComboBox" Margin="0,0,0,14" SelectionChanged="DeviceKindComboBox_SelectionChanged"/>
+
+                            <TextBlock Text="Device / Vendor Name" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="NameTextBox" Margin="0,0,0,10"/>
+
+                            <CheckBox Name="EnabledCheckBox" Content="Enabled"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="SERIAL PARAMETERS" Style="{StaticResource SectionLabelText}" Margin="0,0,0,12"/>
+
+                            <TextBlock Text="COM Port" Style="{StaticResource FieldLabelText}"/>
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0" Name="ComPortComboBox" IsEditable="True" Margin="0,0,8,0"/>
+                                <Button Grid.Column="1" Name="RefreshPortsButton" Style="{StaticResource SecondaryButton}" Click="RefreshPortsButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE72C;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Refresh"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Baud Rate" Style="{StaticResource FieldLabelText}"/>
+                                    <ComboBox Name="BaudRateComboBox" IsEditable="True"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Data Bits" Style="{StaticResource FieldLabelText}"/>
+                                    <ComboBox Name="DataBitsComboBox"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Stop Bits" Style="{StaticResource FieldLabelText}"/>
+                                    <ComboBox Name="StopBitsComboBox" DisplayMemberPath="Label"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Parity" Style="{StaticResource FieldLabelText}"/>
+                                    <ComboBox Name="ParityComboBox" DisplayMemberPath="Label"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Flow Control" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="FlowControlComboBox" DisplayMemberPath="Label" Margin="0,0,0,14"/>
+
+                            <TextBlock Text="Read Timeout (ms)" Style="{StaticResource FieldLabelText}"/>
+                            <TextBox Name="ReadTimeoutTextBox" Width="140"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}" Margin="0">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Name="TestConnectionButton" Height="36"
+                                        Style="{StaticResource SecondaryButton}" Click="TestConnectionButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE895;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Test Connection"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2" Name="SaveButton" Height="36"
+                                        Style="{StaticResource PrimaryButton}" Click="SaveButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE73E;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Save"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBlock Name="StatusTextBlock" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,14,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ===== Device Status (from the former DeviceStatusWindow) ===== -->
+                <StackPanel Name="DeviceStatusPanel" Visibility="Collapsed">
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="WEIGHING SCALE" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                            <StackPanel Name="ScaleStateHost" Orientation="Horizontal" Margin="0,0,0,8"/>
+                            <TextBlock Name="ScaleDetailTextBlock" Style="{StaticResource CaptionText}" Margin="0,0,0,14"/>
+                            <Button Name="TestScaleButton" HorizontalAlignment="Left"
+                                    Style="{StaticResource SecondaryButton}" Click="TestScaleButton_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE895;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Test Scale Connection"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorder}">
+                        <StackPanel>
+                            <TextBlock Text="MILK ANALYSER" Style="{StaticResource SectionLabelText}" Margin="0,0,0,10"/>
+                            <StackPanel Name="AnalyserStateHost" Orientation="Horizontal" Margin="0,0,0,8"/>
+                            <TextBlock Name="AnalyserDetailTextBlock" Style="{StaticResource CaptionText}" Margin="0,0,0,14"/>
+                            <Button Name="TestAnalyserButton" HorizontalAlignment="Left"
+                                    Style="{StaticResource SecondaryButton}" Click="TestAnalyserButton_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE895;" Style="{StaticResource InlineIconText}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Test Analyser Connection"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

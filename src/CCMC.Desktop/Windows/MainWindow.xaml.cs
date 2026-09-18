@@ -5,11 +5,22 @@ using CCMC.Application.Abstractions;
 using CCMC.Application.Auth;
 using CCMC.Application.Sync;
 using CCMC.Desktop.Controls;
+using CCMC.Desktop.Views;
 using CCMC.Domain.Enums;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CCMC.Desktop.Windows;
 
+/// <summary>
+/// The single-window application shell (2026-09-18 redesign - see CLAUDE.md "single-window
+/// application shell" requirement). Left sidebar navigation + a right ContentControl
+/// (MainContent) that swaps in the selected page - Dashboard/Reception/History/Sources/
+/// Vehicles/Synchronization/Settings all render here now instead of each opening its own
+/// top-level Window. Dashboard's own markup/logic stays exactly where it was (declared inline
+/// in MainWindow.xaml, driven by this class) - it is simply the ContentControl's initial
+/// Content instead of the whole window's only content; every other page is a UserControl
+/// built via DI (see Views/*) and assigned to MainContent.Content on demand.
+/// </summary>
 public partial class MainWindow : Window
 {
     private readonly IServiceProvider _serviceProvider;
@@ -23,6 +34,23 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+
+    /// <summary>Captured once at Loaded (the Dashboard content declared inline in XAML), so ShowDashboard() can restore it after another page has replaced MainContent.Content.</summary>
+    private object? _dashboardContent;
+
+    private readonly List<Button> _navButtons = [];
+
+    /// <summary>
+    /// Sources/Vehicles nav visibility (CLAUDE.md RBAC requirement: hidden for Operator,
+    /// visible for Manager/Admin). Deliberately role-based, not permission-based - the
+    /// Operator role is actually granted SOURCE_VIEW/VEHICLE_VIEW server-side (BRD v2 section
+    /// 14's least-privilege grant, so Reception's own source/vehicle pickers keep working for
+    /// an Operator) - so gating on that permission would NOT hide these nav items for an
+    /// Operator. This mirrors the explicit nav requirement instead, and is UX-only, same as
+    /// every other client-side check in this app: the server's own [RequirePermission] guards
+    /// remain the real authorization boundary regardless of what this shell shows or hides.
+    /// </summary>
+    private bool _canManageSourcesAndVehicles;
 
     public MainWindow(
         IServiceProvider serviceProvider,
@@ -44,6 +72,8 @@ public partial class MainWindow : Window
         _cloudApiClient = cloudApiClient;
         _receptionRepository = receptionRepository;
 
+        _navButtons.AddRange([NavDashboardButton, NavReceptionButton, NavHistoryButton, NavSourcesButton, NavVehiclesButton, NavSyncButton, NavSettingsButton]);
+
         Loaded += MainWindow_Loaded;
         Closed += (_, _) =>
         {
@@ -54,10 +84,14 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        _dashboardContent = MainContent.Content;
+
         var session = _sessionStore.Current;
         WelcomeTextBlock.Text = session is not null
             ? $"{session.User.FullName} ({string.Join(", ", session.User.Roles)})"
             : string.Empty;
+
+        ApplyRoleBasedNavigation(session);
 
         // Offline-authenticated session (see CLAUDE.md "Architecture Decisions" -
         // Offline Operator Login): no valid access token, so sync stays paused
@@ -81,6 +115,24 @@ public partial class MainWindow : Window
         // Run one tick immediately at startup too, after the outbox's stale-processing sweep.
         await _syncEngineService.RecoverAtStartupAsync(CancellationToken.None);
         await RunSyncTickAsync();
+    }
+
+    /// <summary>
+    /// Sources/Vehicles are hidden entirely (not just disabled) for an Operator - see
+    /// <see cref="_canManageSourcesAndVehicles"/>'s doc comment for why this checks roles
+    /// rather than the SOURCE_VIEW/VEHICLE_VIEW permissions. Admin is granted the same
+    /// Source/VehicleCreate/Edit permissions as Manager (SeedHelpers.RolePermissions), so
+    /// Admin naturally passes this check too - no separate Admin-specific branch needed.
+    /// </summary>
+    private void ApplyRoleBasedNavigation(Session? session)
+    {
+        var roles = session?.User.Roles ?? [];
+        _canManageSourcesAndVehicles = roles.Any(r =>
+            string.Equals(r, "Manager", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase));
+
+        NavSourcesButton.Visibility = _canManageSourcesAndVehicles ? Visibility.Visible : Visibility.Collapsed;
+        NavVehiclesButton.Visibility = _canManageSourcesAndVehicles ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task RunSyncTickAsync()
@@ -179,7 +231,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Shows the most recent locally captured receptions (any sync state) - purely a
     /// read of the existing IReceptionRepository.ListRecentAsync (the same method
-    /// ReceptionHistoryWindow already uses), never fabricated/estimated data. Works
+    /// ReceptionHistoryView already uses), never fabricated/estimated data. Works
     /// offline (SQLite is local) unlike the cloud-backed summary cards above.
     /// </summary>
     private async Task RefreshRecentReceptionsAsync()
@@ -191,7 +243,7 @@ public partial class MainWindow : Window
         {
             var empty = new Border { Style = (Style)FindResource("EmptyStateBorder"), BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent };
             var stack = new StackPanel();
-            stack.Children.Add(new TextBlock { Text = "", Style = (Style)FindResource("EmptyStateIconText") });
+            stack.Children.Add(new TextBlock { Text = "", Style = (Style)FindResource("EmptyStateIconText") });
             stack.Children.Add(new TextBlock { Text = "No receptions captured yet", Style = (Style)FindResource("EmptyStateTitleText") });
             stack.Children.Add(new TextBlock { Text = "Receptions you capture on the Milk Reception screen will appear here.", Style = (Style)FindResource("EmptyStateBodyText") });
             empty.Child = stack;
@@ -240,63 +292,96 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ReceptionButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<ReceptionWindow>());
+    // ===================== Single-window navigation =====================
+    // Every nav button below swaps MainContent.Content instead of opening a Window - this
+    // is the entire "single main window + left nav + right content" mechanism. Sources/
+    // Vehicles are additionally guarded here (not just by Visibility.Collapsed on the
+    // button) so an Operator cannot reach them if some future code path ever calls these
+    // methods directly.
 
-    private void HistoryButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<ReceptionHistoryWindow>());
-
-    private void SourcesButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SourcesWindow>());
-
-    private void VehiclesButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<VehiclesWindow>());
-
-    private void DeviceStatusButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<DeviceStatusWindow>());
-
-    private void DeviceConfigButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<DeviceConfigurationWindow>());
-
-    private void SyncStatusButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SyncStatusWindow>());
-
-    private void SettingsButton_Click(object sender, RoutedEventArgs e) => ShowOwned(_serviceProvider.GetRequiredService<SettingsWindow>());
-
-    /// <summary>
-    /// Every secondary window is owned by this shell (Owner + WindowStartupLocation=
-    /// CenterOwner, set in each window's own XAML) so it opens centred over the
-    /// dashboard, minimizes/restores with it, and never appears as a detached,
-    /// unrelated window - see this redesign's window-hierarchy requirement. Still
-    /// non-modal (.Show(), not .ShowDialog()) - unchanged from before, so an operator
-    /// can still have Reception and History open side by side if they choose.
-    /// Also clamps the window to the work area of whichever monitor it actually opens
-    /// on (WindowScreenFit) - fixes tall windows (Reception) opening partly off-screen
-    /// on smaller/secondary displays, applied here once rather than in every window.
-    /// </summary>
-    private void ShowOwned(Window window)
+    private void SetActiveNav(Button active)
     {
-        window.Owner = this;
-        window.SourceInitialized += (_, _) => WindowScreenFit.EnsureFitsWorkArea(window);
-        window.Show();
+        foreach (var button in _navButtons)
+        {
+            button.Style = (Style)FindResource("SidebarButtonStyle");
+        }
+        active.Style = (Style)FindResource("SidebarNavButtonActiveStyle");
     }
+
+    private void ShowDashboard()
+    {
+        SetActiveNav(NavDashboardButton);
+        MainContent.Content = _dashboardContent;
+    }
+
+    private void ShowReception()
+    {
+        SetActiveNav(NavReceptionButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<ReceptionView>();
+    }
+
+    private void ShowHistory(string? statusFilter)
+    {
+        SetActiveNav(NavHistoryButton);
+        var view = _serviceProvider.GetRequiredService<ReceptionHistoryView>();
+        view.InitialStatusFilter = statusFilter;
+        MainContent.Content = view;
+    }
+
+    private void ShowSources()
+    {
+        if (!_canManageSourcesAndVehicles) return;
+        SetActiveNav(NavSourcesButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<SourcesView>();
+    }
+
+    private void ShowVehicles()
+    {
+        if (!_canManageSourcesAndVehicles) return;
+        SetActiveNav(NavVehiclesButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<VehiclesView>();
+    }
+
+    private void ShowSync()
+    {
+        SetActiveNav(NavSyncButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<SyncStatusView>();
+    }
+
+    private void ShowSettings()
+    {
+        SetActiveNav(NavSettingsButton);
+        MainContent.Content = _serviceProvider.GetRequiredService<SettingsView>();
+    }
+
+    private void DashboardButton_Click(object sender, RoutedEventArgs e) => ShowDashboard();
+
+    private void ReceptionButton_Click(object sender, RoutedEventArgs e) => ShowReception();
+
+    private void HistoryButton_Click(object sender, RoutedEventArgs e) => ShowHistory(null);
+
+    private void SourcesButton_Click(object sender, RoutedEventArgs e) => ShowSources();
+
+    private void VehiclesButton_Click(object sender, RoutedEventArgs e) => ShowVehicles();
+
+    private void SyncStatusButton_Click(object sender, RoutedEventArgs e) => ShowSync();
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e) => ShowSettings();
 
     /// <summary>
     /// Opens Reception History pre-filtered to a status - the Dashboard's Receptions/
-    /// Accepted/Hold/Rejected cards (see MainWindow.xaml) all route through this instead
-    /// of building separate filtered screens. <paramref name="statusFilter"/> is one of
-    /// ReceptionHistoryWindow's own filter option strings ("Accepted"/"Hold"/"Rejected"),
-    /// or null for "Receptions" (all statuses, no filter). Reuses the exact same window
-    /// class/DI registration the sidebar's "Reception History" item already opens - not a
-    /// second, parallel history screen.
+    /// Accepted/Hold/Rejected cards (see MainWindow.xaml) all route through ShowHistory
+    /// instead of building separate filtered screens. <paramref name="statusFilter"/> is one
+    /// of ReceptionHistoryView's own filter option strings ("Accepted"/"Hold"/"Rejected"), or
+    /// null for "Receptions" (all statuses, no filter).
     /// </summary>
-    private void OpenHistoryFiltered(string? statusFilter)
-    {
-        var history = _serviceProvider.GetRequiredService<ReceptionHistoryWindow>();
-        history.InitialStatusFilter = statusFilter;
-        ShowOwned(history);
-    }
+    private void ReceptionsCard_Click(object sender, RoutedEventArgs e) => ShowHistory(null);
 
-    private void ReceptionsCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered(null);
+    private void AcceptedCard_Click(object sender, RoutedEventArgs e) => ShowHistory("Accepted");
 
-    private void AcceptedCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Accepted");
+    private void HoldCard_Click(object sender, RoutedEventArgs e) => ShowHistory("Hold");
 
-    private void HoldCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Hold");
-
-    private void RejectedCard_Click(object sender, RoutedEventArgs e) => OpenHistoryFiltered("Rejected");
+    private void RejectedCard_Click(object sender, RoutedEventArgs e) => ShowHistory("Rejected");
 
     private async void LogoutButton_Click(object sender, RoutedEventArgs e)
     {

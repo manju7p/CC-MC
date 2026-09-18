@@ -1,18 +1,24 @@
 using System.Windows;
+using System.Windows.Controls;
 using CCMC.Application.Abstractions;
 using CCMC.Application.Sync;
 using CCMC.Desktop.Controls;
 
-namespace CCMC.Desktop.Windows;
+namespace CCMC.Desktop.Views;
 
-public partial class SyncStatusWindow : Window
+/// <summary>
+/// Synchronization Status - moved from Windows/SyncStatusWindow (a top-level Window) to a
+/// UserControl hosted in MainWindow's single content area (2026-09-18 single-window shell
+/// redesign). Logic unchanged from SyncStatusWindow.
+/// </summary>
+public partial class SyncStatusView : UserControl
 {
     private readonly IOutboxRepository _outboxRepository;
     private readonly IOverrideOutboxRepository _overrideOutboxRepository;
     private readonly SyncEngineService _syncEngineService;
     private readonly ISessionStore _sessionStore;
 
-    public SyncStatusWindow(
+    public SyncStatusView(
         IOutboxRepository outboxRepository,
         IOverrideOutboxRepository overrideOutboxRepository,
         SyncEngineService syncEngineService,

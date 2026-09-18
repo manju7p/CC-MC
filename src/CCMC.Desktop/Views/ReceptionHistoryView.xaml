@@ -1,9 +1,7 @@
-<Window x:Class="CCMC.Desktop.Windows.ReceptionHistoryWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Reception History" Height="760" Width="1180" MinHeight="520" MinWidth="820"
-        WindowStartupLocation="CenterOwner">
-    <Window.Resources>
+<UserControl x:Class="CCMC.Desktop.Views.ReceptionHistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
         <!-- One transaction row, rendered as a card-like Grid rather than a raw DataGrid line -
              see this redesign's "do not make History look like Excel" requirement. Column
              widths mirror ColumnHeaderRow below so labels and data always line up. -->
@@ -63,7 +61,7 @@
                 </Grid>
             </Border>
         </DataTemplate>
-    </Window.Resources>
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -82,7 +80,7 @@
                     <TextBlock Text="&#xE917;" Style="{StaticResource WindowHeaderIconText}"/>
                     <StackPanel>
                         <TextBlock Text="Reception History" Style="{StaticResource TitleText}"/>
-                        <TextBlock Text="The most recent 200 locally captured receptions." Style="{StaticResource CaptionText}"/>
+                        <TextBlock Text="Locally captured receptions." Style="{StaticResource CaptionText}"/>
                     </StackPanel>
                 </StackPanel>
                 <Button Grid.Column="1" Name="RefreshButton" Style="{StaticResource SecondaryButton}" Click="RefreshButton_Click">
@@ -131,19 +129,27 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="14"/>
-                            <ColumnDefinition Width="220"/>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="180"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="SEARCH" Style="{StaticResource FieldLabelText}"/>
                             <Grid>
                                 <TextBox Name="SearchTextBox" Style="{StaticResource SearchTextBox}" TextChanged="Filter_Changed"
-                                         ToolTip="Search by source, vehicle, or transaction #"
+                                         ToolTip="Search by source, vehicle, transaction #, quantity, fat, SNF, rate, amount, status, and more"
                                          AutomationProperties.Name="Search reception history"/>
                                 <TextBlock Text="&#xE721;" Style="{StaticResource InlineIconText}" Foreground="{StaticResource TextMutedBrush}"
                                            Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False"/>
                             </Grid>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
+                            <TextBlock Text="PERIOD" Style="{StaticResource FieldLabelText}"/>
+                            <ComboBox Name="DatePeriodComboBox" SelectionChanged="Filter_Changed"
+                                      AutomationProperties.Name="Filter reception history by date period"
+                                      ToolTip="Filter by Today/Past Week/Past Month/Past Year/Total"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
                             <TextBlock Text="STATUS" Style="{StaticResource FieldLabelText}"/>
                             <ComboBox Name="StatusFilterComboBox" SelectionChanged="Filter_Changed"
                                       AutomationProperties.Name="Filter reception history by status"
@@ -192,7 +198,7 @@
                                 <TextBlock Text="&#xE721;" Style="{StaticResource EmptyStateIconText}"/>
                                 <TextBlock Text="No receptions match this filter" Style="{StaticResource EmptyStateTitleText}"/>
                                 <TextBlock Style="{StaticResource EmptyStateBodyText}"
-                                           Text="Try clearing the search text or choosing a different status."/>
+                                           Text="Try clearing the search text, choosing a different period, or choosing a different status."/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -200,4 +206,4 @@
             </StackPanel>
         </ScrollViewer>
     </Grid>
-</Window>
+</UserControl>

@@ -49,7 +49,12 @@ public static class StatusChip
             _ => ("NeutralChipBorder", "NeutralChipText", "NeutralChipIcon", GlyphInfo),
         };
 
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var panel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
         panel.Children.Add(new TextBlock
         {
             Style = (Style)System.Windows.Application.Current.FindResource(iconKey),

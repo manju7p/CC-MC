@@ -385,9 +385,15 @@ src/
 │                         Application + Contracts
 └── CCMC.Desktop/         WPF, code-behind only, no MVVM. Composition/ (DI
                           wiring incl. structured logging, AppPaths),
-                          Windows/ (Login, Main, Reception, ReceptionHistory,
-                          Sources, Vehicles, DeviceStatus, DeviceConfiguration
-                          - full serial parameter UI, SyncStatus, Settings) —
+                          Windows/ (Login, and Main - the single-window shell:
+                          left sidebar nav + a right ContentControl that swaps
+                          in whichever page is selected - see "Single-Window
+                          Shell" below), Views/ (Reception, ReceptionHistory,
+                          Sources, Vehicles, SyncStatus, Settings - the last
+                          combining General/Device Configuration/Device Status
+                          as three toggled sections on one screen; every one
+                          of these is a UserControl hosted in Main's content
+                          area, not a separate top-level Window) —
                           refs all four projects above
 tests/
 ├── CCMC.Tests/              xUnit — Domain, Persistence, Sync, Serial, Devices, Auth (89 tests, all passing)

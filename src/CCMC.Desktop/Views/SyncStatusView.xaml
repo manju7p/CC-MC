@@ -1,8 +1,6 @@
-<Window x:Class="CCMC.Desktop.Windows.SyncStatusWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="CCMC - Synchronization Status" Height="420" Width="520" MinHeight="360" MinWidth="440"
-        WindowStartupLocation="CenterOwner">
+<UserControl x:Class="CCMC.Desktop.Views.SyncStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -35,4 +33,4 @@
             </Border>
         </StackPanel>
     </Grid>
-</Window>
+</UserControl>

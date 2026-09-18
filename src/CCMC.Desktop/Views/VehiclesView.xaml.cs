@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using CCMC.Application.Abstractions;
 using CCMC.Application.MasterData;
 using CCMC.Contracts.Auth;
@@ -7,9 +8,15 @@ using CCMC.Contracts.Dtos;
 using CCMC.Domain.Entities;
 using CCMC.Domain.Enums;
 
-namespace CCMC.Desktop.Windows;
+namespace CCMC.Desktop.Views;
 
-public partial class VehiclesWindow : Window
+/// <summary>
+/// Vehicles - moved from Windows/VehiclesWindow (a top-level Window) to a UserControl hosted in
+/// MainWindow's single content area (2026-09-18 single-window shell redesign). Logic unchanged
+/// from VehiclesWindow. Visibility of the Vehicles nav item itself (Manager/Admin only, hidden
+/// for Operator) is enforced one level up, in MainWindow - see its RBAC nav filtering.
+/// </summary>
+public partial class VehiclesView : UserControl
 {
     private readonly ISessionStore _sessionStore;
     private readonly IChillingCentreRepository _centreRepository;
@@ -19,7 +26,7 @@ public partial class VehiclesWindow : Window
 
     private List<Vehicle> _allVehicles = [];
 
-    public VehiclesWindow(
+    public VehiclesView(
         ISessionStore sessionStore,
         IChillingCentreRepository centreRepository,
         IVehicleRepository vehicleRepository,
@@ -53,7 +60,7 @@ public partial class VehiclesWindow : Window
         _allVehicles = all;
         ApplySearchFilter();
 
-        // Client-side visibility only (see SourcesWindow's identical comment) -
+        // Client-side visibility only (see SourcesView's identical comment) -
         // the server independently enforces VEHICLE_CREATE regardless.
         var canCreate = !session.IsOffline && session.User.Permissions.Contains(PermissionCodes.VehicleCreate);
         AddVehiclePanel.Visibility = canCreate ? Visibility.Visible : Visibility.Collapsed;
@@ -191,8 +198,8 @@ public partial class VehiclesWindow : Window
         {
             var isActive = v.Status == RecordStatus.Active;
             var (glyph, borderKey, iconKey, textKey) = isActive
-                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
-                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
+                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
+                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
 
             return new VehicleRow
             {

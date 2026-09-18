@@ -12,6 +12,7 @@ using CCMC.Infrastructure.Persistence;
 using CCMC.Infrastructure.Persistence.Repositories;
 using CCMC.Infrastructure.Serial;
 using CCMC.Infrastructure.Sync;
+using CCMC.Desktop.Views;
 using CCMC.Desktop.Windows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,17 +80,21 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new SyncEngineOptions());
         services.AddSingleton<SyncEngineService>();
 
-        // Windows - transient, so each navigation opens a fresh instance with fresh data.
+        // Top-level windows - transient. Only Login and the single-window shell
+        // (MainWindow) are still real Windows post-redesign (2026-09-18 single-window
+        // shell) - every other former Window is now a UserControl hosted inside
+        // MainWindow's content area (see Views below).
         services.AddTransient<LoginWindow>();
         services.AddTransient<MainWindow>();
-        services.AddTransient<ReceptionWindow>();
-        services.AddTransient<ReceptionHistoryWindow>();
-        services.AddTransient<SourcesWindow>();
-        services.AddTransient<VehiclesWindow>();
-        services.AddTransient<DeviceStatusWindow>();
-        services.AddTransient<DeviceConfigurationWindow>();
-        services.AddTransient<SyncStatusWindow>();
-        services.AddTransient<SettingsWindow>();
+
+        // Content views - transient, so each navigation click builds a fresh instance
+        // with freshly loaded data (matches the previous per-Window behaviour exactly).
+        services.AddTransient<ReceptionView>();
+        services.AddTransient<ReceptionHistoryView>();
+        services.AddTransient<SourcesView>();
+        services.AddTransient<VehiclesView>();
+        services.AddTransient<SyncStatusView>();
+        services.AddTransient<SettingsView>();
 
         return services;
     }

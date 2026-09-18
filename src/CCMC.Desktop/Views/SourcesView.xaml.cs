@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using CCMC.Application.Abstractions;
 using CCMC.Application.MasterData;
 using CCMC.Contracts.Auth;
@@ -6,9 +7,15 @@ using CCMC.Contracts.Dtos;
 using CCMC.Domain.Entities;
 using CCMC.Domain.Enums;
 
-namespace CCMC.Desktop.Windows;
+namespace CCMC.Desktop.Views;
 
-public partial class SourcesWindow : Window
+/// <summary>
+/// Sources - moved from Windows/SourcesWindow (a top-level Window) to a UserControl hosted in
+/// MainWindow's single content area (2026-09-18 single-window shell redesign). Logic unchanged
+/// from SourcesWindow. Visibility of the Sources nav item itself (Manager/Admin only, hidden
+/// for Operator) is enforced one level up, in MainWindow - see its RBAC nav filtering.
+/// </summary>
+public partial class SourcesView : UserControl
 {
     private readonly ISessionStore _sessionStore;
     private readonly IChillingCentreRepository _centreRepository;
@@ -18,7 +25,7 @@ public partial class SourcesWindow : Window
 
     private List<Source> _allSources = [];
 
-    public SourcesWindow(
+    public SourcesView(
         ISessionStore sessionStore,
         IChillingCentreRepository centreRepository,
         ISourceRepository sourceRepository,
@@ -184,8 +191,8 @@ public partial class SourcesWindow : Window
         {
             var isActive = s.Status == RecordStatus.Active;
             var (glyph, borderKey, iconKey, textKey) = isActive
-                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
-                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
+                ? ("", "SuccessChipBorder", "SuccessChipIcon", "SuccessChipText")
+                : ("", "NeutralChipBorder", "NeutralChipIcon", "NeutralChipText");
 
             return new SourceRow
             {

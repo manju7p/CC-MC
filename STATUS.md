@@ -1565,6 +1565,166 @@ card, dragging Reception to a second monitor, tabbing through the
 sidebar) - no GUI automation tool was available for this native WPF app
 in this environment, the same limitation stated in every prior session.
 
+## Single-Window Shell & Navigation Redesign (2026-09-18)
+
+A UI/UX/navigation task, not a business-logic change: no Domain/
+Application/Infrastructure/Contracts/Cloud.* code touched, no device
+protocol/API contract/database schema change. `dotnet build CCMC.sln`
+0 warnings/0 errors; `dotnet test CCMC.sln` client suite unaffected
+(155/155 - `CCMC.Tests` has zero reference to `CCMC.Desktop`, so a WPF
+navigation change cannot regress it); the cloud suite could not be
+exercised this session (no local Postgres test DB running - a pre-
+existing environmental gap, not something this pass caused). A real
+Debug `.exe` launch was performed and its log shows the same clean
+startup signature as every prior session (`DeviceManager` reaching the
+Videocon adapter, "CCMC startup complete").
+
+**Single-window shell.** `ReceptionWindow`, `ReceptionHistoryWindow`,
+`SourcesWindow`, `VehiclesWindow`, `SyncStatusWindow`,
+`SettingsWindow`, `DeviceConfigurationWindow`, and `DeviceStatusWindow`
+(eight separate top-level `Window`s, each opened via `MainWindow.ShowOwned`)
+are now UserControls under a new `CCMC.Desktop.Views` namespace, hosted
+in a single `ContentControl` (`MainWindow.MainContent`) that the left
+sidebar swaps between - `MainWindow` itself is the only remaining
+top-level window besides `LoginWindow`. None of the moved windows used
+`Close()`/`DialogResult`/`ShowDialog`/`Owner`, so the conversion was a
+pure base-class change (`Window` → `UserControl`, `InitializeComponent`
+unchanged) with zero logic rewritten - every constructor/DI signature,
+event handler, and repository/service call is identical to its source
+window. `MainWindow`'s own Dashboard content is unchanged and stays
+inline in `MainWindow.xaml`; it is simply `MainContent`'s initial
+`Content` (captured once in `MainWindow_Loaded` so `ShowDashboard()` can
+restore it later) rather than the whole window's only content. Every
+sidebar button (including Dashboard, previously a static "you are here"
+`Border`) is now a real `Button`; the active one is styled via a new
+`SidebarNavButtonActiveStyle` (`Styles/Theme.xaml`, `BasedOn`
+`SidebarButtonStyle` - same template, only the background differs) set
+in code by `MainWindow.SetActiveNav`. Content views are still resolved
+via `IServiceProvider.GetRequiredService<T>()` and still transient, so
+each navigation click builds a fresh instance with freshly loaded data -
+identical behaviour to the previous per-`Window` model, just without a
+second top-level window appearing.
+
+**Settings now hosts Device Configuration and Device Status.** The
+former `DeviceConfigurationWindow` and `DeviceStatusWindow` content
+(COM port enumeration, baud/parity/stop-bits/flow-control selection,
+test-connection, and the scale/analyser connection-state chips) is
+merged into the new `SettingsView` as two additional sections alongside
+the original "General" (cloud API URL / DB path / captures path,
+read-only) section, switched by three small buttons at the top of the
+screen (not a new `TabControl` template - `Theme.xaml` had no
+`TabControl`/`TabItem` styling, so reusing the same
+button-swaps-visible-panel idea `MainWindow`'s own sidebar already uses
+avoided inventing new chrome). All three sections' logic - serial
+config load/save/test, device status refresh/test - is verbatim from
+the original windows. `MainWindow`'s sidebar no longer has separate
+"Device Status"/"Device Configuration" entries; both are reachable only
+through Settings now.
+
+**Reception History date-period filter.** A `PERIOD` `ComboBox`
+(Today/Past Week/Past Month/Past Year/Total) was added next to the
+existing `STATUS` filter, defaulting to **Today** (local calendar date,
+`DateTime.Today` - never hard-coded). Past Week/Month/Year are inclusive
+7/30/365-day windows ending today (`today.AddDays(-6/-29/-364)`); Total
+applies no date bound. All three filters (date period, status, search)
+combine with a single `Where` over the already-loaded in-memory row set
+- unchanged client-side-filtering approach, no new endpoint. The KPI
+summary cards (RECEPTIONS/TOTAL QUANTITY/TOTAL AMOUNT/breakdown) now
+reflect the *filtered* set rather than the full unfiltered load, so
+"Today" actually shows today's totals - a deliberate behaviour change
+from the previous pass (which computed the summary once from the full
+200-record load and never updated it), made because a KPI card labelled
+"RECEPTIONS" while a "Today" filter is active would otherwise show a
+number that has nothing to do with today. `IReceptionRepository
+.ListRecentAsync`'s `take` parameter (a plain SQL `LIMIT`) is now called
+with `int.MaxValue` instead of a fixed `200`, so "Total" genuinely means
+every reception ever captured locally, not just the most recent 200 -
+a parameter-value change, not a new query/repository method/schema
+change. For a chilling centre with a very large multi-year local
+history, this is a heavier one-time load than before when "Total" (or
+a wide "Past Year") is actually selected - not expected to matter at
+this project's scale, but worth knowing if it ever does.
+
+**Reception History search now covers every field a row displays.**
+Previously only source/vehicle/transaction-number were searched. Each
+row now also precomputes a lower-cased `SearchHaystack` string covering
+quantity, fat, SNF, CLR, water, protein, temperature, rate, amount
+(each included both in raw decimal form and its displayed rounded form,
+e.g. both `49.2` and `49.20`, so a search for either matches), reading
+source, status, sync state, and the captured date/time - every field
+that actually exists on `MilkReceptionTransaction`/the row, nothing
+invented. `ApplyFilter` is now a single `Contains` check against this
+string instead of three separate field comparisons.
+
+**Status chip sizing/alignment.** `Styles/Theme.xaml`'s `ChipBorderBase`
+gained a `MinHeight="24"` so Accepted/Hold/Rejected/etc. chips are the
+same height regardless of which glyph a given `StatusChip.ChipKind`
+renders (different icon glyphs have slightly different natural ascent/
+descent, which previously left the auto-sized `Border` a pixel or two
+taller/shorter depending on status); `ChipTextBase`/`ChipIconBase` both
+gained explicit `HorizontalAlignment="Center"`/`VerticalAlignment="Center"`
+(previously only the icon had `VerticalAlignment="Center"`, not the
+text), and `StatusChip.Create`'s inner `StackPanel` is now built with
+the same explicit centering - so a chip's icon+text is centered
+regardless of the chip's own width, not just visually incidental
+because its content happened to fit tightly.
+
+**Shared icon-textbox padding, not per-window `Padding` overrides.**
+`LoginWindow`'s email/password fields previously hard-coded
+`Padding="30,6,10,6"` inline (duplicating `Styles/Theme.xaml`'s
+`SearchTextBox` style used by History/Sources/Vehicles' own search
+boxes); they now reference `SearchTextBox` (email) and a new
+`IconPasswordBox` style (password) instead, so the one shared left-
+padding value used by every icon-prefixed input lives in exactly one
+place. The base `TextBox` style also gained an explicit
+`HorizontalContentAlignment="Left"` Setter for documentation/defensive
+correctness, though its custom `ControlTemplate` (a `Border` +
+`ScrollViewer` `PART_ContentHost`) does not actually read that property
+- the left-alignment is controlled entirely by `Padding`, same as
+before this pass.
+
+**Removed the "+" icon from the Milk Reception header.** `ReceptionView`
+(formerly `ReceptionWindow`)'s header no longer shows the ``
+("Add"/plus) glyph next to "Milk Reception" - purely cosmetic; the same
+glyph is intentionally left in place everywhere else it already
+appeared (the sidebar's own "Milk Reception" nav icon, the Dashboard's
+"RECEPTIONS" card icon, and the genuine "Add Source"/"Add Vehicle"
+button icons), since only the Reception screen's own header was in
+scope.
+
+**Sources/Vehicles hidden from Operator navigation.** `MainWindow`
+computes `_canManageSourcesAndVehicles` from `session.User.Roles`
+containing "Manager" or "Admin" (case-insensitive) and sets
+`NavSourcesButton`/`NavVehiclesButton`'s `Visibility` accordingly at
+`MainWindow_Loaded` - deliberately **role**-based, not permission-based.
+`SeedHelpers.RolePermissions` (`CCMC.Cloud.Infrastructure/Seed/
+SeedHelpers.cs`) actually grants Operator both `SOURCE_VIEW` and
+`VEHICLE_VIEW` (BRD v2 §14's least-privilege grant - so Reception's own
+source/vehicle picker `ComboBox`es keep populating for an Operator, which
+is unchanged and correct), so gating the nav item on that permission
+would **not** hide it for an Operator; this task's own explicit nav
+matrix was treated as the source of truth for the nav item's visibility,
+while the server's `[RequirePermission]` guards on the Source/Vehicle
+CRUD endpoints remain completely untouched and are still the real
+authorization boundary. `ShowSources()`/`ShowVehicles()` additionally
+early-return when `!_canManageSourcesAndVehicles`, so an Operator
+cannot reach either screen even via a future code path that calls these
+methods directly, not just via the hidden button. Admin is granted the
+same Source/VehicleCreate/Edit permissions as Manager in
+`RolePermissions`, so Admin's broader access is preserved without a
+separate Admin-specific branch.
+
+**Not verified this session (documented, not silently skipped):**
+literal mouse-click GUI interaction (clicking through each nav button,
+confirming the active-nav highlight visually, confirming chip
+sizing/centering by eye, confirming textbox padding by eye) - no GUI
+automation tool was available for this native WPF app in this
+environment, the same limitation stated in every prior UI session (see
+"UI/UX Refinement Pass (2026-09-15)" above). Verification here was
+static/code-level (build, the unaffected client test suite, and a real
+`.exe` launch confirming clean startup) plus manual review of the
+merged XAML/code-behind against each original window's own source.
+
 ## Important Commands
 
 ```

@@ -201,6 +201,7 @@
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="CaretBrush" Value="{StaticResource PrimaryBrush}"/>
         <Setter Property="SelectionBrush" Value="{StaticResource PrimaryLightBrush}"/>
@@ -423,15 +424,15 @@
         </Setter>
     </Style>
 
-    <!-- The single permanently-active "Dashboard" sidebar entry - not a Button, since
-         MainWindow's own content IS the dashboard (every other item opens a separate
-         window - see "Do not rewrite architecture"/"no MVVM" - so there is no in-shell
-         page swap to track). This is the shell's "you are here" indicator. -->
-    <Style x:Key="SidebarActiveItemBorder" TargetType="Border">
+    <!-- Single-window shell nav (2026-09-18 redesign): every sidebar entry, including
+         Dashboard, is now a real Button that swaps MainWindow's content area instead of
+         opening a separate top-level window - see MainWindow.xaml.cs SetActiveNav. This
+         style is the "you are here" state for whichever button is currently selected;
+         same template/shape as SidebarButtonStyle (BasedOn it), only the colour changes,
+         so switching a button between the two styles at runtime never changes its layout. -->
+    <Style x:Key="SidebarNavButtonActiveStyle" TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
         <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-        <Setter Property="CornerRadius" Value="5"/>
-        <Setter Property="Padding" Value="16,10"/>
-        <Setter Property="Margin" Value="8,2"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
     <!-- Sidebar section label, e.g. "NAVIGATION". -->
@@ -540,20 +541,31 @@
          source/vehicle status, device/sync state, offline banner) renders it identically
          instead of five slightly different one-off Borders. One style per semantic role;
          the icon glyph itself is supplied by the caller (StatusChip.Kind), not the style. -->
+    <!-- MinHeight forces every chip (Accepted/Hold/Rejected, and every other StatusChip
+         caller) to the same footprint regardless of which glyph a given ChipKind renders -
+         different icon glyphs have slightly different natural ascent/descent, which
+         otherwise left the auto-sized Border a pixel or two taller/shorter than its
+         neighbours (this redesign's "status boxes must be the same size" fix). -->
     <Style x:Key="ChipBorderBase" TargetType="Border">
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Padding" Value="8,4"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="MinHeight" Value="24"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style x:Key="ChipTextBase" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style x:Key="ChipIconBase" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="Margin" Value="0,0,5,0"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
@@ -662,8 +674,16 @@
         <Setter Property="MaxWidth" Value="420"/>
     </Style>
 
-    <!-- ================= Search box ================= -->
+    <!-- ================= Icon-prefixed inputs (search box / login fields) ================= -->
+    <!-- Shared left padding for any TextBox/PasswordBox that overlays a small icon glyph at its
+         left edge (Reception History/Sources/Vehicles search, Login email/password - see each
+         XAML's Grid+TextBlock overlay pattern) - one definition instead of each window repeating
+         its own inline Padding, so a future adjustment only happens here (this redesign's
+         "shared style, not per-control margins" fix for the icon/text spacing). -->
     <Style x:Key="SearchTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="Padding" Value="30,6,10,6"/>
+    </Style>
+    <Style x:Key="IconPasswordBox" TargetType="PasswordBox" BasedOn="{StaticResource {x:Type PasswordBox}}">
         <Setter Property="Padding" Value="30,6,10,6"/>
     </Style>
 
