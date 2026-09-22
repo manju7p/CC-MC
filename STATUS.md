@@ -8,6 +8,117 @@
 > is the current-state summary that cites specific sections of this file;
 > read this one when you need the *why* and *when* behind a decision
 > `context.md` only references.
+>
+> **Checkpoint update (2026-09-13):** development is paused here
+> deliberately (checkpoint task, no new code). See "Checkpoint (2026-09-13)"
+> immediately below for the current COMPLETE/PARTIAL/NOT IMPLEMENTED/NEXT
+> summary, `architecture.mmd` (repo root) for the full system diagram, and
+> `HOW_TO_RUN.md` for the current Docker/Neon runbook.
+>
+> **Update (2026-09-15):** the "Production user bootstrap mechanism" item
+> below is now done — see "Neon Production Bootstrap (2026-09-15)" further
+> down for the full writeup. A UI/UX redesign pass also landed the same
+> day (see "UI/UX Redesign (2026-09-15)" / "UI/UX Refinement Pass
+> (2026-09-15)" further down) — presentational only, no domain/
+> application/infrastructure change. **Render deployment is now explicitly
+> BLOCKED** (not just "not started"): the GitHub repository is owned by
+> the CEO and the current operator lacks the access to connect it to
+> Render — a real access/permissions blocker, not a technical one. The
+> checkpoint below is updated accordingly (new BLOCKED category added).
+
+## Checkpoint (2026-09-13) — Current Scope
+
+A future session should read this section first, then follow the pointers
+into the rest of this file / `context.md` / `progress.md` for detail.
+
+### COMPLETE
+- WPF client: device abstractions (Videocon scale, Ekomilk KAM98-2A
+  analyser), reception workflow (Accept/Hold/RejectAtReception), rate
+  calculation (Fat-vs-SNF and TS-based, BRD §25), offline-first SQLite
+  persistence + outbox sync, online/offline authentication
+  (Argon2id+DPAPI offline store), master-data sync, Source/Vehicle
+  management UI for Manager/Admin, transaction history with Rate/Amount
+  columns, Enter-key login.
+- Cloud API: full RBAC (14 permission codes, server-side
+  `[RequirePermission]` + `CentreAccessGuard`), JWT auth (HMAC-SHA256, 8h
+  expiry), all master-data/reception/override/dashboard/audit endpoints,
+  idempotent reception sync, EF Core/Npgsql with 3 migrations,
+  Development-only seeder, production account bootstrap (see "Neon
+  Production Bootstrap (2026-09-15)").
+- Dockerization: `cc-mc` (API) + `cc-mc-postgres` containers, Compose
+  profile-based skip of local Postgres in Neon mode, `.env.docker`/
+  `.env.neon`/`.env.example` environment separation (all three
+  secret-bearing files gitignored).
+- Neon linkage: project `fancy-cherry-25725711`, branch `production` —
+  connectivity, TLS, and automatic migrations all verified working; real
+  Admin/Manager/Operator accounts and one Chilling Centre now exist there
+  (see "Neon Production Bootstrap (2026-09-15)").
+- UI/UX redesign (2026-09-15): full visual pass across the WPF client
+  (design system, window sizing/ownership, status chips, dashboard
+  drill-down, history search/filter, screen-fit) plus a same-day
+  refinement pass fixing contrast/alignment/off-screen issues found by
+  manual review — presentational only, no domain/application/
+  infrastructure/rate/quality/sync logic touched (see "UI/UX Redesign
+  (2026-09-15)" / "UI/UX Refinement Pass (2026-09-15)" below).
+- Automated tests: 190/190 passing (155 client + 35 cloud), reverified
+  fresh after both the bootstrap work and the UI/UX passes.
+
+### PARTIALLY VERIFIED
+- Physical Ekomilk KAM98-2A hardware: payload **decode** verified against
+  2 real sample frames; the physical serial connection itself has not been
+  verified against real hardware (see "Hardware Verification" below and
+  the parser's own doc comment).
+- Literal WPF GUI mouse-click/keyboard interaction: not testable in any
+  automated environment used so far — verified instead at the service/data
+  layer via real production classes against a real running API (see
+  "Application Bug Fixes (2026-09-12)").
+- Neon authenticated login flow: connectivity/migrations verified end-to-end
+  at the data layer (real accounts now exist with real PBKDF2 hashes,
+  correct role/permission counts, correct centre scoping) — the actual
+  `POST /auth/login` round-trip against Neon was deliberately not exercised
+  in this session (the human operator chose to keep the bootstrap password
+  out of the session rather than pass it through a curl command), so it
+  remains "verified at the data layer, not yet a live login" until someone
+  logs in for real (WPF client or a manual request) using the bootstrap
+  credentials.
+
+### NOT IMPLEMENTED
+- A password-change/reset endpoint — still genuinely absent (see "Neon
+  Production Bootstrap (2026-09-15)" below); rotating any account's
+  password today requires direct database access, not the app.
+- BRD items not yet built: source hierarchy beyond the current flat
+  Source/Vehicle model, notification hooks, printed receipt/result output,
+  reporting screens, WiX MSI installer packaging.
+
+### BLOCKED
+- **Render deployment.** Not a technical gap — the Docker image and Neon
+  backend are both already deployment-ready (§10 of `HOW_TO_RUN.md`).
+  Blocked because the GitHub repository is owned/controlled by the CEO and
+  the current operator does not have the access needed to connect the
+  private repo to Render. Waiting on repository access from the repo
+  owner/CEO before this can proceed.
+
+### NEXT
+1. Obtain GitHub repository access sufficient to connect it to Render.
+2. Connect the repository to Render and deploy the existing ASP.NET Core
+   Docker image (`Dockerfile`, repo root — already built and verified
+   against both local Docker Postgres and Neon).
+3. Configure Render's own environment variables
+   (`ConnectionStrings__CcmcDb`, `Jwt__Secret`, etc.) pointing at Neon, via
+   Render's dashboard/CLI — never committed to this repo.
+4. Verify Render → Neon connectivity (`/health`, `/health/db`) for real.
+5. Point the WPF client's `CloudApi:BaseUrl` at the Render HTTPS URL
+   (currently `http://localhost:8081/` — see "Current WPF API
+   Configuration" note in `HOW_TO_RUN.md` §14/`context.md`). Not done in
+   this pass, not to be done without an explicit instruction.
+6. Real-world end-to-end verification, including a real first login
+   against Neon's now-real Admin/Manager/Operator accounts (see "Neon
+   Production Bootstrap (2026-09-15)" below — this specific round-trip has
+   not been exercised yet, by explicit choice, not oversight).
+
+Production user bootstrap itself is done — see "Neon Production Bootstrap
+(2026-09-15)" below. See also `progress.md`'s own "Checkpoint (2026-09-15)"
+for the full narrative.
 
 ## Current Objective
 
@@ -47,8 +158,16 @@ curl-verified end-to-end, plus 21 automated integration tests (all
 passing) against a dedicated `ccmc_cloud_test` database. Two real runtime
 bugs were found and fixed via this live testing (JWT claim remapping;
 Npgsql UTC-only `DateTimeOffset` requirement) - see "CC-MC Cloud Backend"
-→ "Fixed Bugs" below. Full solution (`dotnet test CCMC.sln`): **110/110
-tests passing** (89 Windows-client + 21 cloud).
+→ "Fixed Bugs" below.
+
+**Update (2026-09-12): Milk Rate Calculation (BRD v5.0 section 25)
+implemented** - see "Milk Rate Calculation" below for the full writeup.
+Full solution (`dotnet test CCMC.sln`): **187/187 tests passing** (154
+Windows-client + 33 cloud, the cloud suite run against a real local
+PostgreSQL instance, not skipped). The "110/110" figure previously here
+was already stale before this update (it predated the milk-analyser work
+below) - see "Milk Rate Calculation" for how the current count was
+actually verified.
 
 ## Architecture Decisions
 
@@ -445,8 +564,565 @@ the verified default - not merely "the interface exists."
   fact. Still needs explicit human confirmation before real protocol work
   starts (see Decisions Pending #1).
 
+## Milk Analyser + Quality Decision Flow (2026-09-12)
+
+The physical Ekomilk Milkana KAM98-2A milk analyser is not available in any
+dev environment (same "no hardware" constraint as the Videocon scale before
+its own verification pass). What changed this pass is that the project owner
+supplied two REAL, observed device outputs directly (not manufacturer
+documentation, not a live serial capture) - enough to derive a confident,
+documented fixed-width field layout without guessing:
+
+```
+(03900830283801210000032404503) -> Fat 3.9  Snf 8.3  Clr 28.4  Water 1.21  Protein 3.24
+(02500520171638900000020906585) -> Fat 2.5  Snf 5.2  Clr 17.2  Water 38.9  Protein 2.09
+```
+
+**Built:**
+- `Kam98A2AAnalyserFrameParser` (`CCMC.Infrastructure.Devices`) - the field
+  mapping, fully documented in its own doc comment, with a captured-string
+  regression test suite (`Kam98A2AAnalyserFrameParserTests`, 15 cases
+  including both real samples verbatim, parentheses/whitespace/CRLF
+  tolerance, and malformed-input rejection - never fabricates a reading).
+  Two entry points share the exact same field-decoding code: `ParseLatest`
+  (byte stream, device path) and `ParsePayload` (a single string, manual-test
+  path) - by construction, manual test input cannot diverge from what the
+  real device path would decode.
+- `EkomilkKam98A2AAnalyserAdapter` (replaces the old `GenericMilkAnalyserAdapter`
+  placeholder) - real connection lifecycle via the existing
+  `SerialConnectionManager`/`RawCaptureLogger` infrastructure (no second
+  serial stack), throws `DeviceParseException` rather than fabricating a
+  reading when no complete frame is present. **The physical serial link
+  itself (COM port, baud rate, real RS232 traffic) has NOT been exercised
+  against the hardware** - only the payload decode is verified against real
+  samples. Do not treat this adapter's existence as proof the serial
+  connection works.
+- `MilkQualityReading.Temperature` is now nullable - the KAM98-2A does not
+  measure temperature at all (never fabricated, same principle `Clr` already
+  used); Water/Protein go into the existing `OptionalParameters` dictionary
+  (no new ad-hoc fields).
+- **Explicit human quality decision, auto-accept retained but dormant.**
+  `QualityValidationService`'s automatic Fat/Snf/Temperature range check
+  (the original "auto-accept" logic) is unchanged and still computed on
+  every save - but `ReceptionWorkflowService.ValidateAndSaveAsync` no longer
+  uses its output as the final `Status`; a `ReceptionDecision` (`Accept`/
+  `Hold`) supplied by the caller does, with the automatic suggestion
+  recorded in `Reason` whenever the operator's decision differs from it.
+  REJECT does not add a new "create as Rejected" path - the existing
+  invariant (`TransactionStatus`'s own doc comment: Rejected only via
+  override of a Hold) is preserved exactly; `RejectAtReceptionAsync` saves
+  as Hold via the same `ValidateAndSaveAsync`, then immediately applies the
+  existing `OverrideAsync` machinery. Both steps are separately audited and
+  separately sync-eligible via their own existing outbox mechanisms -
+  nothing new invented at the persistence layer. Covered by
+  `ReceptionWorkflowServiceTests` (6 cases, real SQLite).
+- **Cloud mirrors the same decision, backward-compatibly.**
+  `CreateReceptionRequestDto`/`CreateReceptionCommand` gained an *optional*
+  `Status` (Accepted/Hold only - a direct Rejected create is rejected with
+  400) plus `Clr`/`Water`/`Protein`/`RawAnalyserPayload`. When supplied, it
+  is authoritative (the cloud's own automatic suggestion is still computed
+  and logged, same dormant treatment as the client); when omitted, the
+  cloud falls back to its pre-existing fully-automatic behavior unchanged -
+  this is why `Create_ValidReception_Returns201WithCreatedOutcome` and
+  `Create_QualityOutOfRange_ReturnsHold_NeverAutoRejects` (both predating
+  this pass, neither sending `Status`) still pass unmodified. New EF Core
+  migration `20260912023742_AddMilkAnalyserFields` (additive, nullable
+  columns only) applied to `ccmc_cloud_dev`. New SQLite migration
+  `Migration003AnalyserFields` (same shape) for the Windows client.
+- **Reception window UI**: added CLR/Water/Protein/raw-payload fields, a
+  clearly-labelled "Milk Analyser - Manual Test Input" panel (raw string ->
+  the exact same parser -> the exact same fields - see HOW_TO_RUN.md), and
+  three explicit ACCEPT/HOLD/REJECT buttons replacing the old single
+  "Validate and Save Reception" button. All prior functionality (centre/
+  source/vehicle selection, Read Devices, weight capture, provenance
+  tracking) is unchanged.
+- Weighing scale integration untouched - confirmed via this session's own
+  app log (`DeviceManager` still reaches `VideoconWeighingScaleAdapter` on
+  COM4/2400 from the existing `DeviceConfiguration` row).
+
+**Not done / explicitly out of scope this pass:**
+- Hardware-in-the-loop verification of the KAM98-2A's actual serial
+  connection (device unavailable - see above).
+- Extending the configurable quality-rule engine to Clr/Water/Protein - no
+  confirmed acceptance thresholds exist for them yet, and inventing some
+  would violate "no invented business rules"; they are captured, displayed,
+  and available for operator judgment, not (yet) auto range-checked.
+
+## Milk Rate Calculation (2026-09-12)
+
+BRD v5.0 section 25's live Rate/Amount calculation, ported exactly from
+the BRD's own spec (itself ported from a legacy Android reference
+implementation - `MilkCollectionFragment.getAmount()`/`RateFormulaFragment`,
+not part of this repository, so only the BRD's written formula was
+available to implement against, not any reusable code).
+
+**Built:**
+- `RateCalculationService` (`CCMC.Domain.Services`, client) - pure, static,
+  independently unit-tested (16 cases: both modes, rounding, blank-input
+  and missing-config zero-fallback, boundary values). Implements both BRD
+  modes exactly: Fat-vs-SNF (`Rate = (Value1+Value2)*0.22*(FAT/100) +
+  (Value1+Value2)*0.36*(SNF/100) + 0.32`) and TS-based (`Rate =
+  (FAT+SNF)*TsRate/100`), `Amount = Rate * Weight`, both rounded to 2
+  decimals with `MidpointRounding.AwayFromZero` applied independently to
+  Rate and to Amount (the BRD's own section ordering - formula, then
+  Amount = Rate x Weight, then a separate 25.4 "Output Formatting" step -
+  read literally, not as "round Rate first, then multiply").
+- `RateFormulaSettings` (`RateType`, `Value1?`, `Value2?`, `TsRate?`,
+  nullable `CentreId`) - a new cloud-owned master-data concept, mirroring
+  `QualityRule`'s exact centre-specific-over-global resolution. **No
+  numeric default was seeded anywhere** - the BRD gives no example
+  Value1/Value2/TsRate (unlike section 10's FAT/SNF/Temperature limits),
+  so inventing one would have violated "no fabricated business values."
+  A centre's Rate/Amount is genuinely 0/0 until a Manager/Admin configures
+  it via the new `PUT /rate-formula-settings` endpoint (`RATE_FORMULA_VIEW`/
+  `RATE_FORMULA_CONFIGURE` permissions, granted to Operator(view)/
+  Manager+Admin(view+configure) in `DevelopmentSeeder`, same pattern as
+  `QUALITY_RULE_*`).
+- Synced client-side via the existing `MasterDataSyncService` pattern
+  (`GET /rate-formula-settings` -> local SQLite cache) - rate calculation
+  works fully offline once a centre's formula has been pulled at least once.
+- `ReceptionWorkflowService.ValidateAndSaveAsync` resolves the centre's
+  rate formula settings and computes Rate/Amount at the exact moment of
+  ACCEPT/HOLD (capture time), storing them on the transaction - never
+  recomputed later. A new public `CalculateRateAsync` method is the single
+  shared resolution+calculation path also called by the reception UI's
+  live preview, so the displayed value is structurally guaranteed to match
+  what gets persisted, not just by convention.
+- `ReceptionWindow` gained a "RATE & AMOUNT" card that recalculates live
+  as Weight/FAT/SNF change (including when a device read or the manual
+  analyser test populates those fields programmatically), always
+  re-resolving the freshest locally cached configuration rather than a
+  value cached at window-open time.
+- `Rate`/`Amount` added as **nullable** `decimal?` (not `required`) on
+  `MilkReceptionTransaction`, both client and cloud - the same reasoning
+  as `Clr`/`Water`/`Protein`: a reception saved before this feature
+  existed has `NULL`, distinct from a reception where the calculation
+  legitimately produced `0.00` (BRD's own "not configured" rule). Client:
+  `Migration004RateCalculation` (additive `ALTER TABLE`, SQLite). Cloud:
+  EF Core migration `AddRateFormulaCalculation` (`numeric(10,2)`/
+  `numeric(14,2)`, additive, nullable) - generated with `dotnet ef
+  migrations add` and applied for real against a live local PostgreSQL 16
+  instance during this work (not just written and left unverified).
+- **Cloud trust model matches Clr/Water/Protein exactly**: the cloud does
+  not recompute Rate/Amount - it stores whatever the client computed and
+  sent, verbatim. This is what makes the BRD's own invariant ("a
+  transaction retains the Rate/Amount calculated at collection time even
+  if configuration later changes") hold structurally, confirmed directly
+  (not just asserted) both in `ReceptionWorkflowServiceTests` and in a
+  live end-to-end run: a reception's Rate/Amount were unchanged after the
+  centre's rate formula was reconfigured to a different mode with
+  different numbers.
+
+**Verification performed** (see also `context.md`'s test-count update):
+187/187 tests passing (154 client incl. `RateCalculationServiceTests` and
+rate-specific additions to `ReceptionWorkflowServiceTests`/
+`ReceptionRepositoryTests`/`SchemaMigratorTests`/a new
+`RateFormulaSettingsRepositoryTests`; 33 cloud incl. a new
+`RateFormulaSettingsTests` and rate-specific additions to
+`ReceptionTests`), the cloud suite run against a real, freshly initialized
+local PostgreSQL 16 instance (a throwaway `pg_ctl`-managed data directory,
+not the machine's own stopped `postgresql-x64-16` service, which was left
+untouched). Additionally, a real end-to-end harness (a throwaway console
+program outside this repository) exercised the exact production
+`ReceptionWorkflowService`/`MasterDataSyncService`/`SyncEngineService`/
+`HttpCloudApiClient` code against the real running Cloud API: configured
+both rate modes via the real `PUT /rate-formula-settings` endpoint,
+created receptions and confirmed exact expected Rate/Amount for each
+mode, confirmed SQLite persistence and outbox creation, synced to the
+cloud and confirmed verbatim storage, confirmed no duplication on a
+repeated sync tick, confirmed historical immutability under a
+configuration change, confirmed an unconfigured centre computes 0/0
+rather than fabricating a value, and confirmed a reception created while
+the cloud was genuinely unreachable still saves locally and syncs
+successfully once reachability is restored, without duplication.
+
+**Not done / explicitly out of scope this pass:**
+- A literal mouse-click walkthrough of the WPF `ReceptionWindow` - no GUI
+  automation tool was available for a native Windows/WPF app in this
+  environment. The verification above exercises the identical underlying
+  service code the UI calls (the strongest verification available without
+  that tooling), but the specific claim "the on-screen Rate/Amount labels
+  visibly update on keystroke" rests on code inspection of the
+  `TextChanged` wiring, not an observed screenshot.
+- A WPF UI for **configuring** the rate formula (Rate Type/Value1/Value2/
+  TsRate) - deliberately not built, following the exact same precedent as
+  Sources/Vehicles (the cloud API supports mutation, the Windows client
+  only reads/caches; no client-side master-data-edit UI exists anywhere
+  in this repo yet). Configuration happens via the cloud API directly
+  (`PUT /rate-formula-settings`) until/unless a broader master-data-edit
+  UI is built for all three concepts together.
+- Source Hierarchy field and the Notification hook (BRD section 17) -
+  separate, still-unimplemented MVP gaps, out of scope for this pass.
+- A Receipt/Result view showing Rate/Amount to the operator (BRD section
+  19's "RECEIPT / REPORT" end state) - the reception screen shows it
+  live, but no printable/exportable receipt exists yet.
+
+## Rate/Amount Semantics Verification + Docker (2026-09-12)
+
+**Rate/Amount rounding order, re-verified directly against BRD text
+(not from memory of the earlier pass):** BRD v5.0 section 25.2/25.3
+define `Rate = <formula>` then `Amount = Rate x Weight` as two lines with
+no rounding mentioned; section 25.4 ("Output Formatting") is a separate,
+later section stating both are rounded "before being displayed and used
+for printing/SMS receipts." Read literally, rounding is output formatting
+applied to both already-computed full-precision quantities, not an
+intermediate step feeding back into the Amount formula - i.e. Amount uses
+the FULL-PRECISION Rate, not the 2-decimal-rounded one. `RateCalculationService`
+already implemented it this way; confirmed unchanged, no code correction
+needed. A discriminating regression test was added
+(`Calculate_TsBased_DiscriminatingCase_UsesFullPrecisionRateForAmount_NotRoundedRate`
+in `RateCalculationServiceTests.cs`): FAT=3.00, SNF=4.00, TsRate=15.05,
+Weight=45.5 -> raw Rate 1.0535 (displayed/stored rounded to 1.05), Amount
+from the raw rate = 47.93, Amount if the rounded rate had been used
+instead = 47.78 - genuinely different 2-decimal results, proving which
+code path actually runs rather than merely documenting an assumption.
+
+**Real bug found and fixed via Docker testing** (exactly what this pass
+was for): `JwtOptions.Issuer`/`Audience` were `required string` with no
+default, while `Program.cs`'s token-*validation* setup had its own
+separate hardcoded fallback ("ccmc-cloud-api"/"ccmc-windows-client"). A
+container started with only `Jwt__Secret` supplied (a very plausible real
+deployment shape, and exactly what `.dockerignore` now forces on any
+image build by excluding `appsettings.Development.json`, which is the
+only place Issuer/Audience were previously set) issued tokens with an
+**empty** `aud`/`iss` claim, so every authenticated request after a
+successful login failed with 401 ("The audience 'empty' is invalid") -
+reproduced directly against a real running container before being
+diagnosed. Fixed by giving `JwtOptions.Issuer`/`Audience` the same default
+constants (`JwtOptions.DefaultIssuer`/`DefaultAudience`) Program.cs already
+assumed, and - to close the underlying class of bug, not just today's
+symptom - refactoring `Program.cs` so both token issuance
+(`JwtTokenGenerator`) and validation (`AddJwtBearer`'s
+`TokenValidationParameters`) now resolve Secret/Issuer/Audience from the
+exact same `IOptions<JwtOptions>` instance (via
+`AddOptions<JwtBearerOptions>().Configure<IOptions<JwtOptions>>(...)`)
+instead of two independent `builder.Configuration[...]` reads that could
+silently disagree. Locked down by two new tests
+(`JwtConfigurationTests.cs`, using a dedicated `SecretOnlyJwtApiFactory`
+that supplies only `Jwt:Secret`, mirroring the real container repro
+exactly) - both pass now.
+
+**Docker**: `Dockerfile` (repo root, multi-stage: `dotnet/sdk:8.0` build ->
+`dotnet/aspnet:8.0` runtime) and `.dockerignore` added for `CCMC.Cloud.Api`.
+Built dependency graph verified directly from the `.csproj` files (not
+assumed) - only `CCMC.Contracts` + the four `CCMC.Cloud.*` projects are
+needed; the Windows client projects and `tests/` are excluded entirely.
+`appsettings.Development.json` is excluded from the build context (never
+enters the image, in any environment) - confirmed by inspecting the built
+image's `/app` contents directly. `Program.cs` also now honors a `PORT`
+environment variable (Render's convention) by calling
+`builder.WebHost.UseUrls` when present, falling back unchanged otherwise.
+
+Verified end-to-end against a real container (`cc-mc`, on a dedicated
+`cc-mc-network`) + a real disposable PostgreSQL 16 container
+(`cc-mc-postgres`, not the machine's own `postgresql-x64-16` service,
+left untouched): container starts, binds `http://[::]:8080` (all
+interfaces, not localhost-only), `/health` and `/health/db` both return
+200, EF Core migrations apply for real (`__EFMigrationsHistory` contains
+all three current migrations including `AddRateFormulaCalculation`),
+login issues a correctly-signed token with only `Jwt__Secret` supplied,
+an authenticated `GET /centres` succeeds, a reception's Rate/Amount
+persist through the full HTTP -> Cloud.Application -> EF Core ->
+PostgreSQL path exactly as sent (confirmed both via the API response and
+directly via `psql`), the cloud does not recompute Rate/Amount (proven by
+posting deliberately-inconsistent values and confirming they're stored
+verbatim, not corrected), and the container exits cleanly on `docker stop`
+(SIGTERM, exit code 0, "Application is shutting down..." logged). Full
+solution: 190/190 tests passing (155 client + 35 cloud, the cloud suite
+run against a real reachable PostgreSQL).
+
+**Not done this pass, by explicit instruction**: no deployment to Render,
+no Neon database created/configured - this was local Docker verification
+only, in preparation for that next step.
+
+## Docker Compose + Neon Setup (2026-09-12)
+
+**Docker Compose**: the manually-`docker run` containers from the
+previous pass (`cc-mc`, `cc-mc-postgres`) were reorganized under a single
+Compose project (`compose.yaml`, repo root, project name `cc-mc`) - same
+container names, same `cc-mc-network`, plus a named volume
+(`cc-mc-postgres-data`, replacing the previous anonymous volume, which
+held only throwaway test data from the prior pass's own verification and
+was safe to discard) and a real PostgreSQL healthcheck so the API's
+`depends_on: condition: service_healthy` actually waits for the database
+to accept connections, not just for the container process to start.
+Verified: `docker compose -p cc-mc --env-file .env.local config` is
+valid, `up -d --build` brings up both services in the correct order
+(Postgres reaches "Healthy" before the API container starts), and
+`/health`/`/health/db` both return 200 through it.
+
+**Environment strategy**: `.env.example` (reference, documents every
+variable), `.env.local.example` -> `.env.local` (local Docker, gitignored),
+`.env.production.example` -> `.env.production` (Neon, gitignored). Same
+variable names everywhere (`ASPNETCORE_ENVIRONMENT`,
+`ConnectionStrings__CcmcDb`, `Jwt__Secret`) - only values differ. `.gitignore`
+updated with an explicit exception (`!.env.*.example`) so the placeholder
+templates are committed while `.env`/`.env.local`/`.env.production`
+(and anything else matching `.env.*`) stay ignored.
+
+**Neon**: linked and deployed to the user-provided project
+(`fancy-cherry-25725711`, branch `production`) via the exact CLI sequence
+supplied (`neon login`, `neon skills -y`, `neon mcp -y`, `neon link`,
+`neon config init`, `neon deploy`), with `neon.ts` set to the exact
+minimal content requested (`defineConfig({})`), not the CLI's own
+auto-generated starter policy. Two real CLI behaviors were discovered and
+corrected, not silently worked around:
+- `neon skills -y` and `neon mcp -y` have side effects beyond this repo:
+  the former wrote `.claude/` + `skills-lock.json` into the repo root
+  (Neon's own agent-skill documentation, no secrets - confirmed by
+  inspection); the latter minted a new, account-wide Neon API key
+  (scoped to everything the account can reach, in every organization) and
+  wrote MCP server configuration into several *global*, outside-this-repo
+  config files (`~/.claude.json`, `~/.gemini/*`, `~/.codex/*`, etc.) -
+  this key is not stored anywhere in this repository, but the user should
+  know it exists (revocable via `neon api-keys revoke <id>`, printed at
+  mint time).
+- Both `neon link` and `neon deploy` default to pulling the branch's Neon
+  variables (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_BRANCH`)
+  directly into a file literally named `.env.local` - which collided with
+  this repo's own use of that filename for LOCAL DOCKER configuration.
+  Each time, the Neon-pulled lines were removed from `.env.local`
+  afterward and the connection info (converted from Postgres URI to
+  Npgsql keyword form, using the unpooled/direct endpoint - simpler and
+  avoids any PgBouncer transaction-pooling interaction with EF Core's
+  migration DDL) was placed in `.env.production` instead, preserving the
+  required separation (local Docker must keep pointing at
+  `cc-mc-postgres`, never Neon).
+
+**Verified against the real Neon `production` branch** (inspected first,
+confirmed empty - zero tables - before running anything): all three
+migrations (`InitialCreate`, `AddMilkAnalyserFields`,
+`AddRateFormulaCalculation`) applied cleanly and in order,
+`__EFMigrationsHistory`/schema confirmed via `neon psql`, `/health` and
+`/health/db` both healthy, `ASPNETCORE_ENVIRONMENT=Production` correctly
+did **not** run `DevelopmentSeeder` (confirmed: `SELECT count(*) FROM
+users` = 0 on Neon), and a login attempt correctly returned 401 rather
+than crashing (proving the full auth code path - including the same
+`IOptions<JwtOptions>` issuance/validation fix from the previous pass -
+executes correctly against Neon).
+
+**Genuine limitation, reported rather than routed around** (per this
+session's own explicit instruction not to enable Development seeding in
+Production or invent a bootstrap mechanism): with zero users in the Neon
+database and no administrative bootstrap path, the full
+login-then-authenticated-endpoint-then-Rate/Amount-persistence chain
+could not be exercised through the live HTTP API against Neon in this
+pass. What *was* verified against Neon: connectivity, migrations, the
+auth pipeline's correctness up to credential lookup, and the seeding
+security boundary. See README.md §29.17 "Known Gaps" for the standing
+consideration this left for whoever sets up the first real production
+user — **resolved 2026-09-15, see "Neon Production Bootstrap
+(2026-09-15)" below.**
+
+**Local Docker re-verified working, unaffected**: after all Neon work,
+`cc-mc`/`cc-mc-postgres` (via Compose) still pass `/health`/`/health/db`
+and a seeded local login still succeeds - confirmed the exact same image
+behaves correctly in both environments, controlled entirely by which
+`--env-file` is passed, with zero source-code differences. Full solution:
+190/190 tests passing, unchanged (this pass touched configuration and
+tooling only, not application code).
+
+**Update (2026-09-12, later same day): the `.env`/`.env.docker`/`.env.neon`
+naming and mechanism described above were superseded** by the "Application
+Bug Fixes" pass immediately below - `compose.yaml` now uses Compose's own
+default `.env` auto-load (via `env_file:`) plus Compose *profiles* to skip
+the local `cc-mc-postgres` service entirely in Neon mode, rather than
+`--env-file .env.local`/`.env.production`. See that section for the
+current, actual mechanism - this note exists so the reasoning trail above
+isn't silently contradicted.
+
+## Application Bug Fixes (2026-09-12)
+
+A user manually tested the actual WPF application (not just the API in
+isolation) and found six real, related problems. Traced end-to-end before
+touching any code, per this pass's own explicit instruction not to treat
+them as independent - five of the six turned out to share one root cause.
+
+**Root cause (bugs "login shows offline", "rate calculator blank", "app
+appears offline"): `src/CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`
+was still `http://localhost:5000/` - the old pre-Docker `dotnet run`
+default - while the actual running backend (Docker Compose's `cc-mc`
+container) is reachable at `http://localhost:8081`.** Confirmed directly
+from the user's own prior session log
+(`%LOCALAPPDATA%\CCMC\logs\ccmc-<date>.log`): every login attempt shows
+`POST http://localhost:5000/auth/login` failing with "actively refused,"
+`AuthenticationService` correctly falling back to its OFFLINE credential
+path (this fallback logic itself was never broken - see
+`AuthenticationService.LoginAsync`'s existing online-first/offline-fallback
+design, unchanged), and `LoginWindow.xaml.cs` correctly skipping the
+master-data pull for an offline session (`if (!result.IsOffline) { ...
+PullAsync... }` - also unchanged, also correct) - which is *why* the rate
+calculator was blank: `RateFormulaSettings` (and everything else) never
+had a chance to sync while every login silently fell back to a stale
+offline cache. Fixed by correcting `BaseUrl` to `http://localhost:8081/`
+(the actual current Docker-mapped host port) - no change to the
+online/offline classification logic itself, which was already correct
+and must not be weakened. Re-verified via a real end-to-end harness using
+the corrected URL: `AuthenticationService.LoginAsync` now returns
+`IsOffline: false` (genuinely online), master data (centres/sources/
+vehicles/quality-rules/rate-formula-settings) syncs successfully, and the
+legitimate offline fallback still works correctly and separately when the
+cloud is *actually* unreachable (tested by pointing at a real unreachable
+address) - confirming this fix did not remove or weaken offline support.
+
+**Rate calculator blank**: root cause was the above (master data never
+synced) - no calculation-logic change was needed or made
+(`RateCalculationService` was already correct, confirmed in the prior
+Rate Calculation pass). Re-verified end-to-end with an explicitly-labeled
+TEST rate configuration (FatVsSnf, Value1=10, Value2=8 - set via the
+existing `PUT /rate-formula-settings` endpoint as the Manager role,
+**not** a fabricated application default) against FAT=4.5/SNF=9.0/
+Weight=45.5: Rate=1.08, Amount=49.20, computed and persisted correctly.
+
+**History missing Rate/Amount**: a pure UI-column omission, not a
+persistence bug - `MilkReceptionTransaction.Rate`/`Amount` (added in the
+earlier Rate Calculation pass) were never wired into
+`ReceptionHistoryWindow.xaml`'s `DataGrid.Columns`. Fixed by adding two
+columns (`{0:F2}`-formatted, matching the reception screen's own
+formatting); no repository/query change needed - confirmed directly that
+`ReceptionRepository.ListRecentAsync` (what this window already calls)
+already returns both fields correctly.
+
+**Manager/Admin cannot add Source/Vehicle**: confirmed via code
+inspection that `SourcesWindow`/`VehiclesWindow` were genuinely read-only
+(matching the known gap already recorded in README.md §29.17/context.md)
+- the cloud API already fully supports `POST /sources`/`POST /vehicles`
+gated by `SOURCE_CREATE`/`VEHICLE_CREATE` (granted to Manager and Admin,
+not Operator, in `DevelopmentSeeder` - unchanged, no new privilege
+invented), but the Windows client had no UI for it and `ICloudApiClient`
+had no method to call it. Added: `CreateSourceRequestDto`/
+`CreateVehicleRequestDto` (`CCMC.Contracts`), `ICloudApiClient.
+CreateSourceAsync`/`CreateVehicleAsync` + `HttpCloudApiClient`
+implementation (mirrors `OverrideReceptionAsync`'s existing status-code
+classification exactly - 401→AuthRetryable, 429/5xx→Retryable, everything
+else including 403→Terminal), and a minimal inline "Add Source"/"Add
+Vehicle" form in each window - visible only when the signed-in user's
+`Permissions` include the relevant `*_CREATE` code (client-side UX only,
+per this repo's existing convention; the server independently and
+authoritatively enforces the same permission regardless of what the
+client shows). After a successful create, the window re-runs
+`MasterDataSyncService.PullAsync` and reloads its own grid, so the new
+record is immediately selectable in Reception, per this pass's explicit
+requirement. Verified end-to-end: Manager can create both; Operator's
+identical attempt is correctly denied (`Terminal` outcome, HTTP 403) -
+not silently treated as successful.
+
+**Enter key does not sign in**: `LoginWindow.xaml`'s `LoginButton` had no
+`IsDefault="True"`. Added it - WPF's native mechanism, so Enter (from
+either the email field or the password box) invokes the exact same
+`LoginButton_Click` handler a mouse click does, with zero duplicated
+authentication logic.
+
+**Verification method, stated precisely per this pass's own "no false
+success" instruction**: a real end-to-end harness (a throwaway console
+program outside this repository, using the exact production
+`AuthenticationService`/`MasterDataSyncService`/`ReceptionWorkflowService`/
+`SyncEngineService`/`ICloudApiClient` code, now configured with the
+corrected `http://localhost:8081/` URL) proved every one of the above at
+the service/data layer, including the Operator-denial case and a full
+offline-capture-then-reconnect-then-sync-with-no-duplicates cycle. The
+actual compiled WPF executable was also launched directly and confirmed
+to start cleanly and display the Sign In window (no crash) - but literal
+mouse-click/Enter-key/visual confirmation of on-screen behavior was
+**not possible** in this environment (no GUI automation tool available
+for a native Windows/WPF app) and is reported as NOT TESTED, not PASS,
+for that specific narrow claim - see the task's own final report for the
+exact PASS/NOT TESTED breakdown.
+
+## Neon Production Bootstrap (2026-09-15)
+
+Closes the "no production user bootstrap mechanism" gap recorded in the
+2026-09-13 checkpoint and `HOW_TO_RUN.md` §9. Repository/DB state was
+inspected first (Neon MCP tools + `docker exec ... psql`), not assumed:
+
+- **Neon (`fancy-cherry-25725711`, branch `production`) before this pass:**
+  schema fully migrated (all 3 EF Core migrations present in
+  `__EFMigrationsHistory`, matching the repo's migration chain exactly) but
+  every table had zero rows — confirming `context.md`/`HOW_TO_RUN.md` were
+  accurate, not stale.
+- **Local Docker Postgres (`ccmc_cloud_docker`) inspected for reusable
+  data:** 4 users, 2 centres, 9 reception transactions, 1 override, 23
+  audit logs — all unambiguously `DevelopmentSeeder` output plus manual QA
+  testing (duplicate/near-duplicate transaction rows from button-mash
+  testing on 2026-09-12/09-14). Judged not real business data and
+  deliberately **not** migrated to Neon, per this pass's own instruction
+  not to blindly copy dev/test data into production.
+- **New mechanism:** `ProductionBootstrapSeeder`
+  (`src/CCMC.Cloud.Infrastructure/Seed/ProductionBootstrapSeeder.cs`) +
+  `ProductionBootstrapOptions` (same folder), invoked from `Program.cs`
+  after migrations run, in **any** environment, but only when
+  `Bootstrap:AdminEmail` configuration is present — absent (the default),
+  it is a complete no-op. Every identity/credential comes from
+  `Bootstrap__*` environment variables (documented, placeholders only, in
+  `.env.example`) — nothing is invented. Idempotent: re-running with the
+  same config on a later startup detects existing users by email and
+  leaves their `PasswordHash` untouched (never resets a real password
+  silently) — logs "already exists, left unchanged" instead.
+  `DevelopmentSeeder`'s own role/permission grants and upsert helpers were
+  extracted into a new shared `SeedHelpers` (RBAC grants) so the two
+  seeders cannot drift apart on what each role can do — `DevelopmentSeeder`
+  itself is otherwise unchanged (same dev-only accounts/centres/quality
+  rules it always seeded), and both were reverified passing (190/190)
+  after the refactor.
+- **Validation, fail-fast, before any DB write:** `ProductionBootstrapOptions.FromConfiguration`
+  throws immediately if a Manager/Operator email is supplied without both
+  `Bootstrap:CentreCode`/`Bootstrap:CentreName` (never an unscoped
+  operational account), or if any supplied password is missing or under 12
+  characters. This caught a real mistake during this session's own run —
+  the human-supplied `Bootstrap__AdminPassword` was 11 characters; the
+  container correctly crashed with a clear `InvalidOperationException`
+  instead of creating a weak Admin account, the length gap was fixed, and
+  the retry succeeded.
+- **Bootstrapped into Neon `production` this session** (per explicit
+  human decisions on centre/accounts/password-supply-method): one
+  Chilling Centre (`BLR-CC-01` / "Chilling Centre - Bangalore" — reused
+  the same placeholder identity as the dev seed, by the human's own
+  choice, to be renamed later once a real centre identity is known), one
+  Admin (`admin@ccmc.local`, `AllCentres=true`), one Manager and one
+  Operator (`manager1@ccmc.local` / `operator1@ccmc.local`, both scoped to
+  `BLR-CC-01`), plus the same BRD §10 global quality rules
+  (FAT 3.0–6.0, SNF 8.0–10.0, Temperature 0.0–10.0) `DevelopmentSeeder`
+  already used — a documented business rule, not a fabricated default.
+  Verified directly against Neon after the run: correct role/permission
+  counts (Admin 15, Manager 15, Operator 7 — matching `SeedHelpers.RolePermissions`
+  exactly), correct centre scoping, and real ASP.NET Core Identity PBKDF2
+  hashes (`AQAAAAIA...` format prefix, not plaintext) — not merely "the
+  container didn't crash."
+- **`RateFormulaSettings` deliberately not seeded** for production, same as
+  `DevelopmentSeeder` — the BRD's own "no fabricated defaults" rule (see
+  "Milk Rate Calculation" above): a Manager must configure it for real
+  through the app once one exists.
+- **Real, not yet closed, security incident from this same session:** a
+  diagnostic shell command intended only to check line numbers
+  (`grep -n ""` over `.env.neon`) printed the file's full contents —
+  including the real Neon DB password, the JWT signing secret, and all
+  three bootstrap account passwords (weak/predictable ones, following the
+  dev-seed pattern) — into this session's own transcript. Disclosed to the
+  human immediately; offered to rotate all three account passwords (and
+  flagged the DB password/JWT secret as needing rotation too) — the human
+  chose to handle rotation themselves outside this session. **Until that
+  rotation happens, treat `admin@ccmc.local`/`manager1@ccmc.local`/
+  `operator1@ccmc.local`'s current passwords, the Neon connection string,
+  and `Jwt__Secret` as compromised, not merely "worth rotating eventually."**
+- **`.env.neon`'s `Bootstrap__*` block removed after successful bootstrap**
+  (human's own choice, offered because the seeder is idempotent and
+  doesn't need the block again) — if a second centre/account is bootstrapped
+  later, re-add fresh `Bootstrap__*` lines with new values per
+  `.env.example`'s documented shape.
+- **Still not done, deliberately out of this pass's scope:** an in-app
+  password-change/reset endpoint (still genuinely absent — see "Known
+  Limitations" below, new bullet), a real login round-trip against Neon
+  (data-layer verification only - see "Checkpoint" PARTIALLY VERIFIED
+  above), and Render deployment itself (unchanged, still not started).
+
 ## Known Limitations
 
+- **No password-change/reset endpoint exists anywhere in the cloud API**
+  (confirmed by inspection, not assumed — no controller, no
+  `AuthenticationService` method). Rotating any account's password today
+  (bootstrap or otherwise) requires direct database access with the same
+  `IPasswordHasher` used at runtime — see "Neon Production Bootstrap
+  (2026-09-15)".
 - **No installer.** `dotnet publish` produces a deployable folder, not an
   MSI/EXE setup experience. WiX MSI is the chosen direction (see "Product
   Decisions") but not built. Framework-dependent publish was used (not
@@ -478,8 +1154,11 @@ the verified default - not merely "the interface exists."
   machine, under the same Windows user account** (DPAPI `CurrentUser`
   scope) - there is no way to provision offline access for an account
   that has never logged in online here.
-- Analyser protocol, and the Videocon/ESSAE discrepancy, remain open (see
-  Hardware Verification).
+- The KAM98-2A analyser's payload decode is now derived and verified against
+  two real observed samples (see "Milk Analyser + Quality Decision Flow"
+  above), but its physical serial connection is still unverified - no
+  hardware-in-the-loop test exists. The Videocon/ESSAE scale discrepancy
+  separately remains open (see Hardware Verification).
 - **Decimal precision relies on SQLite `REAL` (double) columns**, not an
   exact fixed-point type. Empirically verified safe for this domain's
   realistic value ranges (a scratch test round-tripped `4.53`, `9.87`,
@@ -644,6 +1323,651 @@ for the per-test breakdown.
 installer for the API itself; closing the override idempotency-key gap
 above.
 
+## UI/UX Redesign (2026-09-15)
+
+A full visual redesign of the Windows client, explicitly scoped as
+**"better UI over the existing working system," not a rewrite** - no
+MVVM, no domain/application/infrastructure changes, no rate/quality/sync
+logic changes. Every `CCMC.Desktop` project other than `Controls/StatusChip.cs`
+(new) was a modification of an existing file; nothing was deleted or
+descoped. `dotnet build CCMC.sln` and `dotnet test CCMC.sln` both re-run
+clean after this pass: **190/190 passing** (155 client + 35 cloud, cloud
+suite run against a real disposable local PostgreSQL 16 container),
+unchanged from the pre-redesign baseline - expected, since no
+Domain/Application/Infrastructure/Contracts/Cloud.* code was touched.
+
+**Research basis:** Fluent 2's documented 4px spacing scale (design
+tokens: XXS/XS/S/M/L/XL/XXL/XXXL = 2/4/8/12/16/20/24/32px -
+fluent2.microsoft.design/design-tokens) informed every new margin/padding
+value added; Microsoft's Windows-apps keyboard-accessibility guidance
+(learn.microsoft.com/windows/apps/design/accessibility/keyboard-accessibility)
+informed the new explicit `IsKeyboardFocused` focus-ring triggers added to
+the Button/sidebar-button templates in `Theme.xaml` (the prior templates
+relied solely on WPF's default dashed-rectangle adorner, which the
+existing `CornerRadius`-clipped templates could partially obscure).
+
+**Design system (`Styles/Theme.xaml`, extended not replaced):** every
+existing resource key from before this pass still resolves to the same
+role, so no other file needed to change just because the theme changed.
+Added: an icon font resource (`IconFontFamily` = "Segoe Fluent Icons,
+Segoe MDL2 Assets" - both ship with Windows, zero new package/asset),
+`PageTitleText`/`PageSubtitleText` typography, a full chip system
+(`SuccessChipBorder`/`WarningChipBorder`/`DangerChipBorder`/`InfoChipBorder`/
+`NeutralChipBorder` + matching icon/text styles) built by the new
+`CCMC.Desktop.Controls.StatusChip.Create(text, kind)` helper so every
+status shown anywhere (transaction status, device connection state, sync
+pending count, online/offline) renders as icon+colour+text consistently -
+never colour alone. Also added: `WindowHeaderBorder`/`WindowHeaderIconText`
+(the icon+title+subtitle strip now atop every secondary window),
+`EmptyStateBorder`/`EmptyStateIconText`/`EmptyStateTitleText`/
+`EmptyStateBodyText` (used by History/Sources/Vehicles/Dashboard's Recent
+Receptions instead of a blank grid), `SearchTextBox`, and an
+`IsKeyboardFocused` trigger on the Button and sidebar-nav templates.
+
+**Window hierarchy fixed** (the task's named "parent windows can be
+smaller than child windows" defect): `MainWindow` is now the dominant
+shell (1320x820 default, 1040x680 minimum, up from 960x620/720x480).
+Every secondary window (`ReceptionWindow`, `ReceptionHistoryWindow`,
+`SourcesWindow`, `VehiclesWindow`, `DeviceConfigurationWindow`,
+`DeviceStatusWindow`, `SyncStatusWindow`, `SettingsWindow`) is now opened
+via `MainWindow.ShowOwned()`, which sets `Owner = this` before `.Show()`;
+each window's own XAML changed `WindowStartupLocation` from `CenterScreen`
+to `CenterOwner` and gained real `MinWidth`/`MinHeight` values (three -
+`DeviceStatusWindow`, `SyncStatusWindow`, `SettingsWindow` - had **no**
+minimum size at all before this pass, so they could be resized down until
+content clipped). Still non-modal (`.Show()`, not `.ShowDialog()`) -
+an operator can still have Reception and History open side by side.
+**Noted, deliberate side effect:** because WPF automatically closes owned
+windows when their owner closes, logging out (which closes `MainWindow`)
+now also closes any still-open secondary windows instead of leaving them
+orphaned against a session that no longer exists - judged a correctness
+improvement, not a functionality removal, and flagged here rather than
+silently introduced. `LoginWindow` intentionally keeps `ResizeMode="NoResize"`
+(a single-purpose auth dialog, not a data-entry screen) - a deliberate,
+narrow exception per the task's own "don't disable resizing everywhere"
+instruction, not the default.
+
+**Reception History no longer looks like a spreadsheet** (the task's
+explicit, named requirement): the old 16-column flat `DataGrid` is
+replaced with KPI summary cards (count/quantity/amount/status breakdown,
+computed client-side from the already-loaded set - never invented), a
+search box (source/vehicle/transaction #) + status filter, and a
+card-styled row list built from a `DataTemplate` bound to a small
+display-only `HistoryRow` class (formatting/lookup only - no
+business/quality logic recomputed, per `CLAUDE.md` "business logic stays
+out of the UI"). Source and vehicle **names** (previously not shown at
+all - the old grid had no Source/Vehicle columns) are resolved via the
+same `ISourceRepository`/`IVehicleRepository` calls `SourcesWindow`/
+`VehiclesWindow` already used, across every centre the operator can see -
+existing data only. Two distinct empty states (`EmptyStatePanel`: "no
+receptions yet" vs. `NoMatchesPanel`: "no receptions match this filter").
+
+**Dashboard** gained a `Recent Receptions` card - the five most recent
+locally captured transactions (any sync state), from
+`IReceptionRepository.ListRecentAsync(5, ...)`, the exact same method
+`ReceptionHistoryWindow` already called; no new data source, no invented
+metric. `MainWindow`'s device/sync status areas now render
+`CCMC.Desktop.Controls.StatusChip`s instead of one concatenated status
+string per card.
+
+**Reception, Device Configuration, Device Status, Synchronization,
+Settings, Sources, Vehicles** all gained the shared `WindowHeaderBorder`
+header, icon-labelled buttons, and (Sources/Vehicles) a client-side search
+box over the already-loaded grid plus a proper empty state - the
+add/edit forms, DataGrid columns, validation, and every `Click`/
+`SelectionChanged`/`TextChanged` handler are unchanged. Device
+Status/Synchronization now show connection/pending state as chips instead
+of a single plain-text line.
+
+**Rate/quality/sync/auth logic: byte-for-byte unchanged.** No formula,
+threshold, permission check, idempotency key, offline-fallback rule, or
+outbox state machine was touched - every functional change in this pass
+is additive UI wiring (new constructor dependencies that were already
+DI-registered singletons: `IReceptionRepository` into `MainWindow`;
+`ISessionStore`/`IChillingCentreRepository`/`ISourceRepository`/
+`IVehicleRepository` into `ReceptionHistoryWindow`) or pure presentation
+(new Border/StackPanel wrappers, `Style=` attributes, icon glyphs).
+
+**Verification performed:** `dotnet build CCMC.sln` (0 warnings/errors),
+`dotnet test CCMC.sln` (190/190, cloud suite against a real disposable
+`postgres:16` container per HOW_TO_RUN.md §4), and a real launch of the
+Debug build's `.exe` - process stayed up, and its own structured log
+(`%LocalAppData%\CCMC\logs\ccmc-yyyyMMdd.log`) shows the same clean
+startup signature as prior sessions (`DeviceManager` reaching the
+Videocon adapter, "CCMC startup complete") - confirming the composition
+root and every window's constructor still resolve correctly through DI.
+**Not verified:** literal mouse-click/keyboard GUI interaction (login
+flow, Reception's Read Devices/Accept/Hold/Reject buttons, History's
+search/filter, resizing behaviour at different DPI) - no GUI automation
+tool was available for a native WPF app in this environment, consistent
+with every prior session's own stated limitation on this exact point (see
+"Tests Completed" above). This is a source-level and composition-root-level
+verification, not a substitute for a human clicking through the app.
+
+**No new dependency added.** The icon font (`Segoe Fluent Icons` /
+`Segoe MDL2 Assets`) ships with Windows - no NuGet package, no new binary
+asset, nothing to approve.
+
+## UI/UX Refinement Pass (2026-09-15)
+
+A targeted follow-up to the "UI/UX Redesign (2026-09-15)" pass above,
+scoped to specific issues found by manually reviewing the redesigned app -
+**not** a second redesign. No Domain/Application/Infrastructure/
+Contracts/Cloud.* code touched; `dotnet build CCMC.sln` and
+`dotnet test CCMC.sln` both re-run clean: **190/190 passing** (155 client
++ 35 cloud, cloud suite against a real disposable local PostgreSQL 16
+container), unchanged from baseline.
+
+**Root-cause fix, bigger than it looked: sidebar "black text on green".**
+`Theme.xaml`'s implicit `TargetType="TextBlock"` style had its own hard
+`Foreground` Setter (`TextPrimaryBrush`, near-black). A WPF Style Setter
+always outranks an *inherited* property value, so every plain,
+unstyled `TextBlock` placed inside a `Button`'s `Content` (the icon+label
+`StackPanel` pattern used throughout the prior redesign - sidebar nav,
+ACCEPT/HOLD/REJECT, Save, Read Devices, Test Connection, Refresh, Add
+Source/Vehicle, etc.) rendered in near-black regardless of the button's
+own intended `Foreground` - correct-looking by accident on light
+buttons, actively broken on the dark sidebar, and silently wrong on
+every coloured button's **hover** state too (`AcceptButtonStyle`'s
+`IsMouseOver` trigger sets `Foreground="{StaticResource TextInverseBrush}"`
+on the `Button` itself, intending white text on the now-solid-green
+background - the label never picked it up). Fixed at the root: the
+`Window` style now sets `TextElement.Foreground` (an inheritable attached
+property) to `TextPrimaryBrush`, and the implicit `TextBlock` style no
+longer sets `Foreground` at all - so a plain `TextBlock` now correctly
+inherits from whichever ancestor is closer (a `Button`'s own resolved
+Foreground, or the `Window`'s default for body text). Every named text
+style (`CaptionText`, `SectionLabelText`, `MetricValueText`, chip styles,
+etc.) already set its own `Foreground` explicitly and is unaffected.
+Fixes the reported sidebar contrast bug and, as a byproduct, the
+previously-silent hover-state contrast bug on ACCEPT/HOLD/REJECT and
+every other coloured icon+label button.
+
+**Reception weight field alignment.** The Weight card's `TextBox` reused
+the base `TextBox` style's `Padding="8,6"` (tuned for its 13px default
+`FontSize`) while itself set to `FontSize="18"` - the enlarged text sat
+off-centre in padding sized for a smaller font, and the field's fixed
+`Width="180"` floated alone in a card as wide as the whole window instead
+of following the same `Grid`-column rhythm every other field on the
+screen uses (Reception Details, FAT/SNF/CLR, Rate/Amount all use
+proportioned `Grid` columns). Fixed at the layout level, not with a
+margin offset: a new `MetricInputTextBox` style (`Styles/Theme.xaml`)
+scales padding/min-height together with its larger font, and the field
+now sits in a bounded `Grid` column matching the screen's existing
+rhythm.
+
+**Milk Reception opening off-screen.** New `CCMC.Desktop.Controls.WindowScreenFit`
+(Win32 `MonitorFromWindow`/`GetMonitorInfo` via `user32.dll` P/Invoke -
+already part of Windows, no NuGet package) resolves the actual monitor a
+window opens on and clamps its size/position to that monitor's work area,
+called once from `MainWindow.ShowOwned` (`SourceInitialized`, before first
+paint - no visible jump) for every secondary window, not just Reception.
+This is deliberately NOT `SystemParameters.WorkArea`, which only ever
+reports the *primary* monitor - wrong the moment the app runs on a
+secondary display. `ReceptionWindow`'s own static default `Height` was
+also reduced (860 → 780) as a more reasonable baseline; its existing
+`ScrollViewer` remains the fallback if content still exceeds the clamped
+height on a small screen.
+
+**Dashboard metrics are now actionable, not just numbers.** The four
+"Today" cards (Receptions/Accepted/Hold/Rejected) are real `Button`s
+(new `DashboardCardButtonStyle` - hover/pressed/keyboard-focus states,
+pointer cursor, `ToolTip` + `AutomationProperties.Name`, a "View
+accepted →" text hint so clickability isn't colour/shape-only) that call
+`MainWindow.OpenHistoryFiltered(statusFilter)`, which opens
+`ReceptionHistoryWindow` (the exact same window class/DI registration the
+sidebar's own "Reception History" item already opens - no second,
+parallel history screen) with its new `InitialStatusFilter` property set
+before `.Show()`. `ReceptionHistoryWindow.LoadAsync` applies it exactly
+once (a later manual "Refresh" never re-forces it over whatever the
+operator has since chosen) by setting `StatusFilterComboBox.SelectedItem`,
+which routes through the *existing* `ApplyFilter()` client-side filter -
+no new filtering backend, since History already loads its full
+(200-record) dataset and filters in memory. Counts on the cards remain
+exactly what `RefreshDashboardSummaryAsync` already computed from
+`GET /dashboard/summary` - untouched.
+
+**Sources and Vehicles no longer use a raw `DataGrid`.** Both replaced
+with the same card-row `DataTemplate`/`ItemsControl` pattern History
+already established, now shared via three new `Styles/Theme.xaml`
+resources (`ListHeaderBorder`, `ListContainerBorder`,
+`AlternatingRowBorder` - retrofitted into History too, so the row
+striping only exists once) instead of duplicating the same row-chrome
+XAML three times. Each row: identity (Source name+code / Vehicle
+number+tanker) as the primary line, secondary metadata (location/milk
+type; driver+mobile/capacity), and an Active/Inactive status chip
+(`StatusChip`-style, Success/Neutral). Search (already added in the
+prior pass) and the Add panels are unchanged. **No edit UI was added** -
+this app has never had one (only Add existed before this pass, confirmed
+by inspection; the cloud API supports `PATCH` but no client ever called
+it - a pre-existing, documented gap, see `progress.md` §7/§18). Building
+one was out of scope for a presentation-only refinement pass and would
+have been new functionality, not a redesign of existing functionality -
+flagged here rather than silently fabricated.
+
+**Accessibility additions:** `AutomationProperties.Name` added to all 8
+sidebar nav buttons and the History search/status controls (previously
+`ToolTip`-only); the History search/status filter fields gained visible
+field labels ("SEARCH"/"STATUS") so the active filter is never implied
+only by the ComboBox's own text.
+
+**Verification performed:** `dotnet build CCMC.sln` (0 warnings/errors),
+`dotnet test CCMC.sln` (190/190, cloud suite against a real disposable
+`postgres:16` container), and a real launch of the Debug build's `.exe` -
+log confirms the same clean startup signature as every prior session
+(`DeviceManager` reaching the Videocon adapter, "CCMC startup complete"),
+and incidentally shows a real prior manual-testing session in the same
+log file successfully calling `GET /dashboard/summary` against the local
+Docker cloud API (200 responses), evidence the previous redesign pass has
+already been exercised against a live backend, not just built. **Not
+verified:** literal mouse-click GUI interaction (clicking a Dashboard
+card, dragging Reception to a second monitor, tabbing through the
+sidebar) - no GUI automation tool was available for this native WPF app
+in this environment, the same limitation stated in every prior session.
+
+## Single-Window Shell & Navigation Redesign (2026-09-18)
+
+A UI/UX/navigation task, not a business-logic change: no Domain/
+Application/Infrastructure/Contracts/Cloud.* code touched, no device
+protocol/API contract/database schema change. `dotnet build CCMC.sln`
+0 warnings/0 errors; `dotnet test CCMC.sln` client suite unaffected
+(155/155 - `CCMC.Tests` has zero reference to `CCMC.Desktop`, so a WPF
+navigation change cannot regress it); the cloud suite could not be
+exercised this session (no local Postgres test DB running - a pre-
+existing environmental gap, not something this pass caused). A real
+Debug `.exe` launch was performed and its log shows the same clean
+startup signature as every prior session (`DeviceManager` reaching the
+Videocon adapter, "CCMC startup complete").
+
+**Single-window shell.** `ReceptionWindow`, `ReceptionHistoryWindow`,
+`SourcesWindow`, `VehiclesWindow`, `SyncStatusWindow`,
+`SettingsWindow`, `DeviceConfigurationWindow`, and `DeviceStatusWindow`
+(eight separate top-level `Window`s, each opened via `MainWindow.ShowOwned`)
+are now UserControls under a new `CCMC.Desktop.Views` namespace, hosted
+in a single `ContentControl` (`MainWindow.MainContent`) that the left
+sidebar swaps between - `MainWindow` itself is the only remaining
+top-level window besides `LoginWindow`. None of the moved windows used
+`Close()`/`DialogResult`/`ShowDialog`/`Owner`, so the conversion was a
+pure base-class change (`Window` → `UserControl`, `InitializeComponent`
+unchanged) with zero logic rewritten - every constructor/DI signature,
+event handler, and repository/service call is identical to its source
+window. `MainWindow`'s own Dashboard content is unchanged and stays
+inline in `MainWindow.xaml`; it is simply `MainContent`'s initial
+`Content` (captured once in `MainWindow_Loaded` so `ShowDashboard()` can
+restore it later) rather than the whole window's only content. Every
+sidebar button (including Dashboard, previously a static "you are here"
+`Border`) is now a real `Button`; the active one is styled via a new
+`SidebarNavButtonActiveStyle` (`Styles/Theme.xaml`, `BasedOn`
+`SidebarButtonStyle` - same template, only the background differs) set
+in code by `MainWindow.SetActiveNav`. Content views are still resolved
+via `IServiceProvider.GetRequiredService<T>()` and still transient, so
+each navigation click builds a fresh instance with freshly loaded data -
+identical behaviour to the previous per-`Window` model, just without a
+second top-level window appearing.
+
+**Settings now hosts Device Configuration and Device Status.** The
+former `DeviceConfigurationWindow` and `DeviceStatusWindow` content
+(COM port enumeration, baud/parity/stop-bits/flow-control selection,
+test-connection, and the scale/analyser connection-state chips) is
+merged into the new `SettingsView` as two additional sections alongside
+the original "General" (cloud API URL / DB path / captures path,
+read-only) section, switched by three small buttons at the top of the
+screen (not a new `TabControl` template - `Theme.xaml` had no
+`TabControl`/`TabItem` styling, so reusing the same
+button-swaps-visible-panel idea `MainWindow`'s own sidebar already uses
+avoided inventing new chrome). All three sections' logic - serial
+config load/save/test, device status refresh/test - is verbatim from
+the original windows. `MainWindow`'s sidebar no longer has separate
+"Device Status"/"Device Configuration" entries; both are reachable only
+through Settings now.
+
+**Reception History date-period filter.** A `PERIOD` `ComboBox`
+(Today/Past Week/Past Month/Past Year/Total) was added next to the
+existing `STATUS` filter, defaulting to **Today** (local calendar date,
+`DateTime.Today` - never hard-coded). Past Week/Month/Year are inclusive
+7/30/365-day windows ending today (`today.AddDays(-6/-29/-364)`); Total
+applies no date bound. All three filters (date period, status, search)
+combine with a single `Where` over the already-loaded in-memory row set
+- unchanged client-side-filtering approach, no new endpoint. The KPI
+summary cards (RECEPTIONS/TOTAL QUANTITY/TOTAL AMOUNT/breakdown) now
+reflect the *filtered* set rather than the full unfiltered load, so
+"Today" actually shows today's totals - a deliberate behaviour change
+from the previous pass (which computed the summary once from the full
+200-record load and never updated it), made because a KPI card labelled
+"RECEPTIONS" while a "Today" filter is active would otherwise show a
+number that has nothing to do with today. `IReceptionRepository
+.ListRecentAsync`'s `take` parameter (a plain SQL `LIMIT`) is now called
+with `int.MaxValue` instead of a fixed `200`, so "Total" genuinely means
+every reception ever captured locally, not just the most recent 200 -
+a parameter-value change, not a new query/repository method/schema
+change. For a chilling centre with a very large multi-year local
+history, this is a heavier one-time load than before when "Total" (or
+a wide "Past Year") is actually selected - not expected to matter at
+this project's scale, but worth knowing if it ever does.
+
+**Reception History search now covers every field a row displays.**
+Previously only source/vehicle/transaction-number were searched. Each
+row now also precomputes a lower-cased `SearchHaystack` string covering
+quantity, fat, SNF, CLR, water, protein, temperature, rate, amount
+(each included both in raw decimal form and its displayed rounded form,
+e.g. both `49.2` and `49.20`, so a search for either matches), reading
+source, status, sync state, and the captured date/time - every field
+that actually exists on `MilkReceptionTransaction`/the row, nothing
+invented. `ApplyFilter` is now a single `Contains` check against this
+string instead of three separate field comparisons.
+
+**Status chip sizing/alignment.** `Styles/Theme.xaml`'s `ChipBorderBase`
+gained a `MinHeight="24"` so Accepted/Hold/Rejected/etc. chips are the
+same height regardless of which glyph a given `StatusChip.ChipKind`
+renders (different icon glyphs have slightly different natural ascent/
+descent, which previously left the auto-sized `Border` a pixel or two
+taller/shorter depending on status); `ChipTextBase`/`ChipIconBase` both
+gained explicit `HorizontalAlignment="Center"`/`VerticalAlignment="Center"`
+(previously only the icon had `VerticalAlignment="Center"`, not the
+text), and `StatusChip.Create`'s inner `StackPanel` is now built with
+the same explicit centering - so a chip's icon+text is centered
+regardless of the chip's own width, not just visually incidental
+because its content happened to fit tightly.
+
+**Shared icon-textbox padding, not per-window `Padding` overrides.**
+`LoginWindow`'s email/password fields previously hard-coded
+`Padding="30,6,10,6"` inline (duplicating `Styles/Theme.xaml`'s
+`SearchTextBox` style used by History/Sources/Vehicles' own search
+boxes); they now reference `SearchTextBox` (email) and a new
+`IconPasswordBox` style (password) instead, so the one shared left-
+padding value used by every icon-prefixed input lives in exactly one
+place. The base `TextBox` style also gained an explicit
+`HorizontalContentAlignment="Left"` Setter for documentation/defensive
+correctness, though its custom `ControlTemplate` (a `Border` +
+`ScrollViewer` `PART_ContentHost`) does not actually read that property
+- the left-alignment is controlled entirely by `Padding`, same as
+before this pass.
+
+**Removed the "+" icon from the Milk Reception header.** `ReceptionView`
+(formerly `ReceptionWindow`)'s header no longer shows the ``
+("Add"/plus) glyph next to "Milk Reception" - purely cosmetic; the same
+glyph is intentionally left in place everywhere else it already
+appeared (the sidebar's own "Milk Reception" nav icon, the Dashboard's
+"RECEPTIONS" card icon, and the genuine "Add Source"/"Add Vehicle"
+button icons), since only the Reception screen's own header was in
+scope.
+
+**Sources/Vehicles hidden from Operator navigation.** `MainWindow`
+computes `_canManageSourcesAndVehicles` from `session.User.Roles`
+containing "Manager" or "Admin" (case-insensitive) and sets
+`NavSourcesButton`/`NavVehiclesButton`'s `Visibility` accordingly at
+`MainWindow_Loaded` - deliberately **role**-based, not permission-based.
+`SeedHelpers.RolePermissions` (`CCMC.Cloud.Infrastructure/Seed/
+SeedHelpers.cs`) actually grants Operator both `SOURCE_VIEW` and
+`VEHICLE_VIEW` (BRD v2 §14's least-privilege grant - so Reception's own
+source/vehicle picker `ComboBox`es keep populating for an Operator, which
+is unchanged and correct), so gating the nav item on that permission
+would **not** hide it for an Operator; this task's own explicit nav
+matrix was treated as the source of truth for the nav item's visibility,
+while the server's `[RequirePermission]` guards on the Source/Vehicle
+CRUD endpoints remain completely untouched and are still the real
+authorization boundary. `ShowSources()`/`ShowVehicles()` additionally
+early-return when `!_canManageSourcesAndVehicles`, so an Operator
+cannot reach either screen even via a future code path that calls these
+methods directly, not just via the hidden button. Admin is granted the
+same Source/VehicleCreate/Edit permissions as Manager in
+`RolePermissions`, so Admin's broader access is preserved without a
+separate Admin-specific branch.
+
+**Not verified this session (documented, not silently skipped):**
+literal mouse-click GUI interaction (clicking through each nav button,
+confirming the active-nav highlight visually, confirming chip
+sizing/centering by eye, confirming textbox padding by eye) - no GUI
+automation tool was available for this native WPF app in this
+environment, the same limitation stated in every prior UI session (see
+"UI/UX Refinement Pass (2026-09-15)" above). Verification here was
+static/code-level (build, the unaffected client test suite, and a real
+`.exe` launch confirming clean startup) plus manual review of the
+merged XAML/code-behind against each original window's own source.
+
+## Visual Correction Pass + Rate Calculation Root-Cause Fix (2026-09-18)
+
+Follow-up to "Single-Window Shell & Navigation Redesign (2026-09-18)" above,
+triggered by manual verification finding the textbox-padding and status-
+chip-sizing fixes from that pass had not actually taken visual effect, and
+that Rate Calculation was not working at all in the running application.
+BRD source consulted directly for this pass: `Doc/CCMC_BRD_and_Technical_
+Design_v2.docx` §25 "Milk Rate Calculation — Business Logic" (extracted via
+its own `word/document.xml`, not taken from any prior summary) - its
+25.1–25.4 wording matches this repo's own `RateCalculationService`/
+`RateCalculationServiceTests` doc comments verbatim, confirming those were
+already an accurate port; nothing in the formula itself needed to change.
+
+**Textbox padding - real root cause found.** The previous pass's fix
+(`HorizontalContentAlignment="Left"`) was cosmetic only and said so in its
+own doc comment - `TextBox`/`PasswordBox`'s custom `ControlTemplate` never
+reads that property (WPF's `PART_ContentHost` renders text directly into a
+`ScrollViewer`, not through a `ContentPresenter`), so it changed nothing.
+The actual structural problem: `SearchTextBox`/`IconPasswordBox` were a
+plain input given a large left `Padding` (30px) purely to leave room for a
+*separate* icon `TextBlock` manually overlaid on top of it in each caller's
+own `Grid` - two independently-tuned numbers (the icon's `Margin`, the
+input's `Padding`) with no relationship enforced between them, in two
+different elements. Fixed by moving the icon **into** the same
+`ControlTemplate` as its own `Grid.Column`, sharing the one `Bd` Border
+with `PART_ContentHost` - text now starts after a normal, modest
+`Padding="10,6,10,6"` (matching every other input in the app) immediately
+following the icon column, not after an inflated guess. The icon glyph is
+now supplied per instance via `Tag` (e.g. `Tag="&#xE721;"`). Every caller
+(`LoginWindow`'s email/password, and History/Sources/Vehicles' search
+boxes) had its old `Grid`+overlay `TextBlock` removed and now just sets
+`Tag` on a single `TextBox`/`PasswordBox`.
+
+**Update (2026-09-18, same day, later commit):** the developer's own
+commit message for this exact change (`dfa9ad9 "Rate config added --
+text box bug still an issue"`) records that, per manual testing after
+committing, the textbox left-padding issue is **still visually present**
+despite this structural fix being in place. This is not silently claimed
+resolved - see the "Documentation Consistency Pass" entry near the end of
+this file and `rateconfig.md` §13 for how this is now tracked as an open
+item. No further code change was made to re-diagnose it in the
+documentation-only pass that added that note.
+
+**Accepted/Hold/Rejected sizing - real root cause found.** The previous
+pass added `MinHeight`/centering to the *shared* `ChipBorderBase` (correct,
+kept) but never gave the chip a `MinWidth` - so "HOLD" (4 characters) was
+always narrower than "ACCEPTED"/"REJECTED" (8 characters each) wherever
+they appeared down a column of History rows, because width was left
+entirely to the text. Fixed with four new History-specific styles
+(`HistorySuccessChipBorder`/`HistoryWarningChipBorder`/
+`HistoryDangerChipBorder`/`HistoryNeutralChipBorder`, each `BasedOn` the
+existing colour-specific chip style plus `MinWidth="112"`) used **only** by
+`ReceptionHistoryView`'s status column - deliberately not applied to the
+shared `SuccessChipBorder`/etc. keys `StatusChip.Create` uses everywhere
+else (Device/Sync state, Source/Vehicle Active/Inactive), which were never
+reported broken and must not change size.
+
+**Rate Calculation - actual root cause: configuration never existed, not
+a calculation bug.** `RateCalculationService.Calculate` (domain layer),
+`ReceptionWorkflowService.CalculateRateAsync`/`ValidateAndSaveAsync`
+(resolves settings, computes, persists), `SyncEngineService`'s outbox
+mapping, the cloud's `ReceptionService.CreateAsync` (persists verbatim),
+and `ReceptionHistoryView`'s Rate/Amount columns were all *already*
+correctly wired and already covered by tests (`RateCalculationServiceTests`
+- exact BRD §25.2/25.3 formulas including the "full-precision Rate feeds
+Amount, not the rounded one" discriminating case; `ReceptionWorkflowService
+Tests` - local persistence/reload; `ReceptionTests.Create_WithRateAndAmount
+_PersistsAndReturnsThemVerbatim` - cloud persistence/round-trip). The cloud
+already had a working `PUT /rate-formula-settings` (`RateFormulaSettings
+Controller`/`Service`, gated by `RATE_FORMULA_CONFIGURE`) and its own
+passing RBAC tests. What never existed anywhere: (1) any seed data for the
+`rate_formula_settings` table (confirmed by reading `SeedHelpers`/
+`DevelopmentSeeder`/`ProductionBootstrapSeeder` - none inserts a row), (2)
+any WPF screen to configure it, and (3) any method on `ICloudApiClient` to
+call the PUT at all (only `GetRateFormulaSettingsAsync` existed). Consequence:
+`IRateFormulaSettingsRepository.ResolveForCentreAsync` always resolved
+`null`, so `RateCalculationService.Calculate`'s `config is null -> Zero`
+branch always ran - every reception's Rate/Amount was always 0, for every
+centre, always. Also fixed in passing: `RateCalculationService`'s own doc
+comment falsely claimed a `CCMC.Cloud.Domain.Services.RateCalculationService`
+mirror existed "exactly as QualityValidationService already is" - no such
+type is defined anywhere in the solution (confirmed by search); corrected,
+since BRD §25's own wording ("Rate is recalculated live... on the milk
+collection screen") makes this correctly a client-side-only calculation -
+the cloud only ever persists the Rate/Amount the client already computed
+and sent, it never recomputes them.
+
+**Rate Configuration screen (new, Manager/Admin-only).**
+`Views/RateConfigurationView` - centre selector (only the caller's own
+accessible centres, mirroring Sources/Vehicles' Add panels), a mode
+`ComboBox` (Fat vs SNF / TS Based), the exact BRD §25.2/25.3 formula text
+rendered read-only, editable Value1/Value2 (Fat-vs-SNF) or TS Rate (TS-
+based) fields with the 0.22/0.36/0.32 constants shown as explicitly
+non-editable (BRD does not make these configurable), a calculation preview
+(sample FAT/SNF/Weight -&gt; Rate/Amount, computed by calling
+`RateCalculationService.Calculate` directly - the same one authoritative
+implementation, not a second copy), and Save. Save validates Value1+Value2
+(Fat-vs-SNF) or TsRate (TS-based) are present per BRD 25.2/25.3's own
+"otherwise Rate/Amount = 0" wording, then calls the new
+`ICloudApiClient.UpdateRateFormulaSettingsAsync` (PUT, new
+`UpsertRateFormulaSettingsRequestDto` in `CCMC.Contracts`) and refreshes
+the local cache via the existing `MasterDataSyncService.PullAsync` - same
+pattern as `SourcesView`/`VehiclesView`'s own Add buttons, not a second
+persistence mechanism. Nav visibility (`MainWindow.NavRateConfigButton`) is
+Manager/Admin-only, hidden for Operator, computed by role exactly like
+Sources/Vehicles (`_canManageRateConfiguration`) - not by the
+`RATE_FORMULA_VIEW` permission, which Operator also holds (BRD §14's
+least-privilege grant, so Reception's own read-only use of rate settings
+keeps working for an Operator); the Save button additionally checks the
+real `RATE_FORMULA_CONFIGURE` permission defensively. The server's own
+`[RequirePermission]` + (new, see below) `CentreAccessGuard` remain the
+actual authorization boundary regardless of what this screen shows.
+
+**Centre-scoping gap found and fixed server-side.**
+`RateFormulaSettingsService.UpsertAsync` had **no centre check at all** -
+any Manager/Admin with `RATE_FORMULA_CONFIGURE` could silently overwrite
+*any* centre's rate configuration, or the shared global (`CentreId: null`)
+default that applies to every centre without its own override, regardless
+of their own centre assignment. This is exactly the "one centre's
+configuration overwriting another's" failure mode this task's Centre
+Scoping requirement forbids, and it had a passing test
+(`Upsert_ByManager_CreatesNewGlobalSettings`) actively asserting the
+unsafe behaviour as correct. Fixed by adding the same
+`CentreAccessGuard.AssertCanAccess` check `SourceService`/`VehicleService`
+already use for a specific `CentreId`, plus a new rule (extending
+`CentreAccessDeniedException` to accept `int?`) that only a caller with
+`CentreAccess.AllCentres` may write the global (`null`) row. The old test
+was replaced with `Upsert_ByCentreScopedManager_ForGlobalDefault_Returns403`
+(manager1 is BLR-CC-01-scoped, not AllCentres) plus three new tests:
+`Upsert_ByAdmin_ForGlobalDefault_Succeeds` (Admin is seeded AllCentres),
+`Upsert_ByManager_ForOwnCentre_Succeeds`, and
+`Upsert_ByManager_ForOtherCentre_Returns403`.
+
+**Verification performed (real, not just "it builds"):** `dotnet build
+CCMC.sln` - 0 warnings/0 errors. `dotnet test CCMC.sln` -
+**197/197 passing** (159 client, up from 155: +4 new
+`HttpCloudApiClientTests` cases for `UpdateRateFormulaSettingsAsync`; 38
+cloud, up from 35: the centre-scoping test changes above), the cloud suite
+run against a real disposable `postgres:16` Docker container on host port
+5432 (started for this session specifically because the local
+`postgresql-x64-16` Windows service was stopped and this sandbox lacks the
+privilege to start Windows services) - a genuine real-Postgres integration
+run, not skipped. A real Debug `.exe` launch was performed both before and
+after all changes; its log shows the same clean startup signature as every
+prior session both times. Repo-wide search confirms exactly one
+`RateCalculationService` in the whole solution (`CCMC.Domain.Services`) -
+no duplicate/conflicting implementation.
+
+**Not verified this session (documented, not silently skipped):** literal
+mouse-click GUI interaction (typing into the fixed textboxes and visually
+confirming the caret position, visually confirming the three status chips
+are now equal width, clicking through the new Rate Configuration screen as
+a real Manager/Operator account, watching a real reception's Rate/Amount
+populate live) - no GUI automation tool was available for this native WPF
+app in this environment, the same limitation stated in every prior UI
+session. The full calculation-to-persistence-to-sync-to-cloud path was
+instead proven at the automated-test layer end to end (domain formula ->
+local SQLite persistence/reload -> cloud POST /reception persistence -
+three separate, already-existing or newly-added test suites, not a single
+"it builds" claim), and the configuration path (PUT -> centre scoping ->
+local cache refresh) was proven the same way.
+
+## Documentation Consistency Pass (2026-09-18, later the same day)
+
+**Documentation-only session — no source code, XAML, project, test, or
+migration file was touched.** Triggered by a follow-up request to bring
+`CLAUDE.md`/`progress.md`/`STATUS.md`/`HOW_TO_RUN.md` up to date with the
+single-window shell + Rate Calculation/Configuration work above, and to
+add a new `rateconfig.md` explaining the feature to a Manager. Everything
+below was re-verified directly against the current repository state
+before writing it down — not carried forward from memory of the earlier
+sessions.
+
+**Re-verified, fresh, this session (read-only — build/test only, no files
+changed):** `dotnet build CCMC.sln` → 0 warnings/0 errors.
+`dotnet test tests/CCMC.Tests/CCMC.Tests.csproj` → **159/159 passing**.
+`dotnet test tests/CCMC.Cloud.Api.Tests/CCMC.Cloud.Api.Tests.csproj` →
+**38/38 passing**, run against a freshly started, then removed, disposable
+`postgres:16` Docker container on host port 5432 (same throwaway-container
+pattern as the prior pass — the local `postgresql-x64-16` Windows service
+is still stopped and this sandbox still lacks the privilege to start it).
+**197/197 total**, matching the count already recorded above for the same
+code — confirms nothing regressed between that pass and this one.
+
+**Stale documentation found and corrected, with historical text
+preserved (not deleted):**
+
+- `progress.md` §4 "Milk Rate Calculation" and §2 "Overall Status" (both
+  dated 2026-09-12, from a session *before* this repository's own
+  single-window shell / Rate Configuration work) described Rate
+  Calculation as "fully implemented end-to-end" and verified via "a
+  throwaway console program outside the repository" - accurate about the
+  *domain formula and API mechanism* existing and being correct even
+  then, but it left a reader with the impression a Manager could actually
+  configure rates through the running application. They could not: as
+  documented in this file's own "Visual Correction Pass + Rate
+  Calculation Root-Cause Fix (2026-09-18)" entry above, **no WPF screen
+  and no `ICloudApiClient` method to call `PUT /rate-formula-settings`
+  existed until later on 2026-09-18** - every reception's Rate/Amount was
+  actually `0` in the running application for the entire period between
+  the 2026-09-12 entry and that fix, regardless of what the API/harness
+  could already do. An "Update (2026-09-18)" note was appended to both
+  sections making this explicit, rather than editing the original 2026-09-12
+  text out of the record.
+- `RateCalculationService`'s own doc comment (`src/CCMC.Domain/Services/
+  RateCalculationService.cs`) previously claimed a
+  `CCMC.Cloud.Domain.Services.RateCalculationService` mirror existed -
+  already corrected in the prior pass (see that section above), re-verified
+  here by a fresh repo-wide search: no such type exists anywhere in the
+  solution.
+- `CLAUDE.md`'s "Current operational state" checkpoint (dated 2026-09-15,
+  i.e. before both the single-window shell and Rate Configuration work)
+  described the Windows client as a per-window `MainWindow`/
+  `ReceptionWindow`/etc. shell and said rate configuration "reaches the
+  client via `MasterDataSyncService`" without mentioning any way to
+  *write* it. Updated in place (not rewritten wholesale - the rest of the
+  checkpoint, e.g. Neon/Docker/offline-login detail, was already accurate
+  and is left as-is) to describe the current single-window shell and the
+  new Manager/Admin-only Rate Configuration screen, with an explicit note
+  that literal GUI click-through verification has still not been
+  performed in any session to date.
+- `HOW_TO_RUN.md` had no section at all describing how to actually
+  navigate the running application (login → sidebar → a specific screen) -
+  not stale, just missing. A new §12 was added covering navigation in
+  general and reaching Rate Configuration specifically, reusing the
+  already-documented (§8) development credentials verbatim rather than
+  inventing new ones.
+
+**Not verified this session (unchanged limitation, stated plainly):** no
+GUI automation tool is available for this native WPF app in this
+environment. Every claim in the updated documents about what a Manager
+"sees" or "can do" on screen is sourced from reading the actual XAML/code-
+behind (control names, `Style`/`Tag` values, click handlers, RBAC checks),
+not from an observed screenshot or click-through - this is stated
+explicitly in `rateconfig.md`'s own header note and is the same caveat
+every prior UI-focused session in this file has carried. In particular,
+this session did **not** attempt to re-diagnose or re-fix the textbox
+left-padding issue the developer's own commit (`dfa9ad9 "Rate config
+added -- text box bug still an issue"`) reports as still present after
+the structural fix in the prior pass - that is out of scope for a
+documentation-only task and is instead recorded honestly as an open item
+in `STATUS.md`, `progress.md`, and `rateconfig.md`.
+
 ## Important Commands
 
 ```
@@ -662,7 +1986,13 @@ dotnet publish src/CCMC.Desktop/CCMC.Desktop.csproj -c Release -r win-x64 --self
 # %LocalAppData%\CCMC\captures\
 # %LocalAppData%\CCMC\logs\ccmc-yyyyMMdd.log
 
-# Cloud backend - see README.md §29 for full detail
+# Cloud backend - PRIMARY path is Docker Compose (see HOW_TO_RUN.md, README.md §29.16):
+Copy-Item .env.docker .env -Force   # or .env.neon for Neon mode
+docker compose -p cc-mc up -d --build
+curl http://localhost:8081/health
+curl http://localhost:8081/health/db
+
+# Secondary alternative - running the API directly without Docker (README.md §29.11):
 psql -U postgres -h localhost -c "CREATE DATABASE ccmc_cloud_dev;"
 psql -U postgres -h localhost -c "CREATE DATABASE ccmc_cloud_test;"
 dotnet tool install --global dotnet-ef --version 8.0.11
@@ -670,4 +2000,5 @@ dotnet ef database update --project src/CCMC.Cloud.Infrastructure/CCMC.Cloud.Inf
 dotnet run --project src/CCMC.Cloud.Api/CCMC.Cloud.Api.csproj --urls http://localhost:5000
 dotnet test tests/CCMC.Cloud.Api.Tests/CCMC.Cloud.Api.Tests.csproj
 # Swagger: http://localhost:5000/swagger   Health: http://localhost:5000/health , /health/db
+# (if running via Docker instead, substitute 8081 for 5000 above)
 ```

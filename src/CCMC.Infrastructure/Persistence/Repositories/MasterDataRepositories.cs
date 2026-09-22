@@ -284,3 +284,70 @@ public sealed class QualityRuleRepository(SqliteConnectionFactory connectionFact
         CentreId = reader.IsDBNull(4) ? null : reader.GetInt32(4),
     };
 }
+
+public sealed class RateFormulaSettingsRepository(SqliteConnectionFactory connectionFactory) : IRateFormulaSettingsRepository
+{
+    public async Task<IReadOnlyList<RateFormulaSettings>> ListAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = connectionFactory.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = SelectColumns + ";";
+        var results = new List<RateFormulaSettings>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) results.Add(Map(reader));
+        return results;
+    }
+
+    public async Task ReplaceAllAsync(IReadOnlyList<RateFormulaSettings> settings, CancellationToken cancellationToken)
+    {
+        await using var connection = connectionFactory.Open();
+        await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        using (var clear = connection.CreateCommand())
+        {
+            clear.Transaction = tx;
+            clear.CommandText = "DELETE FROM rate_formula_settings;";
+            await clear.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        foreach (var setting in settings)
+        {
+            using var insert = connection.CreateCommand();
+            insert.Transaction = tx;
+            insert.CommandText = """
+                INSERT INTO rate_formula_settings (id, rate_type, value1, value2, ts_rate, centre_id)
+                VALUES ($id, $rateType, $value1, $value2, $tsRate, $centreId);
+                """;
+            insert.Parameters.AddWithValue("$id", setting.Id);
+            insert.Parameters.AddWithValue("$rateType", setting.RateType.ToString());
+            insert.Parameters.AddWithValue("$value1", (object?)setting.Value1 ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$value2", (object?)setting.Value2 ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$tsRate", (object?)setting.TsRate ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$centreId", (object?)setting.CentreId ?? DBNull.Value);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    public async Task<RateFormulaSettings?> ResolveForCentreAsync(int centreId, CancellationToken cancellationToken)
+    {
+        var all = await ListAsync(cancellationToken);
+
+        // Centre-specific overrides global, mirroring QualityRuleRepository.ResolveForCentreAsync.
+        return all.FirstOrDefault(s => s.CentreId == centreId)
+            ?? all.FirstOrDefault(s => s.CentreId is null);
+    }
+
+    private const string SelectColumns = "SELECT id, rate_type, value1, value2, ts_rate, centre_id FROM rate_formula_settings";
+
+    private static RateFormulaSettings Map(SqliteDataReader reader) => new()
+    {
+        Id = reader.GetInt32(0),
+        RateType = Enum.Parse<RateFormulaType>(reader.GetString(1)),
+        Value1 = reader.IsDBNull(2) ? null : (decimal)reader.GetDouble(2),
+        Value2 = reader.IsDBNull(3) ? null : (decimal)reader.GetDouble(3),
+        TsRate = reader.IsDBNull(4) ? null : (decimal)reader.GetDouble(4),
+        CentreId = reader.IsDBNull(5) ? null : reader.GetInt32(5),
+    };
+}

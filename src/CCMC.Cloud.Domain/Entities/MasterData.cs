@@ -60,3 +60,20 @@ public sealed class QualityRule
     public int? CentreId { get; set; }
     public ChillingCentre? Centre { get; set; }
 }
+
+/// <summary>
+/// BRD v5.0 section 25 (PREFS_RATE_*), cloud-owned configuration mirroring
+/// QualityRule's centre-specific-over-global resolution. Value1/Value2/TsRate
+/// stay nullable - the BRD explicitly allows an unconfigured formula (Rate/
+/// Amount then computed as 0, never a fabricated default).
+/// </summary>
+public sealed class RateFormulaSettings
+{
+    public int Id { get; set; }
+    public RateFormulaType RateType { get; set; }
+    public decimal? Value1 { get; set; }
+    public decimal? Value2 { get; set; }
+    public decimal? TsRate { get; set; }
+    public int? CentreId { get; set; }
+    public ChillingCentre? Centre { get; set; }
+}

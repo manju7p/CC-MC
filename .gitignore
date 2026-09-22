@@ -41,6 +41,10 @@ appsettings.Local.json
 appsettings.*.local.json
 .env
 .env.*
+# ...except the committed, placeholder-only templates (see README.md
+# "Environment Configuration") - these must never contain a real secret.
+!.env.example
+!.env.*.example
 
 # Windows / OS
 Thumbs.db
@@ -50,3 +54,8 @@ Desktop.ini
 *.tmp
 *.temp
 ~$*
+.neon
+node_modules/
+
+rateconfig.md
+

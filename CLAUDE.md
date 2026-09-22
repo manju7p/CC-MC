@@ -1,5 +1,16 @@
 # Working guidelines for CCMC
 
+**What is CC-MC?** A native Windows desktop application (WPF, C#/.NET 8,
+code-behind — no MVVM) for the operational workflow at a dairy Chilling
+Centre: weigh and quality-test incoming milk from a vehicle/source, apply
+a manual Accept/Hold/Reject decision (with an advisory automatic
+suggestion), compute Rate/Amount from a configured formula, save locally
+first (SQLite, fully offline-capable), and sync idempotently to a cloud
+API (ASP.NET Core 8 / EF Core / PostgreSQL) for cross-centre reporting,
+RBAC, and audit. See `context.md` "Product" for the full scope statement
+and `Doc/CCMC_BRD_and_Technical_Design_v2.docx` for the authoritative
+requirements.
+
 Engineering guidelines for building this software — how to test it, how
 to keep its docs honest, the code-style and git defaults, and the
 security/infra baseline. This file should stay true regardless of which
@@ -20,6 +31,163 @@ from "what's true right now" from "what happened and why," on purpose:
   bugs found and fixed, product decisions made and why. Read this when
   `context.md` cites something ("see STATUS.md ...") and you need the
   full story behind it.
+- **`architecture.mmd`** — a full-layer Mermaid diagram (devices → WPF →
+  domain/application/infrastructure → cloud API → PostgreSQL → Docker/Neon
+  → future Render). Read this for the shape of the whole system before
+  diving into any one layer's code.
+- **`HOW_TO_RUN.md`** — the practical runbook: build, test, Docker mode,
+  Neon mode, switching between them, logs, migrations, dev credentials.
+
+## Current operational state (checkpoint 2026-09-18)
+
+Read this section first in any new session — it's the fastest way to avoid
+re-deriving context that already exists. Originally written 2026-09-13,
+kept current via dated `Update (...)` notes below rather than rewritten
+each time — see `STATUS.md`'s own "Checkpoint" section and
+`progress.md`'s dated checkpoints for the full chronological detail this
+section only summarizes. Header bumped to 2026-09-18 for the single-window
+shell + Rate Configuration work below (same convention as the 2026-09-13 →
+2026-09-15 bump for the Neon bootstrap/UI redesign work).
+
+- **WPF shell (2026-09-18):** the client is now a genuine single-window
+  application — `MainWindow` (plus `LoginWindow` before sign-in) is the
+  only top-level `Window`; Dashboard, Milk Reception, Reception History,
+  Sources, Vehicles, Synchronization, Settings, and the new Rate
+  Configuration (see below) are all `UserControl`s under
+  `CCMC.Desktop.Views`, swapped into `MainWindow`'s single right-hand
+  `ContentControl` by its left sidebar. **Settings** now contains Device
+  Configuration and Device Status as two additional sections on the same
+  screen — there are no separate sidebar entries for either anymore.
+  **Sources/Vehicles/Rate Configuration are hidden from Operator
+  navigation** (role-name check — Manager/Admin only — not the
+  `*_VIEW` permission an Operator also holds, since that permission still
+  needs to work for Reception's own read-only use of that data). Reception
+  History gained a date-period filter (Today/Past Week/Past Month/Past
+  Year/Total, default Today) and a widened search covering every field a
+  row displays, not just source/vehicle/transaction number.
+
+- **Branch:** `windows-application`. **`pranav-dev`** is a separate,
+  historically unrelated legacy NestJS implementation on its own branch —
+  never checkout, merge, rebase, or modify it. Read-only reference only
+  (`git show pranav-dev:<path>`), and only when explicitly relevant.
+- **Solution:** 11 projects — client (`CCMC.Domain`, `CCMC.Contracts`,
+  `CCMC.Application`, `CCMC.Infrastructure`, `CCMC.Desktop`, `CCMC.Tests`)
+  and cloud (`CCMC.Cloud.Domain`, `CCMC.Cloud.Application`,
+  `CCMC.Cloud.Infrastructure`, `CCMC.Cloud.Api`, `CCMC.Cloud.Api.Tests`).
+  `CCMC.Contracts` is the only project shared across both tiers — the two
+  tiers otherwise have zero code coupling.
+- **Docker:** `docker compose -p cc-mc up -d --build` runs containers
+  `cc-mc` (API, host port `8081`) and `cc-mc-postgres` (Postgres 16, host
+  port `55433`, only created when the `docker` Compose profile is active).
+  The WPF client's `CloudApi:BaseUrl` is always `http://localhost:8081/` —
+  identical in both modes below.
+- **Environment switching:**
+  `Copy-Item .env.docker .env -Force` (local Postgres) or
+  `Copy-Item .env.neon .env -Force` (Neon) before `docker compose up`.
+  `.env`, `.env.docker`, `.env.neon` are real and gitignored; only
+  `.env.example` (placeholders) is tracked. Never put a secret in a tracked
+  file, `compose.yaml`, or `appsettings.json`.
+- **Neon:** project `fancy-cherry-25725711`, branch `production`. Connectivity
+  and automatic migrations are verified working. **Update (2026-09-15):**
+  no longer zero users — a production bootstrap mechanism now exists
+  (`ProductionBootstrapSeeder`, env-var-gated via `Bootstrap:AdminEmail`,
+  a no-op unless configured) and was used to create one Admin, one
+  Manager, and one Operator account plus one Chilling Centre (`BLR-CC-01`,
+  a placeholder identity by explicit human choice — rename once the real
+  centre is known). `DevelopmentSeeder` still correctly never runs outside
+  `ASPNETCORE_ENVIRONMENT=Development`; the two mechanisms are independent
+  and share their RBAC grants via `SeedHelpers`. See `STATUS.md` "Neon
+  Production Bootstrap (2026-09-15)" / `HOW_TO_RUN.md` §9 for the full
+  writeup, including a real secret-exposure incident from that session
+  (Neon DB password, JWT secret, and all three bootstrap passwords printed
+  into a session transcript by a careless diagnostic command) whose
+  rotation the human deferred to themselves — treat those credentials as
+  compromised until confirmed rotated.
+- **Rate calculation:** `RateCalculationService` (BRD §25) — Fat-vs-SNF and
+  TS-based formulas, both implemented exactly as specified, full-precision
+  `Rate` used to compute `Amount` (not a rounded intermediate). Config is
+  cached locally per centre and reaches the client via
+  `MasterDataSyncService`. No fabricated defaults — an unconfigured formula
+  computes Rate=0/Amount=0, never a guessed value. **Update (2026-09-18):**
+  a Manager/Admin-only **Rate Configuration** screen
+  (`Views/RateConfigurationView`, reached from the main window's sidebar)
+  and a corresponding `ICloudApiClient.UpdateRateFormulaSettingsAsync`
+  method now exist to actually call the cloud's `PUT /rate-formula-settings`
+  — **before this date, no such screen or client method existed at all**,
+  so every centre's Rate/Amount was genuinely `0` in the running
+  application regardless of the calculation itself being correct (see
+  `STATUS.md`'s "Visual Correction Pass + Rate Calculation Root-Cause Fix
+  (2026-09-18)" and `rateconfig.md`). A previously-missing centre-scoping
+  check on that same endpoint (any Manager/Admin could overwrite any
+  centre's config, not just their own) was also found and fixed. The BRD
+  gives Value1/Value2 no more specific meaning than "two configured
+  base-rate components, used only in Fat-vs-SNF mode" — `rateconfig.md`
+  documents this deliberately without inventing a dairy-industry
+  interpretation the BRD does not support.
+- **Offline-first:** `Session.IsOffline` gates both `SyncEngineService` and
+  master-data sync. Offline login uses Argon2id + DPAPI
+  (`OfflineCredentialStore`, `CurrentUser` scope) — the raw password is
+  never stored, only the salted hash inside a DPAPI-protected blob. Online
+  login always takes priority; offline is only a fallback on genuine
+  network failure, never on a real (even negative) server response.
+- **Authentication/authorization:** JWT (HMAC-SHA256, 8h expiry, no refresh
+  tokens) carries no roles/permissions/centre claims — those are resolved
+  fresh from the database on every request via
+  `ICurrentUserAccessor`/`RequestUser`. Every protected cloud endpoint
+  carries an explicit `[RequirePermission(code)]` (14 codes total) plus
+  `CentreAccessGuard` for centre scoping — this is the sole real
+  authorization boundary. The Windows client's own permission checks are
+  UX-only convenience, never a security control (see "Security baseline"
+  below).
+- **Recently fixed (2026-09-12):** a stale `CloudApi:BaseUrl`
+  (`localhost:5000` instead of the Docker `localhost:8081`) was the shared
+  root cause of "login shows offline," a blank rate calculator, and "app
+  appears offline." Also fixed: History screen missing Rate/Amount columns,
+  no Source/Vehicle management UI for Manager/Admin (server-side
+  permissions already existed), and Enter key not submitting login
+  (`IsDefault="True"`). Full writeup: `STATUS.md` "Application Bug Fixes
+  (2026-09-12)".
+- **Render deployment: BLOCKED, not merely "not started" (as of
+  2026-09-15).** The GitHub repository is owned/controlled by the CEO, and
+  the current session's operator does not have the access needed to
+  connect the private repo to Render. This is an access/permissions
+  blocker, not a technical one — the Docker image and Neon backend are
+  both already deployment-ready (see the Neon bullet above and
+  `HOW_TO_RUN.md` §10). Do not attempt to work around this (e.g. by
+  requesting elevated access, forking, or making the repo public) without
+  being explicitly asked; do not perform a Render deployment without being
+  explicitly asked, either.
+- **Other remaining gaps:** no in-app password-change/reset endpoint
+  exists anywhere (rotating any account's password today requires direct
+  database access with the same `IPasswordHasher` the app uses at
+  runtime); a real `POST /auth/login` round-trip against Neon's now-real
+  accounts has not actually been exercised (verified at the data layer
+  only, by the human's own choice — see `STATUS.md`); literal WPF GUI
+  mouse/keyboard interaction not verifiable in any environment used so far
+  (verification instead uses real production service classes against a
+  real running API, plus a real `.exe` launch confirming clean startup —
+  see `STATUS.md` "UI/UX Redesign (2026-09-15)"); physical Ekomilk
+  KAM98-2A serial hardware link not yet verified (payload *decode* is
+  verified against real sample frames). **Open as of 2026-09-18:** a
+  textbox left-padding issue (Login email/password, History/Sources/
+  Vehicles search boxes) was structurally re-fixed but the developer's own
+  commit message for that change (`dfa9ad9 "Rate config added -- text box
+  bug still an issue"`) records it as still visually present after manual
+  testing — do not claim this is resolved without new evidence; see
+  `rateconfig.md` §13 and `STATUS.md`'s "Documentation Consistency Pass
+  (2026-09-18, later the same day)" entry.
+- **Next intended step:** obtain Render-connect access from the repo
+  owner, then deploy — see `HOW_TO_RUN.md` §10 and `STATUS.md`
+  "Checkpoint" → NEXT for the ordered list once unblocked. Do not perform
+  Render deployment without being explicitly asked. Production user
+  bootstrap itself is done (see the Neon bullet above); if a new
+  centre/account needs bootstrapping later, reuse
+  `ProductionBootstrapSeeder` via `Bootstrap__*` env vars (see
+  `HOW_TO_RUN.md` §9) rather than inventing a new mechanism. A UI/UX
+  redesign pass (2026-09-15) also landed — see `STATUS.md` "UI/UX Redesign
+  (2026-09-15)" / "UI/UX Refinement Pass (2026-09-15)" — purely
+  presentational, no domain/application/infrastructure/rate/quality/sync
+  logic touched, 190/190 tests unaffected.
 
 ## Testing philosophy
 

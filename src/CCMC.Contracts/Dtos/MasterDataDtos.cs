@@ -37,6 +37,31 @@ public sealed class VehicleDto
     [JsonPropertyName("centreId")] public required int CentreId { get; init; }
 }
 
+/// <summary>Mirrors the cloud's SourcesController.CreateSourceRequest exactly - POST /sources, gated by SOURCE_CREATE (Manager/Admin - see PermissionCodes/DevelopmentSeeder).</summary>
+public sealed class CreateSourceRequestDto
+{
+    [JsonPropertyName("code")] public required string Code { get; init; }
+    [JsonPropertyName("name")] public required string Name { get; init; }
+    [JsonPropertyName("location")] public string? Location { get; init; }
+    [JsonPropertyName("contact")] public string? Contact { get; init; }
+    [JsonPropertyName("milkType")] public string? MilkType { get; init; }
+    [JsonPropertyName("centreId")] public required int CentreId { get; init; }
+}
+
+/// <summary>Mirrors the cloud's VehiclesController.CreateVehicleRequest exactly - POST /vehicles, gated by VEHICLE_CREATE (Manager/Admin - see PermissionCodes/DevelopmentSeeder).</summary>
+public sealed class CreateVehicleRequestDto
+{
+    [JsonPropertyName("vehicleNumber")] public required string VehicleNumber { get; init; }
+    [JsonPropertyName("tankerNumber")] public string? TankerNumber { get; init; }
+    [JsonPropertyName("driverName")] public string? DriverName { get; init; }
+    [JsonPropertyName("driverMobile")] public string? DriverMobile { get; init; }
+
+    [JsonPropertyName("capacityKg"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? CapacityKg { get; init; }
+
+    [JsonPropertyName("centreId")] public required int CentreId { get; init; }
+}
+
 public sealed class QualityRuleDto
 {
     [JsonPropertyName("id")] public required int Id { get; init; }
@@ -47,4 +72,46 @@ public sealed class QualityRuleDto
     [JsonPropertyName("maxValue"), JsonConverter(typeof(FlexibleDecimalJsonConverter))]
     public required decimal MaxValue { get; init; }
     [JsonPropertyName("centreId")] public int? CentreId { get; init; }
+}
+
+/// <summary>BRD v5.0 section 25 (PREFS_RATE_*) - GET /rate-formula-settings is what the Windows client calls (cached locally for fully-offline rate calculation, same pattern as QualityRuleDto).</summary>
+public sealed class RateFormulaSettingsDto
+{
+    [JsonPropertyName("id")] public required int Id { get; init; }
+    [JsonPropertyName("rateType")] public required RateFormulaType RateType { get; init; }
+
+    [JsonPropertyName("value1"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value1 { get; init; }
+
+    [JsonPropertyName("value2"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value2 { get; init; }
+
+    [JsonPropertyName("tsRate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? TsRate { get; init; }
+
+    [JsonPropertyName("centreId")] public int? CentreId { get; init; }
+}
+
+/// <summary>
+/// Mirrors the cloud's RateFormulaSettingsController.UpsertRateFormulaSettingsRequest exactly
+/// - PUT /rate-formula-settings, gated by RATE_FORMULA_CONFIGURE (Manager/Admin - see
+/// PermissionCodes/SeedHelpers) and, as of the 2026-09-18 centre-scoping correction, by
+/// CentreAccessGuard for a specific CentreId (or CentreAccess.AllCentres for a null/global
+/// CentreId) - see RateFormulaSettingsService.UpsertAsync. CentreId is always a specific,
+/// caller-accessible centre when sent from the Windows client's Rate Configuration screen
+/// (never null) - see Views/RateConfigurationView.xaml.cs.
+/// </summary>
+public sealed class UpsertRateFormulaSettingsRequestDto
+{
+    [JsonPropertyName("centreId")] public int? CentreId { get; init; }
+    [JsonPropertyName("rateType")] public required RateFormulaType RateType { get; init; }
+
+    [JsonPropertyName("value1"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value1 { get; init; }
+
+    [JsonPropertyName("value2"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Value2 { get; init; }
+
+    [JsonPropertyName("tsRate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? TsRate { get; init; }
 }

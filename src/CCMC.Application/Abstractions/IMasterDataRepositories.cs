@@ -33,6 +33,15 @@ public interface IQualityRuleRepository
         int centreId, IReadOnlyList<QualityParameter> parameters, CancellationToken cancellationToken);
 }
 
+public interface IRateFormulaSettingsRepository
+{
+    Task<IReadOnlyList<RateFormulaSettings>> ListAsync(CancellationToken cancellationToken);
+    Task ReplaceAllAsync(IReadOnlyList<RateFormulaSettings> settings, CancellationToken cancellationToken);
+
+    /// <summary>Resolves centre-specific-over-global (mirrors IQualityRuleRepository.ResolveForCentreAsync) - null if nothing is configured for this centre or globally.</summary>
+    Task<RateFormulaSettings?> ResolveForCentreAsync(int centreId, CancellationToken cancellationToken);
+}
+
 public interface IAuditLogRepository
 {
     Task RecordAsync(AuditLogEntry entry, CancellationToken cancellationToken);

@@ -1,0 +1,880 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        CCMC shared design system. One small, consistent set of colours/
+        typography/control styles for the whole WPF app - not a per-window
+        pile of one-off styling. Every window merges this dictionary (see
+        App.xaml) so plain TextBox/Button/ComboBox/DataGrid controls pick up
+        a modern look with zero extra XAML; named styles below (PrimaryButton,
+        AcceptButton, etc.) are applied only where a control needs a
+        different visual weight than the implicit default.
+
+        No ControlTemplate here changes what a control DOES - Click/
+        SelectionChanged/TextChanged etc. all keep working exactly as before;
+        these styles only change how things look.
+    -->
+
+    <!-- ================= Palette ================= -->
+    <!-- Restrained, professional agri/dairy palette - deep teal primary, neutral surface, semantic status colours. -->
+    <Color x:Key="PrimaryColor">#0E7C66</Color>
+    <Color x:Key="PrimaryDarkColor">#0A5F4F</Color>
+    <Color x:Key="PrimaryLightColor">#12967B</Color>
+    <Color x:Key="PrimarySoftColor">#E3F1EC</Color>
+
+    <Color x:Key="BackgroundColor">#F3F5F4</Color>
+    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+    <Color x:Key="BorderColor">#DDE3E1</Color>
+    <Color x:Key="BorderStrongColor">#C4CCC9</Color>
+
+    <Color x:Key="TextPrimaryColor">#1B2422</Color>
+    <Color x:Key="TextSecondaryColor">#5B6663</Color>
+    <Color x:Key="TextMutedColor">#8A9390</Color>
+    <Color x:Key="TextInverseColor">#FFFFFF</Color>
+
+    <Color x:Key="SuccessColor">#1E8E5A</Color>
+    <Color x:Key="SuccessSoftColor">#E3F3EA</Color>
+    <Color x:Key="WarningColor">#C77700</Color>
+    <Color x:Key="WarningSoftColor">#FCEEDC</Color>
+    <Color x:Key="DangerColor">#C13B3B</Color>
+    <Color x:Key="DangerSoftColor">#FBE7E7</Color>
+    <Color x:Key="InfoColor">#2E6BB5</Color>
+    <Color x:Key="InfoSoftColor">#E6EEF8</Color>
+
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}"/>
+    <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLightColor}"/>
+    <SolidColorBrush x:Key="PrimarySoftBrush" Color="{StaticResource PrimarySoftColor}"/>
+
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="BorderBrush1" Color="{StaticResource BorderColor}"/>
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrongColor}"/>
+
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
+    <SolidColorBrush x:Key="TextInverseBrush" Color="{StaticResource TextInverseColor}"/>
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="{StaticResource SuccessSoftColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="{StaticResource WarningSoftColor}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="{StaticResource DangerSoftColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
+    <SolidColorBrush x:Key="InfoSoftBrush" Color="{StaticResource InfoSoftColor}"/>
+
+    <!-- Elevated surface (e.g. header bars, popovers) - one step lighter than SurfaceBrush's
+         neighbouring background, used sparingly per Fluent 2's elevation guidance. -->
+    <Color x:Key="ElevatedSurfaceColor">#FBFCFC</Color>
+    <SolidColorBrush x:Key="ElevatedSurfaceBrush" Color="{StaticResource ElevatedSurfaceColor}"/>
+
+    <!-- Keyboard-focus ring colour - distinct, high-contrast, never relies on the same
+         hue as hover/pressed so focus remains visible in every control state. -->
+    <SolidColorBrush x:Key="FocusBrush" Color="#2E6BB5"/>
+
+    <!-- ================= Icon font ================= -->
+    <!-- Built-in Windows icon fonts - no NuGet package/asset required. Segoe Fluent Icons
+         ships with Windows 11; Segoe MDL2 Assets is the Windows 10 predecessor with the
+         same glyph codepoints for the set used in this app - the fallback list means every
+         glyph below renders correctly on either OS. -->
+    <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+    <!-- ================= Spacing scale ================= -->
+    <!-- Fluent 2's 4px-based spacing scale (https://fluent2.microsoft.design/design-tokens) -
+         referenced by convention in this file's own margins/padding rather than as bound
+         resources (WPF Thickness resources add indirection with no real benefit here), but
+         kept as documented values so every new margin in this app picks one of these instead
+         of an arbitrary pixel count: 4 (XS) / 8 (S) / 12 (M) / 16 (L) / 20 (XL) / 24 (XXL) / 32 (XXXL). -->
+
+    <!-- ================= Typography ================= -->
+    <FontFamily x:Key="AppFontFamily">Segoe UI</FontFamily>
+
+    <!-- Page-level title, larger than TitleText, used once per window at the very top. -->
+    <Style x:Key="PageTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Secondary line directly under a PageTitleText, e.g. "Managed in the cloud...". -->
+    <Style x:Key="PageSubtitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+    </Style>
+
+    <Style x:Key="TitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <Style x:Key="HeaderText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="17"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Small-caps-style section label, e.g. "WEIGHT", "MILK QUALITY". -->
+    <Style x:Key="SectionLabelText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryDarkBrush}"/>
+    </Style>
+
+    <Style x:Key="FieldLabelText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <Style x:Key="CaptionText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- Large numeric readout, e.g. the weight display. -->
+    <Style x:Key="MetricValueText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryDarkBrush}"/>
+    </Style>
+
+    <!-- ================= Base control styles (implicit - apply everywhere, no x:Key) ================= -->
+
+    <Style TargetType="Window">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="TextElement.FontSize" Value="13"/>
+        <!-- Sets the INHERITED default text colour for the whole window (TextElement.Foreground
+             is an inheritable attached property). Deliberately NOT duplicated as a hard Setter on
+             the implicit TextBlock style below - see that style's comment for why. -->
+        <Setter Property="TextElement.Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!--
+        Root-cause fix (UI refinement pass): this implicit style must NOT set Foreground with
+        its own Setter. A Style Setter always outranks an inherited property value in WPF's
+        precedence chain - so a plain, unstyled TextBlock placed inside a coloured Button's
+        Content (e.g. the icon+label StackPanel pattern used for sidebar nav items, ACCEPT/
+        HOLD/REJECT, Save, Read Devices, etc.) would otherwise ALWAYS render in TextPrimaryBrush
+        (near-black) regardless of the button's own intended Foreground (white on the dark
+        sidebar, white on hover for solid-coloured buttons) - this was the exact cause of
+        "black text on green background" in the sidebar, and the same silent bug on several
+        other buttons' hover states. Leaving Foreground unset here lets it inherit from the
+        nearest ancestor that DOES set it - normally the Window's TextElement.Foreground above,
+        or a closer Button/Border's own Foreground when the TextBlock lives inside one.
+    -->
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style x:Key="RoundedTextBoxTemplate.Base" TargetType="Control">
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+    </Style>
+
+    <Style TargetType="TextBox">
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="CaretBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource PrimaryLightBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsReadOnly" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="PasswordBox">
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="CaretBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ComboBox">
+        <Setter Property="Padding" Value="8,5"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style TargetType="CheckBox">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Flat, rounded base Button - every existing Button (Click handlers untouched) picks this up automatically. -->
+    <Style TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="5" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource FocusBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ================= Named button variants ================= -->
+    <!-- Same template shape as the base Button; only the colour role changes. Applied selectively to primary/semantic actions. -->
+
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource PrimaryDarkBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{StaticResource BorderBrush1}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryDarkBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+    </Style>
+
+    <Style x:Key="AcceptButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="HoldButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource WarningSoftBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="RejectButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource DangerSoftBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Flat sidebar navigation item (MainWindow shell). Content is expected to be a
+         StackPanel(icon glyph + label) - see MainWindow.xaml - so the style itself stays
+         icon-agnostic. -->
+    <Style x:Key="SidebarButtonStyle" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="Margin" Value="8,2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="5" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#1AFFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#33FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#26FFFFFF"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Single-window shell nav (2026-09-18 redesign): every sidebar entry, including
+         Dashboard, is now a real Button that swaps MainWindow's content area instead of
+         opening a separate top-level window - see MainWindow.xaml.cs SetActiveNav. This
+         style is the "you are here" state for whichever button is currently selected;
+         same template/shape as SidebarButtonStyle (BasedOn it), only the colour changes,
+         so switching a button between the two styles at runtime never changes its layout. -->
+    <Style x:Key="SidebarNavButtonActiveStyle" TargetType="Button" BasedOn="{StaticResource SidebarButtonStyle}">
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <!-- Sidebar section label, e.g. "NAVIGATION". -->
+    <Style x:Key="SidebarSectionLabelText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimarySoftBrush}"/>
+        <Setter Property="Margin" Value="20,0,0,8"/>
+    </Style>
+
+    <!-- Icon glyph inside a sidebar item, sized to sit next to a 13px label. -->
+    <Style x:Key="SidebarIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Foreground" Value="{StaticResource TextInverseBrush}"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Generic icon glyph used inline with body/caption text elsewhere in the app. -->
+    <Style x:Key="InlineIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ================= Cards / sections ================= -->
+
+    <Style x:Key="CardBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Margin" Value="0,0,0,14"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#1B2422" Direction="270" ShadowDepth="1" BlurRadius="6" Opacity="0.06"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ================= DataGrid ================= -->
+
+    <Style TargetType="DataGrid">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="RowHeight" Value="34"/>
+        <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+        <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="AlternatingRowBackground" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="RowBackground" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="HeadersVisibility" Value="Column"/>
+        <Setter Property="CanUserAddRows" Value="False"/>
+        <Setter Property="CanUserResizeRows" Value="False"/>
+        <Setter Property="SelectionMode" Value="Single"/>
+    </Style>
+
+    <Style TargetType="DataGridColumnHeader">
+        <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryDarkBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+
+    <Style TargetType="DataGridCell">
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- ================= Status badge / chip ================= -->
+    <!-- A small coloured pill for connection/sync/quality state text. Colour role is chosen in code-behind
+         (Style key selection or Background/Foreground assignment) based on the actual status - see each
+         window's code-behind, unchanged logic, just a nicer container than a bare TextBlock. -->
+    <Style x:Key="StatusBadgeBorder" TargetType="Border">
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="10,3"/>
+        <Setter Property="Background" Value="{StaticResource BorderBrush1}"/>
+    </Style>
+
+    <Style x:Key="StatusBadgeText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- Full status "chip" - icon + text, never colour alone (WCAG "don't rely on colour
+         alone" / this task's own section 13/20 requirement). Built by
+         CCMC.Desktop.Controls.StatusChip so every window that shows a status (history rows,
+         source/vehicle status, device/sync state, offline banner) renders it identically
+         instead of five slightly different one-off Borders. One style per semantic role;
+         the icon glyph itself is supplied by the caller (StatusChip.Kind), not the style. -->
+    <!-- MinHeight forces every chip (Accepted/Hold/Rejected, and every other StatusChip
+         caller) to the same footprint regardless of which glyph a given ChipKind renders -
+         different icon glyphs have slightly different natural ascent/descent, which
+         otherwise left the auto-sized Border a pixel or two taller/shorter than its
+         neighbours (this redesign's "status boxes must be the same size" fix). -->
+    <Style x:Key="ChipBorderBase" TargetType="Border">
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="MinHeight" Value="24"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="ChipTextBase" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="ChipIconBase" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,0,5,0"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SuccessChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource WarningSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource DangerSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource InfoSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipBorder" TargetType="Border" BasedOn="{StaticResource ChipBorderBase}">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}"/>
+    </Style>
+
+    <Style x:Key="SuccessChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipText" TargetType="TextBlock" BasedOn="{StaticResource ChipTextBase}">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+    <Style x:Key="SuccessChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+    </Style>
+    <Style x:Key="WarningChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+    </Style>
+    <Style x:Key="DangerChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+    </Style>
+    <Style x:Key="InfoChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+    </Style>
+    <Style x:Key="NeutralChipIcon" TargetType="TextBlock" BasedOn="{StaticResource ChipIconBase}">
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- ROOT-CAUSE FIX (2026-09-18 correction pass) - Reception History's Accepted/Hold/
+         Rejected status chips only, NOT every other StatusChip user (Device/Sync state,
+         Source/Vehicle Active/Inactive) which were never reported as broken and must not
+         change. The previous pass added MinHeight/centering to the shared ChipBorderBase
+         (still correct, kept), but never gave the chip a fixed MinWidth - so "HOLD" (4
+         characters) was always narrower than "ACCEPTED"/"REJECTED" (8 characters each),
+         which is exactly the reported "not the same size" bug: width was left to be
+         whatever the text needed, never pinned to one shared value. These four styles add
+         one shared MinWidth (comfortably wider than "ACCEPTED"/"REJECTED"'s own natural
+         content width, so all three clamp to the same floor and none is ever wider than
+         another for these three specific status words) on top of the existing colour-
+         specific chip Border styles - HistoryRowTemplate's binding is the only caller. -->
+    <Style x:Key="HistorySuccessChipBorder" TargetType="Border" BasedOn="{StaticResource SuccessChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryWarningChipBorder" TargetType="Border" BasedOn="{StaticResource WarningChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryDangerChipBorder" TargetType="Border" BasedOn="{StaticResource DangerChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+    <Style x:Key="HistoryNeutralChipBorder" TargetType="Border" BasedOn="{StaticResource NeutralChipBorder}">
+        <Setter Property="MinWidth" Value="112"/>
+    </Style>
+
+    <!-- ================= Secondary-window header ================= -->
+    <!-- Consistent icon + title + optional subtitle strip at the top of every non-shell
+         window (Reception, History, Sources, Vehicles, Device Configuration/Status, Sync
+         Status, Settings) - gives every window a shared identity instead of each one
+         inventing its own header layout. -->
+    <Style x:Key="WindowHeaderBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource ElevatedSurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Padding" Value="24,18"/>
+    </Style>
+
+    <Style x:Key="WindowHeaderIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Margin" Value="0,0,14,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ================= Empty / loading state ================= -->
+    <Style x:Key="EmptyStateBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="32"/>
+    </Style>
+
+    <Style x:Key="EmptyStateIconText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}"/>
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,0,10"/>
+    </Style>
+
+    <Style x:Key="EmptyStateTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="EmptyStateBodyText" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="MaxWidth" Value="420"/>
+    </Style>
+
+    <!-- ================= Icon-prefixed inputs (search box / login fields) ================= -->
+    <!-- ROOT-CAUSE FIX (2026-09-18 correction pass): the previous approach (a plain TextBox
+         given a large left Padding, with a *separate* icon TextBlock manually overlaid on top
+         of it in the CALLING XAML's own Grid, the two positioned by two independently-tuned
+         magic numbers - the icon's own Margin and the TextBox's own Padding) is why this kept
+         looking wrong: those two numbers live in different elements with no relationship
+         enforced between them, so "enough padding to clear the icon" was a guess repeated in
+         every caller, not something the input itself guarantees. It also meant PART_ContentHost's
+         (the ScrollViewer WPF actually renders text into) left inset was set purely to "leave
+         room for a thing drawn on top of it", not to what a normal input's own left padding
+         should be - hence text visibly starting far later than every OTHER TextBox in the app.
+         Fixed by giving the icon its own Grid.Column INSIDE one shared ControlTemplate, so the
+         icon and the text box are two cells of the same Grid, inside the exact same bordered
+         "Bd" box (focus/disabled/read-only triggers below are the same ones the base TextBox/
+         PasswordBox templates already use) - the text column's own Padding is the same modest
+         "10,6,10,6" every other input effectively uses, not a value inflated to dodge an overlay.
+         The icon glyph itself is supplied per instance via Tag (e.g. Tag="&#xE721;" for search) -
+         one template, one visual box, no overlay, no drift-prone padding arithmetic. -->
+    <Style x:Key="SearchTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{TemplateBinding Tag}" Style="{StaticResource InlineIconText}"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="10,0,6,0" IsHitTestVisible="False"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Grid.Column="1" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsReadOnly" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="IconPasswordBox" TargetType="PasswordBox" BasedOn="{StaticResource {x:Type PasswordBox}}">
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PasswordBox">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{TemplateBinding Tag}" Style="{StaticResource InlineIconText}"
+                                       Foreground="{StaticResource TextMutedBrush}" Margin="10,0,6,0" IsHitTestVisible="False"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Grid.Column="1" Margin="{TemplateBinding Padding}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ================= Clickable dashboard metric card ================= -->
+    <!-- Same visual weight as CardBorder, but a real Button underneath - keyboard-focusable,
+         with hover/pressed/focus states, per this refinement pass's "make Dashboard metrics
+         actionable" requirement. Content (icon/label/value/"View..." row) is supplied by the
+         caller; this style only owns the clickable card chrome. -->
+    <Style x:Key="DashboardCardButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="6" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#1B2422" Direction="270" ShadowDepth="1" BlurRadius="6" Opacity="0.06"/>
+                        </Border.Effect>
+                        <ContentPresenter Margin="{TemplateBinding Padding}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource FocusBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- "View accepted →" affordance row at the bottom of a DashboardCardButtonStyle card -
+         communicates "this is clickable" via text, not colour/shape alone. -->
+    <Style x:Key="CardActionHintText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="Margin" Value="0,10,0,0"/>
+    </Style>
+
+    <!-- ================= Large metric input (e.g. Reception's Weight field) ================= -->
+    <!-- The base TextBox style's Padding (8,6) is tuned for its 13px default FontSize - reusing
+         it verbatim for a visually-emphasised, larger metric input left the text sitting
+         off-centre relative to its own field label above it. This style scales padding/min-height
+         together with the larger font so the field's internal proportions stay correct instead of
+         being patched with one-off margins on the label. -->
+    <Style x:Key="MetricInputTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="MinHeight" Value="44"/>
+    </Style>
+
+    <!-- ================= Shared list/card-row chrome ================= -->
+    <!-- Used by Reception History, Sources, and Vehicles so all three "list of records" screens
+         share one visual language instead of each re-declaring the same header bar/row/container
+         XAML (this pass's "create reusable styles centrally" requirement). -->
+    <Style x:Key="ListHeaderBorder" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}"/>
+        <Setter Property="CornerRadius" Value="6,6,0,0"/>
+        <Setter Property="Padding" Value="14,10"/>
+    </Style>
+
+    <Style x:Key="ListContainerBorder" TargetType="Border">
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush1}"/>
+        <Setter Property="BorderThickness" Value="1,0,1,1"/>
+        <Setter Property="CornerRadius" Value="0,0,6,6"/>
+    </Style>
+
+    <!-- Alternating-background row - the DataContext of the row must expose a bool "IsEven". -->
+    <Style x:Key="AlternatingRowBorder" TargetType="Border">
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Margin" Value="0,0,0,1"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEven}" Value="True">
+                <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style TargetType="ScrollViewer">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+</ResourceDictionary>

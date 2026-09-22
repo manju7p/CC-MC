@@ -219,8 +219,9 @@ here).
 login requires at least one prior successful online login, see §20) - you
 need a running instance of the cloud API (§29.6) reachable at the URL
 configured in `src/CCMC.Desktop/appsettings.json` (`CloudApi:BaseUrl`).
-Point it at `http://localhost:5000/` to use the local dev instance from
-§29.
+Point it at `http://localhost:8081/` (the Docker Compose API port — see §29.16
+"Deployment Direction") to use the local dev instance. This is already the
+committed default in `appsettings.json`.
 
 ### 11. Development Credentials
 
@@ -237,7 +238,10 @@ from, the old `pranav-dev` seed script:
 
 These are **development-only** values, seeded only when
 `ASPNETCORE_ENVIRONMENT=Development` (§29.7) - they must never be treated
-as, or reused as, production credentials. Nothing in `CCMC.Desktop`
+as, or reused as, production credentials, and never reused as any
+`Bootstrap__*Password` value (§29.15/HOW_TO_RUN.md §9) - a real bootstrap
+password must be a unique, strong value that does not appear anywhere in
+this repository. Nothing in `CCMC.Desktop`
 hardcodes, assumes, or falls back to any of these - the app has no
 knowledge of them at all until you sign in against a running cloud API
 that has actually run this seed.
@@ -669,6 +673,8 @@ All routes verified against the Windows client's actual
 | `PATCH /vehicles/{id}` | `VEHICLE_EDIT` | |
 | `GET /quality-rules` | `QUALITY_RULE_VIEW` | Centre-specific + global rules |
 | `PATCH /quality-rules/{id}` | `QUALITY_RULE_CONFIGURE` | No create endpoint - rules are seeded/managed by id |
+| `GET /rate-formula-settings` | `RATE_FORMULA_VIEW` | BRD v5.0 §25 - centre-specific + global rate formula config; synced to the Windows client for offline calculation |
+| `PUT /rate-formula-settings` | `RATE_FORMULA_CONFIGURE` | Upsert by centre (body's `centreId` may be `null` for the global default) - no numeric default is ever seeded, so Rate/Amount is 0 until this is called at least once for a centre |
 | `GET /reception` | `RECEPTION_VIEW` | Centre-scoped list |
 | `GET /reception/{id}` | `RECEPTION_VIEW` | `403` if outside caller's centre access |
 | `POST /reception` | `RECEPTION_CREATE` | Idempotent create - see §29.6. Returns **201** for both `created` and `duplicate` outcomes (never 200), matching the client's `HttpResponseClassifier` |
@@ -796,12 +802,22 @@ other environment **must** supply both via environment variables
 missing, rather than silently falling back to an insecure default.
 
 **Windows client configuration** - point `src/CCMC.Desktop/appsettings.json`'s
-`CloudApi:BaseUrl` at wherever you run this API, e.g.:
+`CloudApi:BaseUrl` at wherever you run this API. The committed default is
+`http://localhost:8081/` (the Docker Compose port, §29.16) - only change it
+if you're running the API a different way, e.g.:
 ```json
 { "CloudApi": { "BaseUrl": "http://localhost:5000/" } }
 ```
 
-### 29.11 Migrations & Running Locally
+### 29.11 Migrations & Running Locally (without Docker)
+
+> **Docker Compose (§29.16) is the primary, recommended way to run this API** -
+> `docker compose -p cc-mc up -d --build` with `.env.docker`/`.env.neon`. The
+> steps below are a secondary alternative for running the API directly with
+> `dotnet run` against a manually-installed local PostgreSQL (§29.9), useful
+> for debugging the API itself without a container in the loop. If you use
+> this path, remember to point the Windows client's `CloudApi:BaseUrl` at
+> whatever port you pick here (e.g. `5000`), not the Docker default `8081`.
 
 From the repository root, with `dotnet-ef` on `PATH` (§29.8):
 
@@ -915,14 +931,145 @@ dotnet test CCMC.sln
 
 ### 29.16 Deployment Direction
 
-Not built in this pass (matches the Windows app's own "installer chosen,
-not built" status - §26). Direction: containerize `CCMC.Cloud.Api` (a
-`Dockerfile` is not yet included), run `dotnet ef database update` as an
-explicit deploy step against the target PostgreSQL instance (rather than
-relying on the automatic `Migrate()`-at-startup behavior used in
-development), and supply `ConnectionStrings__CcmcDb`/`Jwt__Secret` (plus
-`ASPNETCORE_ENVIRONMENT=Production`, which disables Swagger and the
-development seeder) via the hosting platform's secret mechanism.
+**Current status: containerized and verified locally (Docker + Docker
+Compose + a real Neon PostgreSQL database, now with real production
+accounts - see §29.15/§29.17); Render deployment is BLOCKED, not merely
+"the next step."** A `Dockerfile` now exists, and the full path from
+source to a running container against a real cloud PostgreSQL has been
+proven - **the only missing piece is repository access**: the GitHub
+repository is owned/controlled by the CEO, and the operator working on
+this repo does not currently have the access needed to connect the
+private repository to Render (2026-09-15). See HOW_TO_RUN.md §10 for the
+exact ordered steps once access is obtained.
+
+```
+Windows WPF ──HTTPS──▶ CCMC.Cloud.Api (same image everywhere) ──Npgsql──▶ PostgreSQL
+                              │
+              Local Docker ───┼─── cc-mc-postgres (Docker Compose)
+              Production ─────┴─── Neon (target: Render, BLOCKED on repository access)
+```
+
+The application binary/image is **identical** across every environment;
+only environment variables change. No source-code branch exists for
+"local" vs "production."
+
+**Docker**: `Dockerfile` (repo root) builds `CCMC.Cloud.Api` as a
+multi-stage image (`mcr.microsoft.com/dotnet/sdk:8.0` → `mcr.microsoft.com/dotnet/aspnet:8.0`).
+`.dockerignore` excludes the Windows client projects, `tests/`, and
+`appsettings.Development.json` (so no dev placeholder secret can ever end
+up in the image, in any environment).
+
+**Docker Compose** (`compose.yaml`, repo root) - project name `cc-mc`,
+used for BOTH local-testing modes below (the SAME `api` service
+definition; only which PostgreSQL it talks to changes):
+
+| Service | Container name | Image | Runs in |
+|---|---|---|---|
+| API | `cc-mc` | `cc-mc-api` (built from `Dockerfile`) | Both modes |
+| PostgreSQL | `cc-mc-postgres` | `postgres:16` | Docker mode only (see below) |
+
+Both run on a dedicated `cc-mc-network` Docker network; the API reaches
+local PostgreSQL via the service hostname `cc-mc-postgres`, never
+`localhost`. PostgreSQL has a healthcheck, and the API's `depends_on`
+waits for it to report healthy (not just "started") before starting,
+since `db.Database.Migrate()` runs immediately at API startup.
+
+**Environment configuration** - see `.env.example` for the full reference
+of every variable CCMC.Cloud.Api consumes. `docker compose` auto-loads a
+file literally named `.env` (no `--env-file` flag needed) - switching
+mode means copying the mode-specific file over it (PowerShell):
+
+| File | Committed? | Copy to `.env` for... |
+|---|---|---|
+| `.env.example` | Yes (placeholders only) | — reference only, never copied directly |
+| `.env.docker` | **No** (gitignored) | Mode A: API → local `cc-mc-postgres` |
+| `.env.neon` | **No** (gitignored) | Mode B: API → Neon PostgreSQL |
+
+**Mode A — Docker** (API → local PostgreSQL):
+
+```powershell
+Copy-Item .env.docker .env -Force
+docker compose -p cc-mc down
+docker compose -p cc-mc up -d --build
+```
+
+Result: `WPF → http://localhost:8081 → cc-mc → cc-mc-postgres`. `.env.docker`
+sets `COMPOSE_PROFILES=docker`, which activates the `cc-mc-postgres`
+service's Compose profile.
+
+**Mode B — Neon** (API → Neon PostgreSQL, no local Postgres container):
+
+```powershell
+Copy-Item .env.neon .env -Force
+docker compose -p cc-mc down
+docker compose -p cc-mc up -d --build
+```
+
+Result: `WPF → http://localhost:8081 → cc-mc → Neon PostgreSQL`.
+`.env.neon` deliberately omits `COMPOSE_PROFILES`, so the `cc-mc-postgres`
+service's profile is never activated and Compose does not start a
+redundant local PostgreSQL container - verified directly (`docker compose
+-p cc-mc ps` shows only `cc-mc` running in this mode).
+
+In both modes, verify with:
+
+```powershell
+docker compose -p cc-mc config   # validate
+docker compose -p cc-mc ps       # confirm which services are running
+curl http://localhost:8081/health
+curl http://localhost:8081/health/db
+```
+
+The variables themselves never change name or meaning between
+environments - only their values (`.env.docker`/`.env.neon` set them,
+`.env.example` documents them):
+
+- `ASPNETCORE_ENVIRONMENT` - `Development` (Docker mode) or `Production` (Neon)
+- `ASPNETCORE_URLS` - `http://0.0.0.0:8080` in both (never `localhost`-only)
+- `ConnectionStrings__CcmcDb` - standard Npgsql keyword connection string; only the `Host` (and, for Neon, `Ssl Mode=Require`) differs
+- `Jwt__Secret` - a real, unique-per-environment random string; never reused between modes
+- `Jwt__Issuer`/`Jwt__Audience` - optional; both modes leave these unset and rely on `JwtOptions`' built-in defaults
+
+**The Windows client** (`src/CCMC.Desktop/appsettings.json`,
+`CloudApi:BaseUrl`) always points at `http://localhost:8081/` in both
+modes - it talks to the locally running `cc-mc` container either way; only
+what's *behind* `cc-mc` changes. This was previously left at a stale
+`http://localhost:5000/` (the old pre-Docker `dotnet run` default), which
+was the root cause of the client always falling back to offline mode -
+see STATUS.md "Application Bug Fixes" for the full diagnosis.
+
+**Never commit** a filled-in `.env`, `.env.docker`, or `.env.neon` file,
+and never paste a real connection string or secret into this README, any
+other tracked file, or a commit message.
+
+**Neon PostgreSQL** is now the production database target (project
+`fancy-cherry-25725711`, branch `production`) - set up via the Neon CLI
+(`neon link`, `neon config init` + `neon.ts`, `neon deploy`). Verified:
+all three current migrations apply cleanly to a fresh Neon database,
+`/health` and `/health/db` both return healthy against it, and -
+correctly - `ASPNETCORE_ENVIRONMENT=Production` does **not** create the
+`DevelopmentSeeder`'s demo accounts there. **Update (2026-09-15):** Neon
+`production` is no longer empty - a dedicated `ProductionBootstrapSeeder`
+(env-var-gated via `Bootstrap:AdminEmail`, a no-op unless configured,
+idempotent, never overwrites an existing password) was used to create one
+Admin, one Manager, one Operator, and one Chilling Centre, verified
+directly against Neon (correct role/permission counts, correct centre
+scoping, real PBKDF2 password hashes). See HOW_TO_RUN.md §9 and
+STATUS.md "Neon Production Bootstrap (2026-09-15)" for the full detail
+and how to bootstrap a further account/centre later.
+
+**Next step: deploy this same `cc-mc-api` image to Render**, pointing it
+at Neon via the same `ConnectionStrings__CcmcDb` environment variable,
+using Render's own environment-variable UI (not this repo's
+`.env.production` file, which stays local-only). **Currently BLOCKED**
+(2026-09-15): the GitHub repository is owned/controlled by the CEO, and
+the operator working on this repo does not have the access needed to
+connect the private repository to Render - an access/permissions
+blocker, not a technical one. See HOW_TO_RUN.md §10.
+
+Migrations continue to run via the existing automatic
+`db.Database.Migrate()` at startup (see §29.11) - this was verified
+directly against Neon, not just locally.
 
 ### 29.17 Known Gaps
 
@@ -935,4 +1082,19 @@ development seeder) via the hosting platform's secret mechanism.
   contract change would need corresponding client-side work in
   `CCMC.Infrastructure.Sync`, and was not made without an explicit
   instruction to change the Windows client.
+- ~~No production administrative bootstrap mechanism~~ - **Resolved
+  2026-09-15.** `DevelopmentSeeder` still correctly never runs outside
+  `ASPNETCORE_ENVIRONMENT=Development`, but a separate, env-var-gated
+  `ProductionBootstrapSeeder` now exists and was used to create real
+  Admin/Manager/Operator accounts and one Chilling Centre in Neon
+  `production` - see HOW_TO_RUN.md §9 and STATUS.md "Neon Production
+  Bootstrap (2026-09-15)".
+- **No in-app password-change/reset endpoint anywhere.** Rotating any
+  account's password today (bootstrap-issued or otherwise) requires
+  direct database access using the same `IPasswordHasher` the app itself
+  uses at runtime - there is no script or endpoint for this yet.
 - **No installer/containerization** for the API itself yet - see §29.16.
+- **Render deployment is BLOCKED, not merely undone** - the GitHub
+  repository is owned/controlled by the CEO, and the operator working on
+  this repo does not currently have the access needed to connect the
+  private repository to Render. See §29.16 and HOW_TO_RUN.md §10.

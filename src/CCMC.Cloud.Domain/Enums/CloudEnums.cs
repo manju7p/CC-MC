@@ -39,3 +39,10 @@ public enum QualityParameter
     Snf,
     Temperature,
 }
+
+/// <summary>BRD v5.0 section 25 (PREFS_RATE_TYPE) - see CCMC.Domain.Enums.RateFormulaType (Windows client) for the matching mirror.</summary>
+public enum RateFormulaType
+{
+    FatVsSnf,
+    TsBased,
+}

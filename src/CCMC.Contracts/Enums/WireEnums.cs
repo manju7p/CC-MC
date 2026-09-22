@@ -42,3 +42,10 @@ public enum QualityParameter
     SNF,
     TEMPERATURE,
 }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum RateFormulaType
+{
+    FAT_VS_SNF,
+    TS_BASED,
+}

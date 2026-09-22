@@ -20,6 +20,49 @@ public sealed class CreateReceptionRequestDto
     [JsonPropertyName("snf")] public required decimal Snf { get; init; }
     [JsonPropertyName("temperature")] public required decimal Temperature { get; init; }
 
+    /// <summary>
+    /// The operator's explicit ACCEPT/HOLD decision at capture time (never
+    /// REJECTED here - see OverrideReceptionRequestDto/CLAUDE.md). Optional
+    /// for backward compatibility with any caller that predates this field:
+    /// when omitted, the cloud falls back to its own automatic quality-rule
+    /// suggestion exactly as before (see ReceptionService.CreateAsync).
+    /// </summary>
+    [JsonPropertyName("status")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TransactionStatus? Status { get; init; }
+
+    /// <summary>Milk analyser fields beyond Fat/Snf - additive, optional (see MilkReceptionTransaction's doc comment).</summary>
+    [JsonPropertyName("clr"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Clr { get; init; }
+
+    [JsonPropertyName("water"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Water { get; init; }
+
+    [JsonPropertyName("protein"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Protein { get; init; }
+
+    /// <summary>The exact analyser payload these values were decoded from (device or manual test input) - preserved verbatim.</summary>
+    [JsonPropertyName("rawAnalyserPayload")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RawAnalyserPayload { get; init; }
+
+    /// <summary>
+    /// BRD v5.0 section 25 Rate/Amount, computed by the Windows client at
+    /// capture time and trusted verbatim by the cloud (same treatment as
+    /// Clr/Water/Protein) - additive/optional so an older client that
+    /// predates this field still round-trips.
+    /// </summary>
+    [JsonPropertyName("rate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Rate { get; init; }
+
+    [JsonPropertyName("amount"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? Amount { get; init; }
+
     [JsonPropertyName("localIdempotencyKey")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LocalIdempotencyKey { get; init; }
@@ -51,6 +94,23 @@ public sealed class ReceptionTransactionDto
 
     [JsonPropertyName("temperature"), JsonConverter(typeof(FlexibleDecimalJsonConverter))]
     public required decimal Temperature { get; init; }
+
+    [JsonPropertyName("clr"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Clr { get; init; }
+
+    [JsonPropertyName("water"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Water { get; init; }
+
+    [JsonPropertyName("protein"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Protein { get; init; }
+
+    [JsonPropertyName("rawAnalyserPayload")] public string? RawAnalyserPayload { get; init; }
+
+    [JsonPropertyName("rate"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Rate { get; init; }
+
+    [JsonPropertyName("amount"), JsonConverter(typeof(FlexibleNullableDecimalJsonConverter))]
+    public decimal? Amount { get; init; }
 
     [JsonPropertyName("status")] public required TransactionStatus Status { get; init; }
     [JsonPropertyName("readingSource")] public required ReadingSource ReadingSource { get; init; }

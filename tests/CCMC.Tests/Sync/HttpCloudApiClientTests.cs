@@ -451,4 +451,68 @@ public class HttpCloudApiClientTests
         Assert.False(result.Success);
         Assert.True(result.IsNetworkFailure);
     }
+
+    // --- Rate formula settings update (Manager-only Rate Configuration screen) ------------
+
+    private static readonly UpsertRateFormulaSettingsRequestDto SampleRateFormulaRequest = new()
+    {
+        CentreId = 1,
+        RateType = CCMC.Contracts.Enums.RateFormulaType.FAT_VS_SNF,
+        Value1 = 10m,
+        Value2 = 8m,
+        TsRate = null,
+    };
+
+    [Fact]
+    public async Task UpdateRateFormulaSettingsAsync_200_ReturnsSuccessWithSettings()
+    {
+        var json = """
+            { "id": 7, "rateType": "FAT_VS_SNF", "value1": "10.00", "value2": "8.00", "tsRate": null, "centreId": 1 }
+            """;
+        var handler = new FakeHttpMessageHandler(_ => FakeHttpMessageHandler.JsonResponse(HttpStatusCode.OK, json));
+        var client = CreateClient(handler);
+
+        var result = await client.UpdateRateFormulaSettingsAsync("token", SampleRateFormulaRequest, CancellationToken.None);
+
+        Assert.Equal(CloudMutationOutcome.Success, result.Outcome);
+        Assert.NotNull(result.Settings);
+        Assert.Equal(10m, result.Settings!.Value1);
+        Assert.Equal(8m, result.Settings.Value2);
+        Assert.Equal(1, result.Settings.CentreId);
+    }
+
+    /// <summary>A Manager attempting to configure a centre outside their access (or an Operator lacking RATE_FORMULA_CONFIGURE) gets 403 - classified Terminal, same as every other master-data mutation's 403.</summary>
+    [Fact]
+    public async Task UpdateRateFormulaSettingsAsync_403_ReturnsTerminal()
+    {
+        var handler = new FakeHttpMessageHandler(_ => FakeHttpMessageHandler.JsonResponse(HttpStatusCode.Forbidden, "{}"));
+        var client = CreateClient(handler);
+
+        var result = await client.UpdateRateFormulaSettingsAsync("token", SampleRateFormulaRequest, CancellationToken.None);
+
+        Assert.Equal(CloudMutationOutcome.Terminal, result.Outcome);
+        Assert.Null(result.Settings);
+    }
+
+    [Fact]
+    public async Task UpdateRateFormulaSettingsAsync_401_ReturnsAuthRetryable()
+    {
+        var handler = new FakeHttpMessageHandler(_ => FakeHttpMessageHandler.JsonResponse(HttpStatusCode.Unauthorized, "{}"));
+        var client = CreateClient(handler);
+
+        var result = await client.UpdateRateFormulaSettingsAsync("token", SampleRateFormulaRequest, CancellationToken.None);
+
+        Assert.Equal(CloudMutationOutcome.AuthRetryable, result.Outcome);
+    }
+
+    [Fact]
+    public async Task UpdateRateFormulaSettingsAsync_NetworkFailure_ReturnsRetryable_DoesNotThrow()
+    {
+        var handler = new FakeHttpMessageHandler(throwing: _ => new HttpRequestException("Connection refused"));
+        var client = CreateClient(handler);
+
+        var result = await client.UpdateRateFormulaSettingsAsync("token", SampleRateFormulaRequest, CancellationToken.None);
+
+        Assert.Equal(CloudMutationOutcome.Retryable, result.Outcome);
+    }
 }

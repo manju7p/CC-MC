@@ -136,11 +136,22 @@ public class AuthenticationServiceTests
             throw new NotSupportedException();
         public Task<IReadOnlyList<CCMC.Contracts.Dtos.QualityRuleDto>> GetQualityRulesAsync(string accessToken, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+        public Task<IReadOnlyList<CCMC.Contracts.Dtos.RateFormulaSettingsDto>> GetRateFormulaSettingsAsync(string accessToken, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
         public Task<CloudCreateReceptionResult> CreateReceptionAsync(
             string accessToken, CCMC.Contracts.Dtos.CreateReceptionRequestDto request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<CloudOverrideResult> OverrideReceptionAsync(
             string accessToken, int cloudTransactionId, CCMC.Contracts.Dtos.OverrideReceptionRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        public Task<CloudCreateSourceResult> CreateSourceAsync(
+            string accessToken, CCMC.Contracts.Dtos.CreateSourceRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        public Task<CloudCreateVehicleResult> CreateVehicleAsync(
+            string accessToken, CCMC.Contracts.Dtos.CreateVehicleRequestDto request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+        public Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(
+            string accessToken, CCMC.Contracts.Dtos.UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<CCMC.Contracts.Dtos.DashboardSummaryDto> GetDashboardSummaryAsync(
             string accessToken, int? centreId, CancellationToken cancellationToken) =>

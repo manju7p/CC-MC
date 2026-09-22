@@ -212,13 +212,18 @@ assumed compatible.
   Manufacturer-specific logic must not leak into the reception workflow.
 - Exactly one component owns a given physical COM port — never two
   independent readers on the same port.
-- **No parser exists for any device yet.** Nothing may be invented; a
-  real parser is blocked on controlled protocol captures and/or
-  manufacturer documentation (see Open Questions).
+- **Real parsers now exist for both devices** (updated 2026-09-12). The
+  weighing scale (Videocon, verified live) and the milk analyser (Ekomilk
+  Milkana KAM98-2A — `Kam98A2AAnalyserFrameParser`, field layout derived
+  from two real observed device outputs the project owner supplied directly
+  — see STATUS.md "Milk Analyser + Quality Decision Flow"). The KAM98-2A's
+  payload DECODE is verified; its physical SERIAL CONNECTION is not (no
+  hardware-in-the-loop test — device unavailable). Nothing here was invented.
 - Reading models (BRD v2 §10, minimum fields): `WeightReading` = Value,
   Unit, Stable, Timestamp, DeviceId, RawData. `MilkQualityReading` = FAT,
-  SNF, CLR, Temperature, optional parameters, Timestamp, DeviceId,
-  RawData.
+  SNF, CLR, Temperature (nullable — the KAM98-2A does not measure it),
+  optional parameters (Water/Protein land here for the KAM98-2A), Timestamp,
+  DeviceId, RawData.
 
 ## Serial Configuration
 
@@ -231,8 +236,12 @@ hard-coded.
 - **Weighing scale — verified:** COM4, 2400 baud, 8 data bits, no
   parity, 1 stop bit, no flow control. Manufacturer: Videocon Precision
   Systems. Model: unknown. Protocol: unknown/uncaptured.
-- **Milk analyser:** no verified configuration yet — all parameters
-  "Configurable" per BRD v2 §5.2, nothing confirmed.
+- **Milk analyser:** manufacturer/model now known — Ekomilk Milkana
+  KAM98-2A — and its OUTPUT PAYLOAD format is derived from two real observed
+  samples (see STATUS.md "Milk Analyser + Quality Decision Flow"). Serial
+  parameters (COM port, baud rate, etc.) remain unverified — still
+  "Configurable" per BRD v2 §5.2, nothing confirmed — the physical link
+  itself has not been tested.
 - **Unresolved discrepancy:** the legacy gateway docs
   (`docs/gateway-architecture.md` on `pranav-dev`) record a different,
   earlier "CEO-confirmed" configuration — ESSAE equipment, 9600 baud,
@@ -247,10 +256,14 @@ hard-coded.
 See "Cloud Responsibilities" above for the full current contract. Base
 URL is configured via `CCMC.Desktop/appsettings.json`'s `CloudApi:BaseUrl`
 - environment-specific values (dev vs. prod cloud endpoint) are an
-operator/deployment concern, not hard-coded. For the cloud API built in
-this repo (§29 of README.md), point it at wherever that's running, e.g.
-`http://localhost:5000/` for a local dev instance started with
-`dotnet run --project src/CCMC.Cloud.Api/CCMC.Cloud.Api.csproj --urls http://localhost:5000`.
+operator/deployment concern, not hard-coded. The committed default,
+and the primary/recommended way to run the cloud API, is
+`http://localhost:8081/` via Docker Compose (`docker compose -p cc-mc up -d
+--build` with `.env.docker`/`.env.neon` - see README.md §29.16 and
+HOW_TO_RUN.md). Running the API directly with `dotnet run --urls
+http://localhost:5000` (README.md §29.11) remains a valid secondary
+alternative for debugging the API without a container, but requires
+pointing `CloudApi:BaseUrl` at that port instead.
 
 **Important, verified wire-format fact:** the cloud's TypeORM `decimal`
 columns (`quantityKg`, `fat`, `snf`, `temperature` on reception;
@@ -345,11 +358,12 @@ Current branch (`windows-application`):
 ```
 Doc/Business Requirements Document.docx    (v1, superseded)
 Doc/Business Requirements Document.pdf     (v1, superseded)
-Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v3.0 — FINALIZED, authoritative
-                                            source of truth; §20-24 added/
-                                            updated this session, see
-                                            "Scope Decisions (v2.1–v3.0)"
-                                            below)
+Doc/CCMC_BRD_and_Technical_Design_v2.docx  (v6.0 — authoritative source of
+                                            truth; §10/§18 amended this
+                                            session to document that
+                                            Quality Decision is manual,
+                                            not automatic — see "Scope
+                                            Decisions (v2.1–v6.0)" below)
 CLAUDE.md / STATUS.md / context.md / .gitignore
 CCMC.sln
 src/
@@ -371,9 +385,17 @@ src/
 │                         Application + Contracts
 └── CCMC.Desktop/         WPF, code-behind only, no MVVM. Composition/ (DI
                           wiring incl. structured logging, AppPaths),
-                          Windows/ (Login, Main, Reception, ReceptionHistory,
-                          Sources, Vehicles, DeviceStatus, DeviceConfiguration
-                          - full serial parameter UI, SyncStatus, Settings) —
+                          Windows/ (Login, and Main - the single-window shell:
+                          left sidebar nav + a right ContentControl that swaps
+                          in whichever page is selected - see "Single-Window
+                          Shell" below), Views/ (Reception, ReceptionHistory,
+                          Sources, Vehicles, SyncStatus, Settings, RateConfiguration -
+                          Settings combines General/Device Configuration/Device Status
+                          as three toggled sections on one screen; RateConfiguration is
+                          Manager/Admin-only (BRD §25, hidden for Operator - see
+                          "Single-Window Shell" below); every one of these is a
+                          UserControl hosted in Main's content
+                          area, not a separate top-level Window) —
                           refs all four projects above
 tests/
 ├── CCMC.Tests/              xUnit — Domain, Persistence, Sync, Serial, Devices, Auth (89 tests, all passing)
@@ -387,7 +409,9 @@ tests/
 ```
 Confirmed building (`dotnet build CCMC.sln` → 0 warnings, 0 errors) and
 confirmed testing (`dotnet test CCMC.sln` → **110/110 passing** — 89
-Windows-client + 21 cloud-backend). The Windows app was also confirmed
+Windows-client + 21 cloud-backend) **at the time the cloud backend was
+first built — see "Current Development State" below for the current
+figure (190/190), which supersedes this.** The Windows app was also confirmed
 publishing + actually launching multiple times, including after the
 critical fix pass (`dotnet publish` then ran the real `.exe`, which
 created a real SQLite DB via `SchemaMigrator` AND logged
@@ -484,20 +508,48 @@ a consumer of any of these files):
 - **Do not build chilling-tank/batch tracking, bulk storage tank
   telemetry, CIP *telemetry* (chemical usage, temperature/time curves),
   or plant/equipment monitoring** — explicit scope decision (BRD §22),
-  held up against six vendors and TUMUL's real RFP. A lightweight CIP
-  *compliance log* (date/operator/result, no telemetry) is a separate,
-  approved MVP item — see "Scope Decisions (v2.1–v3.0)" below, #2 and #6.
-  Do not conflate the two.
+  held up against six vendors and TUMUL's real RFP.
 - **Do not build farmer-level payment, per-farmer rate charts, or farmer
   settlement** — that belongs to the upstream BMC/VLC tier, not this
   Chilling Centre application (BRD §20).
-- **Outbound tanker dispatch and reconciliation/closing-stock reporting
-  are now part of the MVP** (v2.2 — moved in from Post-MVP; see BRD §17,
-  §23 "Superseded" note, and "Scope Decisions" below). Build dispatch
-  before reconciliation, since reconciliation depends on dispatch data
-  existing.
+- **Do not build outbound tanker dispatch, reconciliation/closing-stock
+  reporting, device calibration tracking, or a CIP compliance log** —
+  all four were approved into MVP at v2.2/v3.0, then moved to Out of
+  Scope (v4.0) by explicit business decision, not Post-MVP — not
+  currently planned, revisit only if asked. See BRD §22, §23
+  "Superseded again", §24 "Amended", and "Scope Decisions" below, #9.
+- **v5.0 MVP is exactly eight components:** Milk Arrival, Reception &
+  Testing, Quality Decision, Local Save, Held in Chilling Centre
+  (physical stage, no software tracking), **Rate Calculation** (renamed
+  from Rate Chart Reference — now a live computation, not just a
+  display, see BRD §25), Notification Hook, and Cloud (RBAC/Audit/
+  Dashboard). The optional Source→BMC hierarchy field also remains
+  (zero-cost, blank for a private CC) — it wasn't explicitly named in
+  the v4.0 narrowing instruction either way, so it was kept rather than
+  silently cut; flag if it should go too.
+- **Rate/Amount calculation is now in scope (v5.0, BRD §25) — farmer
+  settlement is still not.** The formula (ported from a legacy Android
+  app: `MilkCollectionFragment.getAmount()`, `RateFormulaFragment`,
+  branch `offline-db`) computes a Rate and Amount for a single
+  collection from FAT/SNF/Weight against an already-configured Rate
+  Formula (Fat-vs-SNF or TS-based). This is deliberately narrower than
+  "farmer/pourer payment" — no ledger, no advances, no incentive
+  schemes, no settlement cycles. See "Scope Decisions" below, #10, for
+  the precise boundary and why it doesn't reopen §20's farmer-tier
+  exclusion.
+- **Quality Decision is manual, not automatic (v6.0, BRD §10/§18).**
+  Verified directly against `ReceptionWorkflowService` source, not
+  assumed: `QualityValidationService` still computes a suggested
+  ACCEPTED/HOLD/REJECTED result, but it's advisory only — the `Status`
+  actually persisted on the transaction is the operator's own explicit
+  decision. The system never auto-applies its own suggestion; a human
+  must always press it. This was found already implemented in code from
+  the latest pull, undocumented in the BRD until this pass — the BRD's
+  workflow diagrams (§1, §9, §12, §19: "Validate Quality" flowing into
+  "ACCEPT/HOLD/REJECT") are still shape-accurate, they just didn't say
+  who decides. See "Scope Decisions" below, #11.
 
-## Scope Decisions (v2.1–v3.0) — BRD finalized at v3.0
+## Scope Decisions (v2.1–v6.0) — Quality Decision clarified at v6.0
 
 This session reviewed the BRD against how privately-owned Milk Chilling
 Centres actually operate in India, against six vendors already selling
@@ -559,6 +611,43 @@ encoded in BRD §20–§24 as well as here:
    zero-connectivity sites — low priority for the private-CC target,
    revisit only if a specific pilot site has no connectivity option at
    all.
+9. **MVP narrowed (v4.0), by explicit business decision — not a
+   validation finding.** Of #4 and #6 above, four items move from MVP to
+   Out of Scope: outbound tanker dispatch, reconciliation/closing-stock
+   reporting, device calibration tracking, and the CIP compliance log.
+   None of this reverses the v3.0 validation itself (dispatch/
+   reconciliation are still real, vendor-proven capabilities; the CIP log
+   is still correctly distinguished from CIP telemetry) — it's a
+   deliberate choice to ship a smaller MVP first. §17's MVP table now
+   lists exactly: Devices, Reception, Local, Cloud, Source Hierarchy,
+   Rate Chart Reference, Notifications. Held in Chilling Centre continues
+   to be treated purely as a physical/conceptual stage with no dedicated
+   data model, as it always has been.
+10. **Rate Calculation added to MVP (v5.0), ported from a real reference
+    implementation.** Source: `MilkCollectionFragment.getAmount()`,
+    `RateFormulaFragment` (legacy Android app, branch `offline-db`) —
+    full formula in BRD §25. Two modes selected by `PREFS_RATE_TYPE`:
+    Fat-vs-SNF (`Rate = (Value1+Value2)×0.22×FAT/100 +
+    (Value1+Value2)×0.36×SNF/100 + 0.32`) and TS-based (`Rate =
+    (FAT+SNF)×TS_Rate/100`); both give `Amount = Rate × Weight`, both
+    fall back to `Rate/Amount = 0` if a required input or config value
+    is missing. **The precise boundary that keeps this from reopening
+    §20's farmer-tier exclusion:** this computes Rate/Amount for one
+    collection against an already-configured formula — it does not
+    author rate charts, does not maintain a farmer/pourer ledger, does
+    not handle advances or incentives, and does not run settlement
+    cycles. Those remain out of scope, confirmed unchanged in the same
+    pass (§20, §24 amendment notes). `Rate Chart Reference` in the MVP
+    table (#9 above) is renamed `Rate Calculation` to match.
+11. **Quality Decision documented as manual, not automatic (v6.0) — a
+    documentation fix, not a scope change.** The behavior already existed
+    in code before this BRD pass; §10/§18 amended to state it explicitly.
+    `QualityValidationService`'s computed ACCEPTED/HOLD/REJECTED result
+    is advisory only — the operator's own explicit decision is what's
+    persisted, the system never auto-applies its own suggestion. Applies
+    to every "Validate"/"Validate Quality" workflow step in the BRD (§1,
+    §9, §12, §19) — their diagram shape is unchanged, only the mechanics
+    needed spelling out.
 
 **Evidence base for v3.0** (see BRD §24 for full detail): a full 171-page
 ERP RFP from TUMUL (Tumkur District Co-operative Milk Producers Societies'
@@ -589,8 +678,11 @@ STATUS.md "Product Decisions") and are no longer listed:
 
 1. Videocon vs. ESSAE hardware discrepancy (see "Current Hardware
    Facts") — needs explicit human confirmation.
-2. Milk analyser: no serial configuration or protocol confirmed at all —
-   no vendor even named yet, unlike the scale's verified Videocon/COM4/2400.
+2. Milk analyser: vendor/model now known (Ekomilk Milkana KAM98-2A) and its
+   output payload format is derived from real observed samples (see
+   STATUS.md), but no serial configuration (COM port/baud/etc.) is
+   confirmed and the physical serial link itself is untested — unlike the
+   scale's verified Videocon/COM4/2400.
 3. Whether the cloud API's routes (unprefixed, e.g. `POST /reception`)
    will stay stable, or whether an `/api/v1` prefix will be introduced
    before the Windows app ships — assume current unprefixed routes until
@@ -638,9 +730,74 @@ found via this live testing and fixed — see STATUS.md "CC-MC Cloud
 Backend" for the full writeup, and README.md §29 for architecture/exact
 commands.
 
+**Milk Rate Calculation (BRD v5.0 §25) implemented 2026-09-12** — the live
+Rate/Amount calculation per collection (Fat-vs-SNF and TS-based modes),
+centre-scoped `RateFormulaSettings` configuration (cloud-owned, synced to
+the client like `QualityRule`, no fabricated default values), wired into
+`ReceptionWorkflowService` and the reception UI, persisted on both SQLite
+and PostgreSQL as nullable columns (so a pre-existing reception is
+distinguishable from one where the calculation legitimately produced
+zero). Verified end-to-end against a real local PostgreSQL instance,
+including that a reception's Rate/Amount survive a later configuration
+change unchanged. See STATUS.md "Milk Rate Calculation" for the full
+writeup.
+
+**Docker + Docker Compose + Neon (2026-09-12)**: `CCMC.Cloud.Api` is now
+containerized (`Dockerfile`, repo root) and verified in a real Docker
+Compose stack (`compose.yaml`, project `cc-mc`: containers `cc-mc` +
+`cc-mc-postgres`, network `cc-mc-network`). Production PostgreSQL now
+means a real Neon project (`fancy-cherry-25725711`, branch `production`)
+- linked via the Neon CLI, all three migrations verified applying cleanly
+against it, `/health`/`/health/db` both healthy. The exact same image
+runs against either database, controlled only by which environment file
+(`.env.local` vs `.env.production`, both gitignored - see
+`.env.example`/`.env.local.example`/`.env.production.example`) is
+supplied - no source-code difference between local and production.
+**Update (2026-09-12, later same day)**: the environment file naming above
+is superseded - it's now `.env`/`.env.docker`/`.env.neon`/`.env.example`,
+switched via `Copy-Item .env.docker .env -Force` or `Copy-Item .env.neon
+.env -Force` (PowerShell) followed by `docker compose -p cc-mc up -d
+--build`; Neon mode uses a Compose profile to skip starting
+`cc-mc-postgres` entirely rather than a second compose file. Also this
+day: a real user manually tested the WPF app and found 6 real bugs, 5 of
+which shared one root cause (`CCMC.Desktop/appsettings.json`'s
+`CloudApi:BaseUrl` was stale at `http://localhost:5000/` instead of the
+actual Docker-mapped `http://localhost:8081/`, causing every login to
+silently fall back to offline mode and therefore never sync master data,
+including rate-formula-settings). All six fixed - see STATUS.md
+"Application Bug Fixes" for the full root-cause writeup.
+
+**Render deployment is now explicitly BLOCKED (2026-09-15), not merely
+"not done yet."** The GitHub repository is owned/controlled by the CEO,
+and the operator working on this repo does not currently have the access
+needed to connect the private repository to Render - an access/
+permissions blocker, not a technical one (the Docker image and Neon
+backend are both already deployment-ready). See HOW_TO_RUN.md §10 for the
+exact ordered steps once access is obtained. Separately, the prior
+blocker here - Neon/production having zero users and no administrative
+bootstrap mechanism - was resolved the same day: `ProductionBootstrapSeeder`
+(env-var-gated, a no-op unless `Bootstrap:AdminEmail` is configured) now
+exists and was used to create one Admin, one Manager, one Operator, and
+one Chilling Centre in Neon `production`, verified directly against Neon
+(correct role/permission counts, correct centre scoping, real PBKDF2
+password hashes). `DevelopmentSeeder` is unchanged and still never runs
+outside `ASPNETCORE_ENVIRONMENT=Development`. See STATUS.md "Neon
+Production Bootstrap (2026-09-15)" for the full writeup, HOW_TO_RUN.md §9
+for how to bootstrap a further account/centre, and STATUS.md's own note
+there about a real secret-exposure incident (Neon DB password, JWT
+secret, bootstrap passwords) whose rotation the project owner deferred to
+themselves - treat those credentials as compromised until rotation is
+confirmed. What remains genuinely open: no in-app password-change/reset
+endpoint exists anywhere (rotation requires direct DB access), the actual
+`POST /auth/login` round-trip against Neon's new accounts has not been
+exercised (data-layer verification only, by explicit choice), and Render
+deployment itself has not started.
+
 **Full solution:** `dotnet build CCMC.sln` → 0 warnings, 0 errors.
-`dotnet test CCMC.sln` → **110/110 tests passing** (89 Windows-client + 21
-cloud-backend).
+`dotnet test CCMC.sln` → **190/190 tests passing** (155 Windows-client +
+35 cloud-backend, the cloud suite run against a real reachable
+PostgreSQL) - this supersedes the "187/187"/"110/110" figures previously
+recorded here (see STATUS.md for the full test-count history).
 
 What is genuinely NOT done (not oversights — each is either blocked on
 external input or an explicit scope cut, see STATUS.md "Known

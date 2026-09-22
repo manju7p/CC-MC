@@ -117,8 +117,16 @@ namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<int>("CentreId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("Clr")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -134,9 +142,21 @@ namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
                     b.Property<int>("OperatorUserId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("Protein")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
                     b.Property<decimal>("QuantityKg")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal?>("Rate")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("RawAnalyserPayload")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("ReadingSource")
                         .IsRequired()
@@ -175,6 +195,10 @@ namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("VehicleId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("Water")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
 
                     b.HasKey("Id");
 
@@ -261,6 +285,42 @@ namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("quality_rules", (string)null);
+                });
+
+            modelBuilder.Entity("CCMC.Cloud.Domain.Entities.RateFormulaSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CentreId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RateType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal?>("TsRate")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal?>("Value1")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<decimal?>("Value2")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CentreId")
+                        .IsUnique();
+
+                    b.ToTable("rate_formula_settings", (string)null);
                 });
 
             modelBuilder.Entity("CCMC.Cloud.Domain.Entities.Role", b =>
@@ -560,6 +620,16 @@ namespace CCMC.Cloud.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("CCMC.Cloud.Domain.Entities.QualityRule", b =>
+                {
+                    b.HasOne("CCMC.Cloud.Domain.Entities.ChillingCentre", "Centre")
+                        .WithMany()
+                        .HasForeignKey("CentreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Centre");
+                });
+
+            modelBuilder.Entity("CCMC.Cloud.Domain.Entities.RateFormulaSettings", b =>
                 {
                     b.HasOne("CCMC.Cloud.Domain.Entities.ChillingCentre", "Centre")
                         .WithMany()

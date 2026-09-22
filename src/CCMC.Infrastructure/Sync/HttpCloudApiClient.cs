@@ -95,6 +95,9 @@ public sealed class HttpCloudApiClient(HttpClient httpClient, ILogger<HttpCloudA
     public Task<IReadOnlyList<QualityRuleDto>> GetQualityRulesAsync(string accessToken, CancellationToken cancellationToken) =>
         GetListAsync<QualityRuleDto>("quality-rules", accessToken, cancellationToken);
 
+    public Task<IReadOnlyList<RateFormulaSettingsDto>> GetRateFormulaSettingsAsync(string accessToken, CancellationToken cancellationToken) =>
+        GetListAsync<RateFormulaSettingsDto>("rate-formula-settings", accessToken, cancellationToken);
+
     public async Task<CloudCreateReceptionResult> CreateReceptionAsync(
         string accessToken, CreateReceptionRequestDto request, CancellationToken cancellationToken)
     {
@@ -209,6 +212,82 @@ public sealed class HttpCloudApiClient(HttpClient httpClient, ILogger<HttpCloudA
         catch (JsonException ex)
         {
             return new CloudOverrideResult(CloudMutationOutcome.Retryable, null, $"Malformed response body: {ex.Message}");
+        }
+    }
+
+    public Task<CloudCreateSourceResult> CreateSourceAsync(string accessToken, CreateSourceRequestDto request, CancellationToken cancellationToken) =>
+        SendMasterDataAsync<CreateSourceRequestDto, SourceDto, CloudCreateSourceResult>(
+            HttpMethod.Post, "sources", accessToken, request,
+            (outcome, dto, message) => new CloudCreateSourceResult(outcome, dto, message),
+            cancellationToken);
+
+    public Task<CloudCreateVehicleResult> CreateVehicleAsync(string accessToken, CreateVehicleRequestDto request, CancellationToken cancellationToken) =>
+        SendMasterDataAsync<CreateVehicleRequestDto, VehicleDto, CloudCreateVehicleResult>(
+            HttpMethod.Post, "vehicles", accessToken, request,
+            (outcome, dto, message) => new CloudCreateVehicleResult(outcome, dto, message),
+            cancellationToken);
+
+    /// <summary>PUT /rate-formula-settings - same classify-the-response shape as CreateSourceAsync/CreateVehicleAsync, just PUT instead of POST (an upsert, not a create).</summary>
+    public Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(string accessToken, UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken) =>
+        SendMasterDataAsync<UpsertRateFormulaSettingsRequestDto, RateFormulaSettingsDto, CloudUpdateRateFormulaSettingsResult>(
+            HttpMethod.Put, "rate-formula-settings", accessToken, request,
+            (outcome, dto, message) => new CloudUpdateRateFormulaSettingsResult(outcome, dto, message),
+            cancellationToken);
+
+    /// <summary>
+    /// Shared send-and-classify logic for the simple (no idempotency-key,
+    /// no created/duplicate distinction) master-data create/upsert endpoints -
+    /// mirrors OverrideReceptionAsync's own status-code classification
+    /// exactly (401 -> AuthRetryable, 429/5xx -> Retryable, everything else
+    /// including 403 permission-denied -> Terminal). Method-agnostic (POST for
+    /// create, PUT for upsert) since the classification logic is identical either way.
+    /// </summary>
+    private async Task<TResult> SendMasterDataAsync<TRequest, TResponse, TResult>(
+        HttpMethod method, string route, string accessToken, TRequest request,
+        Func<CloudMutationOutcome, TResponse?, string?, TResult> makeResult,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var httpRequest = new HttpRequestMessage(method, route)
+            {
+                Content = JsonContent.Create(request, options: JsonOptions),
+            };
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var dto = await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken);
+                return dto is null
+                    ? makeResult(CloudMutationOutcome.Retryable, default, "Create succeeded but the response body was empty.")
+                    : makeResult(CloudMutationOutcome.Success, dto, null);
+            }
+
+            var message = await SafeReadMessageAsync(response, cancellationToken) ?? $"Create failed with status {(int)response.StatusCode}.";
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                return makeResult(CloudMutationOutcome.AuthRetryable, default, message);
+            }
+            if ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500)
+            {
+                return makeResult(CloudMutationOutcome.Retryable, default, message);
+            }
+            return makeResult(CloudMutationOutcome.Terminal, default, message);
+        }
+        catch (HttpRequestException ex)
+        {
+            return makeResult(CloudMutationOutcome.Retryable, default, $"Network error: {ex.Message}");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return makeResult(CloudMutationOutcome.Retryable, default, "Request timed out.");
+        }
+        catch (JsonException ex)
+        {
+            return makeResult(CloudMutationOutcome.Retryable, default, $"Malformed response body: {ex.Message}");
         }
     }
 

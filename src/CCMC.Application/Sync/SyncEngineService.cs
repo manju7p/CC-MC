@@ -152,6 +152,21 @@ public sealed class SyncEngineService(
         // CreateReceptionRequestDto has no ReadingSource field - the cloud contract
         // (documented in context.md) doesn't accept one; it always persists
         // ReadingSource.MANUAL server-side for a gateway-style client submission.
+        //
+        // Status is the ORIGINAL creation-time decision, which is always
+        // Accepted or Hold by construction (TransactionStatus's own invariant -
+        // Rejected is only ever reached via an override of a prior Hold, see
+        // ReceptionWorkflowService.RejectAtReceptionAsync). If the local row's
+        // CURRENT status is Rejected, that means an override already ran
+        // locally (ahead of this create even syncing - the override's own
+        // outbox row is separately gated on this create having synced first,
+        // see OverrideOutboxRepository.GetEligibleAsync) - Hold is what was
+        // actually decided at creation time, so that is what this request
+        // must carry; the override syncs its own change afterward, same as always.
+        var creationStatus = transaction.Status == Domain.Enums.TransactionStatus.Rejected
+            ? Domain.Enums.TransactionStatus.Hold
+            : transaction.Status;
+
         var request = new CreateReceptionRequestDto
         {
             CentreId = transaction.CentreId,
@@ -161,6 +176,13 @@ public sealed class SyncEngineService(
             Fat = transaction.Fat,
             Snf = transaction.Snf,
             Temperature = transaction.Temperature,
+            Status = MapStatus(creationStatus),
+            Clr = transaction.Clr,
+            Water = transaction.Water,
+            Protein = transaction.Protein,
+            RawAnalyserPayload = transaction.RawAnalyserPayload,
+            Rate = transaction.Rate,
+            Amount = transaction.Amount,
             LocalIdempotencyKey = transaction.LocalIdempotencyKey, // never regenerated - see docstring
         };
 

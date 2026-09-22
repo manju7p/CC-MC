@@ -57,6 +57,21 @@ public enum CloudMutationOutcome
 public sealed record CloudOverrideResult(CloudMutationOutcome Outcome, ReceptionTransactionDto? Transaction, string? ErrorMessage);
 
 /// <summary>
+/// A 403 (the caller's role lacks SOURCE_CREATE/VEHICLE_CREATE) is a Terminal
+/// outcome, same as any other authoritative rejection - see
+/// CloudMutationOutcome's existing OverrideReceptionAsync usage for the same
+/// status-code classification this mirrors. The caller (SourcesWindow/
+/// VehiclesWindow) surfaces ErrorMessage directly rather than assuming
+/// success.
+/// </summary>
+public sealed record CloudCreateSourceResult(CloudMutationOutcome Outcome, SourceDto? Source, string? ErrorMessage);
+
+public sealed record CloudCreateVehicleResult(CloudMutationOutcome Outcome, VehicleDto? Vehicle, string? ErrorMessage);
+
+/// <summary>PUT /rate-formula-settings - gated server-side by RATE_FORMULA_CONFIGURE (Manager/Admin) and centre scoping (see RateFormulaSettingsService.UpsertAsync). A 403 (permission denied or out-of-scope centre) is Terminal, same classification as CloudCreateSourceResult/CloudCreateVehicleResult.</summary>
+public sealed record CloudUpdateRateFormulaSettingsResult(CloudMutationOutcome Outcome, RateFormulaSettingsDto? Settings, string? ErrorMessage);
+
+/// <summary>
 /// The Windows app's only path to the cloud. Implemented by
 /// CCMC.Infrastructure's HttpCloudApiClient against the existing NestJS API
 /// contract documented in context.md - NOT a new/invented contract. No
@@ -70,12 +85,22 @@ public interface ICloudApiClient
     Task<IReadOnlyList<SourceDto>> GetSourcesAsync(string accessToken, CancellationToken cancellationToken);
     Task<IReadOnlyList<VehicleDto>> GetVehiclesAsync(string accessToken, CancellationToken cancellationToken);
     Task<IReadOnlyList<QualityRuleDto>> GetQualityRulesAsync(string accessToken, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RateFormulaSettingsDto>> GetRateFormulaSettingsAsync(string accessToken, CancellationToken cancellationToken);
 
     Task<CloudCreateReceptionResult> CreateReceptionAsync(
         string accessToken, CreateReceptionRequestDto request, CancellationToken cancellationToken);
 
     Task<CloudOverrideResult> OverrideReceptionAsync(
         string accessToken, int cloudTransactionId, OverrideReceptionRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>POST /sources - gated server-side by SOURCE_CREATE (Manager/Admin only, per DevelopmentSeeder's role grants). Never assume success client-side; the server remains the real authorization boundary.</summary>
+    Task<CloudCreateSourceResult> CreateSourceAsync(string accessToken, CreateSourceRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>POST /vehicles - gated server-side by VEHICLE_CREATE (Manager/Admin only, per DevelopmentSeeder's role grants).</summary>
+    Task<CloudCreateVehicleResult> CreateVehicleAsync(string accessToken, CreateVehicleRequestDto request, CancellationToken cancellationToken);
+
+    /// <summary>PUT /rate-formula-settings - gated server-side by RATE_FORMULA_CONFIGURE (Manager/Admin only) and centre scoping.</summary>
+    Task<CloudUpdateRateFormulaSettingsResult> UpdateRateFormulaSettingsAsync(string accessToken, UpsertRateFormulaSettingsRequestDto request, CancellationToken cancellationToken);
 
     Task<DashboardSummaryDto> GetDashboardSummaryAsync(string accessToken, int? centreId, CancellationToken cancellationToken);
 }

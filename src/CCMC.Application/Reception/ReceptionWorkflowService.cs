@@ -27,6 +27,17 @@ public sealed record ReadDevicesResult(
     public bool QualityNeedsManualEntry => Quality is null;
 }
 
+/// <summary>
+/// The operator's explicit ACCEPT/HOLD decision at capture time (see
+/// ValidateAndSaveAsync's doc comment for why this - not the automatic
+/// quality suggestion - is what actually gets persisted as Status).
+/// Rejected is deliberately not a valid value here: the system never
+/// creates a transaction as Rejected directly (TransactionStatus's own
+/// invariant, unchanged) - use RejectAtReceptionAsync instead, which reuses
+/// the existing Hold-&gt;override machinery.
+/// </summary>
+public enum ReceptionDecision { Accept, Hold }
+
 public sealed record SaveReceptionInput(
     int CentreId,
     int SourceId,
@@ -36,7 +47,13 @@ public sealed record SaveReceptionInput(
     decimal Fat,
     decimal Snf,
     decimal Temperature,
-    ReadingSource ReadingSource);
+    ReadingSource ReadingSource,
+    ReceptionDecision Decision,
+    decimal? Clr = null,
+    decimal? Water = null,
+    decimal? Protein = null,
+    string? RawAnalyserPayload = null,
+    string? OperatorReason = null);
 
 public sealed record SaveReceptionResult(MilkReceptionTransaction Transaction, bool WasNewlyCreated);
 
@@ -50,6 +67,7 @@ public sealed record SaveReceptionResult(MilkReceptionTransaction Transaction, b
 public sealed class ReceptionWorkflowService(
     IDeviceManager deviceManager,
     IQualityRuleRepository qualityRuleRepository,
+    IRateFormulaSettingsRepository rateFormulaSettingsRepository,
     IReceptionRepository receptionRepository,
     IAuditLogRepository auditLogRepository,
     IIdempotencyKeyGenerator idempotencyKeyGenerator,
@@ -135,6 +153,18 @@ public sealed class ReceptionWorkflowService(
     /// with its sync-outbox record. Local save always happens here,
     /// independent of cloud reachability - the sync engine picks this row up
     /// separately (see SyncEngineService).
+    ///
+    /// The persisted Status is <paramref name="input"/>.Decision - the
+    /// operator's own explicit ACCEPT/HOLD choice - NOT QualityValidationService's
+    /// automatic suggestion. That automatic check (the system's original
+    /// "auto-accept" behavior) is still computed and still logged/recorded in
+    /// Reason below - it is retained, not deleted - but it is no longer what
+    /// decides the transaction's fate: a human must always press ACCEPT or
+    /// HOLD (see CLAUDE.md/STATUS.md "Milk Analyser + Quality Decision Flow" -
+    /// this is a deliberate product decision, not an oversight, and it applies
+    /// even when the analyser's own Clr/Water/Protein readings look fine by
+    /// Fat/Snf/Temperature rules alone but raise a concern the rule engine
+    /// doesn't cover yet).
     /// </summary>
     public async Task<SaveReceptionResult> ValidateAndSaveAsync(SaveReceptionInput input, CancellationToken cancellationToken)
     {
@@ -146,11 +176,25 @@ public sealed class ReceptionWorkflowService(
                 ? new ResolvedQualityRule(rule.MinValue, rule.MaxValue)
                 : throw new InvalidOperationException($"No quality rule resolved for {p} in centre {input.CentreId}."));
 
-        var validation = QualityValidationService.Validate(
+        // Dormant automatic suggestion - still computed, still logged, never
+        // auto-applied. See this method's doc comment.
+        var suggestion = QualityValidationService.Validate(
             new QualityReadingInput(input.Fat, input.Snf, input.Temperature), ruleMap);
+
+        var decidedStatus = input.Decision == ReceptionDecision.Accept ? TransactionStatus.Accepted : TransactionStatus.Hold;
+        var reason = BuildReason(input.Decision, suggestion, input.OperatorReason);
+
         logger.LogInformation(
-            "Reception validated for centre {CentreId}: {Status} (reason: {Reason})",
-            input.CentreId, validation.Status, validation.Reason ?? "n/a");
+            "Reception decided for centre {CentreId}: operator decision={Decision} automatic suggestion={SuggestedStatus} (reason: {Reason})",
+            input.CentreId, decidedStatus, suggestion.Status, suggestion.Reason ?? "n/a");
+
+        // BRD v5.0 section 25: Rate/Amount computed once, here, at capture
+        // time - resolved from whatever rate formula settings are locally
+        // cached for this centre right now (works fully offline, same as
+        // quality-rule resolution above). Never recomputed later from a
+        // possibly-changed configuration (see MilkReceptionTransaction's doc
+        // comment on Rate/Amount).
+        var rateResult = await CalculateRateAsync(input.CentreId, input.Fat, input.Snf, input.QuantityKg, cancellationToken);
 
         var now = clock.UtcNow;
         var transaction = new MilkReceptionTransaction
@@ -163,9 +207,15 @@ public sealed class ReceptionWorkflowService(
             Fat = input.Fat,
             Snf = input.Snf,
             Temperature = input.Temperature,
-            Status = validation.Status,
+            Clr = input.Clr,
+            Water = input.Water,
+            Protein = input.Protein,
+            RawAnalyserPayload = input.RawAnalyserPayload,
+            Rate = rateResult.Rate,
+            Amount = rateResult.Amount,
+            Status = decidedStatus,
             ReadingSource = input.ReadingSource,
-            Reason = validation.Reason,
+            Reason = reason,
             LocalIdempotencyKey = idempotencyKeyGenerator.NewKey(),
             CapturedAt = now,
             CreatedAt = now,
@@ -181,7 +231,7 @@ public sealed class ReceptionWorkflowService(
                 Action = "RECEPTION_CREATE",
                 ResourceType = "MilkReceptionTransaction",
                 ResourceId = created.Transaction.LocalId.ToString(),
-                Reason = validation.Reason,
+                Reason = reason,
                 CreatedAt = now,
             },
             cancellationToken);
@@ -191,6 +241,65 @@ public sealed class ReceptionWorkflowService(
             created.Transaction.LocalId, created.Transaction.Status, created.WasNewlyCreated);
 
         return new SaveReceptionResult(created.Transaction, created.WasNewlyCreated);
+    }
+
+    /// <summary>
+    /// The operator's REJECT decision at reception. TransactionStatus's own
+    /// invariant ("Rejected is reachable only through a Manager override of a
+    /// Hold transaction" - unchanged, see TransactionStatus's doc comment)
+    /// applies here too: this does not add a new "create as Rejected" path,
+    /// it saves the reception as HOLD via the exact same ValidateAndSaveAsync
+    /// above, then immediately applies the existing override machinery
+    /// (OverrideAsync) to move it to REJECTED - two fully audited steps
+    /// (RECEPTION_CREATE, then RECEPTION_OVERRIDE), both already durable and
+    /// sync-eligible via their own existing outbox mechanisms. Nothing new is
+    /// invented at the persistence layer.
+    /// </summary>
+    public async Task<SaveReceptionResult> RejectAtReceptionAsync(SaveReceptionInput input, string reason, CancellationToken cancellationToken)
+    {
+        var holdInput = input with { Decision = ReceptionDecision.Hold, OperatorReason = reason };
+        var saved = await ValidateAndSaveAsync(holdInput, cancellationToken);
+
+        await OverrideAsync(saved.Transaction.LocalId, TransactionStatus.Rejected, reason, input.OperatorUserId, cancellationToken);
+
+        var rejected = await receptionRepository.GetByLocalIdAsync(saved.Transaction.LocalId, cancellationToken)
+            ?? throw new InvalidOperationException($"Reception transaction {saved.Transaction.LocalId} not found locally immediately after being rejected.");
+
+        return new SaveReceptionResult(rejected, saved.WasNewlyCreated);
+    }
+
+    /// <summary>
+    /// The single resolution+calculation path used both here (at save time)
+    /// and by the reception UI's live preview (see ReceptionWindow), so the
+    /// displayed Rate/Amount can never diverge from what gets persisted -
+    /// both read the exact same locally cached rate formula settings through
+    /// this same method.
+    /// </summary>
+    public async Task<RateCalculationResult> CalculateRateAsync(
+        int centreId, decimal? fat, decimal? snf, decimal? quantityKg, CancellationToken cancellationToken)
+    {
+        var settings = await rateFormulaSettingsRepository.ResolveForCentreAsync(centreId, cancellationToken);
+        var config = settings is null
+            ? null
+            : new RateFormulaConfig(settings.RateType, settings.Value1, settings.Value2, settings.TsRate);
+
+        return RateCalculationService.Calculate(new RateCalculationInput(fat, snf, quantityKg), config);
+    }
+
+    private static string? BuildReason(ReceptionDecision decision, QualityValidationResult suggestion, string? operatorReason)
+    {
+        var decidedStatus = decision == ReceptionDecision.Accept ? TransactionStatus.Accepted : TransactionStatus.Hold;
+
+        // Operator confirmed the automatic suggestion - null for an accept, explanatory for a hold - unless
+        // an override is genuinely needed (below).
+        var autoNote = decidedStatus == suggestion.Status
+            ? suggestion.Reason
+            : suggestion.Reason is null
+                ? $"Operator decision ({decidedStatus}) overrides the automatic quality suggestion of {suggestion.Status}."
+                : $"Operator decision ({decidedStatus}) overrides the automatic quality suggestion of {suggestion.Status}: {suggestion.Reason}";
+
+        if (string.IsNullOrWhiteSpace(operatorReason)) return autoNote;
+        return autoNote is null ? operatorReason : $"{operatorReason} ({autoNote})";
     }
 
     /// <summary>

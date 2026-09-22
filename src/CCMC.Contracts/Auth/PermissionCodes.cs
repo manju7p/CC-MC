@@ -20,6 +20,9 @@ public static class PermissionCodes
     public const string QualityRuleView = "QUALITY_RULE_VIEW";
     public const string QualityRuleConfigure = "QUALITY_RULE_CONFIGURE";
 
+    public const string RateFormulaView = "RATE_FORMULA_VIEW";
+    public const string RateFormulaConfigure = "RATE_FORMULA_CONFIGURE";
+
     public const string ReceptionView = "RECEPTION_VIEW";
     public const string ReceptionCreate = "RECEPTION_CREATE";
     public const string ReceptionOverride = "RECEPTION_OVERRIDE";

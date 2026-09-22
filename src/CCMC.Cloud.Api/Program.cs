@@ -11,23 +11,70 @@ using CCMC.Cloud.Infrastructure.Persistence;
 using CCMC.Cloud.Infrastructure.Seed;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// --- Hosting: honor Render's (or any similar PaaS's) injected PORT env var ---
+// ASP.NET Core has no built-in concept of a generic "PORT" variable (Render's
+// own convention, not an ASP.NET Core one) - only ASPNETCORE_URLS/
+// ASPNETCORE_HTTP_PORTS. When PORT is present, bind explicitly to it on
+// 0.0.0.0 (never localhost/127.0.0.1 - the container's loopback interface is
+// not reachable from outside it). When absent (local `dotnet run`, or a
+// container started with ASPNETCORE_URLS/ASPNETCORE_HTTP_PORTS already set,
+// e.g. the official .NET 8 ASP.NET runtime image's own default of 8080),
+// this is a no-op and existing behavior (launchSettings.json's port 5000,
+// or the base image's default) is unchanged.
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(renderPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
+}
+
+// Render (like Heroku/Azure App Service) terminates TLS at its own edge and
+// forwards plain HTTP to the container - Kestrel only ever sees http here,
+// so app.UseHttpsRedirection() below would otherwise redirect every request
+// (including Render's own health-check probes, which don't follow redirects)
+// in an infinite loop, since the container never listens on https at all.
+// X-Forwarded-Proto lets ASP.NET Core recognize the original request was
+// already https and skip the redirect. KnownNetworks/KnownProxies are
+// cleared because Render's edge address isn't a fixed IP/network known at
+// deploy time (unlike an on-prem reverse proxy) - this is the documented
+// ASP.NET Core pattern for exactly this class of PaaS deployment, safe here
+// because the container is reachable only through Render's own routing,
+// never directly from the internet.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // --- Configuration ---------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("CcmcDb")
     ?? throw new InvalidOperationException("Missing configuration: ConnectionStrings:CcmcDb.");
 
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
-var jwtSecret = builder.Configuration[$"{JwtOptions.SectionName}:Secret"]
-    ?? throw new InvalidOperationException(
+// Bound once, validated eagerly (ValidateOnStart - fails fast at startup, not
+// on the first request, matching the previous eager-throw behavior), then
+// resolved via IOptions<JwtOptions> by BOTH JwtTokenGenerator (issuance) and
+// the JWT Bearer setup below (validation) - a single source of truth for
+// Secret/Issuer/Audience. Previously these were read twice, independently,
+// as separate top-level `builder.Configuration[...]` expressions - which is
+// exactly how a real bug shipped: the issuance and validation sides silently
+// disagreed on the Issuer/Audience fallback the moment only Jwt:Secret was
+// supplied (e.g. `docker run -e Jwt__Secret=...` with no Issuer/Audience),
+// producing a token every subsequent request would then fail to validate.
+// See JwtOptions' doc comment for the full story.
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
+    .Validate(o => !string.IsNullOrWhiteSpace(o.Secret),
         "Missing configuration: Jwt:Secret. Set it via appsettings.Development.json (dev only), " +
-        "an environment variable (Jwt__Secret), or user-secrets - never commit a real value.");
-var jwtIssuer = builder.Configuration[$"{JwtOptions.SectionName}:Issuer"] ?? "ccmc-cloud-api";
-var jwtAudience = builder.Configuration[$"{JwtOptions.SectionName}:Audience"] ?? "ccmc-windows-client";
+        "an environment variable (Jwt__Secret), or user-secrets - never commit a real value.")
+    .ValidateOnStart();
 
 // --- Persistence -------------------------------------------------------------
 builder.Services.AddDbContext<CcmcDbContext>(options => options.UseNpgsql(connectionString));
@@ -46,6 +93,7 @@ builder.Services.AddScoped<CentreService>();
 builder.Services.AddScoped<SourceService>();
 builder.Services.AddScoped<VehicleService>();
 builder.Services.AddScoped<QualityRuleService>();
+builder.Services.AddScoped<RateFormulaSettingsService>();
 builder.Services.AddScoped<DashboardService>();
 
 // --- Authentication (JWT Bearer) --------------------------------------------
@@ -60,14 +108,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // present, just renamed). Preserves the claim names exactly as issued
         // by JwtTokenGenerator.
         options.MapInboundClaims = false;
-        options.TokenValidationParameters = new TokenValidationParameters
+    });
+
+// Deferred to DI-resolution time (same moment JwtTokenGenerator itself reads
+// IOptions<JwtOptions>), not at this eager top-level point - see the
+// AddOptions<JwtOptions>() comment above for why this replaced two
+// independent `builder.Configuration[...]` reads.
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<IOptions<JwtOptions>>((bearerOptions, jwtOptions) =>
+    {
+        var jwt = jwtOptions.Value;
+        bearerOptions.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
+            ValidIssuer = jwt.Issuer,
             ValidateAudience = true,
-            ValidAudience = jwtAudience,
+            ValidAudience = jwt.Audience,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
         };
@@ -128,6 +186,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -163,6 +222,19 @@ using (var scope = app.Services.CreateScope())
     {
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
         await DevelopmentSeeder.SeedAsync(db, passwordHasher, logger);
+    }
+
+    // Production account bootstrap - runs in ANY environment, but only when
+    // Bootstrap:AdminEmail is actually configured (Bootstrap__* env vars).
+    // Absent (the default), this is a complete no-op - see
+    // ProductionBootstrapOptions/ProductionBootstrapSeeder for the full
+    // rationale. Never invents an identity/credential; every value comes
+    // from configuration the operator supplied.
+    var bootstrapOptions = ProductionBootstrapOptions.FromConfiguration(builder.Configuration);
+    if (bootstrapOptions is not null)
+    {
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        await ProductionBootstrapSeeder.SeedAsync(db, passwordHasher, logger, bootstrapOptions);
     }
 }
 

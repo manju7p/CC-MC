@@ -14,7 +14,10 @@ namespace CCMC.Cloud.Application.Reception;
 public sealed record CreateReceptionCommand(
     int CentreId, int SourceId, int VehicleId,
     decimal QuantityKg, decimal Fat, decimal Snf, decimal Temperature,
-    string? LocalIdempotencyKey);
+    string? LocalIdempotencyKey,
+    TransactionStatus? Status = null,
+    decimal? Clr = null, decimal? Water = null, decimal? Protein = null, string? RawAnalyserPayload = null,
+    decimal? Rate = null, decimal? Amount = null);
 
 public enum CreateReceptionOutcome { Created, Duplicate }
 
@@ -88,8 +91,33 @@ public sealed class ReceptionService(
         if (vehicle is null || vehicle.CentreId != cmd.CentreId) throw new ValidationException("Vehicle not found for this centre.");
         if (vehicle.Status != RecordStatus.Active) throw new ValidationException("Vehicle is inactive.");
 
+        if (cmd.Status == TransactionStatus.Rejected)
+        {
+            // Matches the client-side invariant exactly (TransactionStatus's own
+            // doc comment, both sides): Rejected is only ever reached via an
+            // override of a prior Hold, never a direct create.
+            throw new ValidationException("A reception cannot be created directly with status Rejected - reject an existing HOLD via the override endpoint instead.");
+        }
+
         var rules = await ResolveRulesAsync(cmd.CentreId, cancellationToken);
         var validation = QualityValidationService.Validate(new QualityReadingInput(cmd.Fat, cmd.Snf, cmd.Temperature), rules);
+
+        // If the caller (the Windows client, going forward) already made an
+        // explicit human ACCEPT/HOLD decision, that decision is authoritative -
+        // it may legitimately differ from this automatic suggestion (e.g. the
+        // operator judged the analyser's Water/Protein reading unacceptable
+        // even though Fat/Snf/Temperature alone are in range, or overrode a
+        // borderline HOLD). The automatic suggestion is still computed and
+        // still recorded (dormant, not deleted - see CLAUDE.md/STATUS.md "Milk
+        // Analyser + Quality Decision Flow"). A caller that omits Status
+        // (none exists today, but the field is optional for backward
+        // compatibility) gets the original, fully-automatic behavior unchanged.
+        var decidedStatus = cmd.Status ?? validation.Status;
+        var reason = cmd.Status is { } decided && decided != validation.Status
+            ? (validation.Reason is null
+                ? $"Operator decision ({decided}) overrides the automatic quality suggestion of {validation.Status}."
+                : $"Operator decision ({decided}) overrides the automatic quality suggestion of {validation.Status}: {validation.Reason}")
+            : validation.Reason;
 
         var now = DateTimeOffset.UtcNow;
         var entity = new MilkReceptionTransaction
@@ -105,9 +133,18 @@ public sealed class ReceptionService(
             Fat = cmd.Fat,
             Snf = cmd.Snf,
             Temperature = cmd.Temperature,
-            Status = validation.Status,
+            Clr = cmd.Clr,
+            Water = cmd.Water,
+            Protein = cmd.Protein,
+            RawAnalyserPayload = cmd.RawAnalyserPayload,
+            // Trusted verbatim from the client, same treatment as Fat/Snf/Clr/
+            // Water/Protein - see MilkReceptionTransaction.Rate's doc comment
+            // for why the cloud never recomputes these independently.
+            Rate = cmd.Rate,
+            Amount = cmd.Amount,
+            Status = decidedStatus,
             ReadingSource = ReadingSource.Manual,
-            Reason = validation.Reason,
+            Reason = reason,
             LocalIdempotencyKey = cmd.LocalIdempotencyKey,
             ReceivedAt = now,
             CreatedAt = now,
@@ -116,13 +153,13 @@ public sealed class ReceptionService(
 
         if (string.IsNullOrEmpty(cmd.LocalIdempotencyKey))
         {
-            return await InsertAndFinalizeAsync(user, centre, entity, validation, cancellationToken);
+            return await InsertAndFinalizeAsync(user, centre, entity, reason, cancellationToken);
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var result = await InsertAndFinalizeAsync(user, centre, entity, validation, cancellationToken);
+            var result = await InsertAndFinalizeAsync(user, centre, entity, reason, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -152,7 +189,7 @@ public sealed class ReceptionService(
     }
 
     private async Task<CreateReceptionResult> InsertAndFinalizeAsync(
-        RequestUser user, ChillingCentre centre, MilkReceptionTransaction entity, QualityValidationResult validation,
+        RequestUser user, ChillingCentre centre, MilkReceptionTransaction entity, string? reason,
         CancellationToken cancellationToken)
     {
         db.MilkReceptionTransactions.Add(entity);
@@ -161,7 +198,7 @@ public sealed class ReceptionService(
         entity.TransactionNumber = $"{centre.Code}-{entity.Id}";
 
         await audit.RecordAsync(
-            new AuditEntry(user.Id, entity.CentreId, "RECEPTION_CREATE", "MilkReceptionTransaction", entity.Id.ToString(), Reason: validation.Reason),
+            new AuditEntry(user.Id, entity.CentreId, "RECEPTION_CREATE", "MilkReceptionTransaction", entity.Id.ToString(), Reason: reason),
             cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
@@ -268,6 +305,7 @@ public sealed class ReceptionService(
         if (existing.Fat != incoming.Fat) conflicts.Add(nameof(existing.Fat));
         if (existing.Snf != incoming.Snf) conflicts.Add(nameof(existing.Snf));
         if (existing.Temperature != incoming.Temperature) conflicts.Add(nameof(existing.Temperature));
+        if (incoming.Status is { } status && existing.Status != status) conflicts.Add(nameof(existing.Status));
         return conflicts;
     }
 
